@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.rudra.daykit.feature.reminder.ui
+package com.daykit.feature.reminder.ui
 
 import android.Manifest
 import android.app.Activity
@@ -61,22 +61,22 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rudra.daykit.AppContainer
-import com.rudra.daykit.core.ui.AppBackButton
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.DangerRed
-import com.rudra.daykit.core.ui.GlassBackground
-import com.rudra.daykit.core.ui.GlassLoadingIndicator
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.PanelAlt
-import com.rudra.daykit.core.ui.PrimaryButton
-import com.rudra.daykit.core.ui.SecondaryButton
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.Stroke
-import com.rudra.daykit.core.ui.glassSurface
-import com.rudra.daykit.feature.reminder.data.Reminder
-import com.rudra.daykit.feature.reminder.notification.ReminderNotifier
-import com.rudra.daykit.feature.reminder.notification.ReminderScheduler
+import com.daykit.AppContainer
+import com.daykit.core.ui.AppBackButton
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.DangerRed
+import com.daykit.core.ui.GlassBackground
+import com.daykit.core.ui.GlassLoadingIndicator
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.PanelAlt
+import com.daykit.core.ui.PrimaryButton
+import com.daykit.core.ui.SecondaryButton
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.Stroke
+import com.daykit.core.ui.glassSurface
+import com.daykit.feature.reminder.data.Reminder
+import com.daykit.feature.reminder.notification.ReminderNotifier
+import com.daykit.feature.reminder.notification.ReminderScheduler
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate

@@ -1,7 +1,7 @@
-package com.rudra.daykit.feature.keystore.data
+package com.daykit.feature.keystore.data
 
-import com.rudra.daykit.core.security.CipherPayload
-import com.rudra.daykit.core.security.SensitiveValueCipher
+import com.daykit.core.security.CipherPayload
+import com.daykit.core.security.SensitiveValueCipher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID

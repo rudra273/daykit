@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.habit.reminder
+package com.daykit.feature.habit.reminder
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -13,8 +13,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.rudra.daykit.MainActivity
-import com.rudra.daykit.R
+import com.daykit.MainActivity
+import com.daykit.R
 
 class HabitReminderWorker(
     appContext: Context,

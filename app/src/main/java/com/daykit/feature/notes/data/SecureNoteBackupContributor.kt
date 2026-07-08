@@ -1,6 +1,6 @@
-package com.rudra.daykit.feature.notes.data
+package com.daykit.feature.notes.data
 
-import com.rudra.daykit.core.backup.BackupContributor
+import com.daykit.core.backup.BackupContributor
 import org.json.JSONArray
 import org.json.JSONObject
 

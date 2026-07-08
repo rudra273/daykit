@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.backup
+package com.daykit.core.backup
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

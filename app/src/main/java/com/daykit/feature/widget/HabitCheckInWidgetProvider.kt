@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.widget
+package com.daykit.feature.widget
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -6,9 +6,9 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
-import com.rudra.daykit.DayKitApplication
-import com.rudra.daykit.R
-import com.rudra.daykit.feature.habit.data.HabitGoalType
+import com.daykit.DayKitApplication
+import com.daykit.R
+import com.daykit.feature.habit.data.HabitGoalType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -46,7 +46,7 @@ class HabitCheckInWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        const val ACTION_TOGGLE_HABIT = "com.rudra.daykit.widget.TOGGLE_HABIT"
+        const val ACTION_TOGGLE_HABIT = "com.daykit.widget.TOGGLE_HABIT"
         const val EXTRA_HABIT_ID = "extra_habit_id"
         const val EXTRA_COMPLETED = "extra_completed"
 

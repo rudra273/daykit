@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.keystore.data
+package com.daykit.feature.keystore.data
 
 data class KeyStoreEntry(
     val id: Long,

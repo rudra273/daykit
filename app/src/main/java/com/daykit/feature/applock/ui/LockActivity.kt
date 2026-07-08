@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.applock.ui
+package com.daykit.feature.applock.ui
 
 import android.content.Context
 import android.content.Intent
@@ -51,16 +51,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
-import com.rudra.daykit.DayKitApplication
-import com.rudra.daykit.core.data.SecureSettingRepository
-import com.rudra.daykit.core.security.BiometricAuthenticator
-import com.rudra.daykit.core.session.AppLockSessionManager
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.DayKitTheme
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.Panel
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.Teal
+import com.daykit.DayKitApplication
+import com.daykit.core.data.SecureSettingRepository
+import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.session.AppLockSessionManager
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.DayKitTheme
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.Panel
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.Teal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -115,7 +115,7 @@ private fun LockChallengeScreen(
     activity: FragmentActivity,
     packageName: String,
     appLabel: String,
-    credentialRepository: com.rudra.daykit.core.security.CredentialRepository,
+    credentialRepository: com.daykit.core.security.CredentialRepository,
     settings: SecureSettingRepository,
     onUnlocked: () -> Unit,
 ) {

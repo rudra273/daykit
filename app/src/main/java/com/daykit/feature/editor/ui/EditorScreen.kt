@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.editor.ui
+package com.daykit.feature.editor.ui
 
 import android.content.Context
 import android.content.Intent
@@ -68,15 +68,15 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import com.rudra.daykit.core.ui.AppBackButton
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.DeepBackground
-import com.rudra.daykit.core.ui.GlassBackground
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.PanelAlt
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.Stroke
-import com.rudra.daykit.core.ui.glassSurface
+import com.daykit.core.ui.AppBackButton
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.DeepBackground
+import com.daykit.core.ui.GlassBackground
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.PanelAlt
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.Stroke
+import com.daykit.core.ui.glassSurface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.notes.data
+package com.daykit.feature.notes.data
 
 import androidx.room.Dao
 import androidx.room.Query

@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.permissions
+package com.daykit.core.permissions
 
 import android.content.Context
 import android.content.Intent

@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.expense.data
+package com.daykit.feature.expense.data
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine

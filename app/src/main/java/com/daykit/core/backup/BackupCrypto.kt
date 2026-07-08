@@ -1,7 +1,7 @@
-package com.rudra.daykit.core.backup
+package com.daykit.core.backup
 
 import android.util.Base64
-import com.rudra.daykit.core.security.PasswordHasher
+import com.daykit.core.security.PasswordHasher
 import org.json.JSONObject
 import java.security.SecureRandom
 import javax.crypto.Cipher

@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.applock.service
+package com.daykit.feature.applock.service
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager

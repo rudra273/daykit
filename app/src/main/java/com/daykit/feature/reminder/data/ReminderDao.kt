@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.reminder.data
+package com.daykit.feature.reminder.data
 
 import androidx.room.Dao
 import androidx.room.Query

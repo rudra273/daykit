@@ -1,14 +1,14 @@
-package com.rudra.daykit.feature.widget
+package com.daykit.feature.widget
 
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
-import com.rudra.daykit.DayKitApplication
-import com.rudra.daykit.R
-import com.rudra.daykit.feature.habit.data.Habit
-import com.rudra.daykit.feature.habit.data.HabitGoalType
-import com.rudra.daykit.feature.habit.data.HabitLog
+import com.daykit.DayKitApplication
+import com.daykit.R
+import com.daykit.feature.habit.data.Habit
+import com.daykit.feature.habit.data.HabitGoalType
+import com.daykit.feature.habit.data.HabitLog
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.math.roundToInt

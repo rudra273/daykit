@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.applock.service
+package com.daykit.feature.applock.service
 
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -9,13 +9,13 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
-import com.rudra.daykit.DayKitApplication
-import com.rudra.daykit.core.data.SecureSettingRepository
-import com.rudra.daykit.core.permissions.AppLockPermissionChecker
-import com.rudra.daykit.core.session.AppLockSessionManager
-import com.rudra.daykit.feature.applock.domain.SamsungSecureFolderSupport
-import com.rudra.daykit.feature.applock.domain.SettingsPackageResolver
-import com.rudra.daykit.feature.applock.ui.LockActivity
+import com.daykit.DayKitApplication
+import com.daykit.core.data.SecureSettingRepository
+import com.daykit.core.permissions.AppLockPermissionChecker
+import com.daykit.core.session.AppLockSessionManager
+import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
+import com.daykit.feature.applock.domain.SettingsPackageResolver
+import com.daykit.feature.applock.ui.LockActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

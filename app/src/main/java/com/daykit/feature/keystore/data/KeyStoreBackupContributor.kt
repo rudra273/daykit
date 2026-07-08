@@ -1,11 +1,11 @@
-package com.rudra.daykit.feature.keystore.data
+package com.daykit.feature.keystore.data
 
 import org.json.JSONArray
 import org.json.JSONObject
 
 class KeyStoreBackupContributor(
     private val repository: KeyStoreRepository,
-) : com.rudra.daykit.core.backup.BackupContributor {
+) : com.daykit.core.backup.BackupContributor {
     override val toolKey: String = "key_store"
     override val schemaVersion: Int = 1
 

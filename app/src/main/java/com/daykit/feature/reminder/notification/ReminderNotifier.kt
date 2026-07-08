@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.reminder.notification
+package com.daykit.feature.reminder.notification
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -11,8 +11,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.rudra.daykit.MainActivity
-import com.rudra.daykit.R
+import com.daykit.MainActivity
+import com.daykit.R
 
 object ReminderNotifier {
     private const val CHANNEL_ID = "reminders"

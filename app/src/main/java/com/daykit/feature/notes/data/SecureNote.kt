@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.notes.data
+package com.daykit.feature.notes.data
 
 data class SecureNote(
     val id: Long,

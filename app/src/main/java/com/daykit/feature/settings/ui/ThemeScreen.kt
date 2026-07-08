@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.settings.ui
+package com.daykit.feature.settings.ui
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
@@ -43,19 +43,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.rudra.daykit.core.ui.AppBackground
-import com.rudra.daykit.core.ui.AppBackButton
-import com.rudra.daykit.core.ui.AppTheme
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.GlassBackground
-import com.rudra.daykit.core.ui.GlassMorphSettings
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.PREF_APP_BACKGROUND
-import com.rudra.daykit.core.ui.PREF_APP_THEME
-import com.rudra.daykit.core.ui.PREF_GLASS_BLUR
-import com.rudra.daykit.core.ui.PREF_GLASS_OPACITY
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.glassSurface
+import com.daykit.core.ui.AppBackground
+import com.daykit.core.ui.AppBackButton
+import com.daykit.core.ui.AppTheme
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.GlassBackground
+import com.daykit.core.ui.GlassMorphSettings
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.PREF_APP_BACKGROUND
+import com.daykit.core.ui.PREF_APP_THEME
+import com.daykit.core.ui.PREF_GLASS_BLUR
+import com.daykit.core.ui.PREF_GLASS_OPACITY
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.glassSurface
 import kotlin.math.roundToInt
 
 private fun AppTheme.displayName(): String = when (this) {

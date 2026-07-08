@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.applock.service
+package com.daykit.feature.applock.service
 
 import android.content.Context
 import android.graphics.PixelFormat
@@ -58,14 +58,14 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import com.rudra.daykit.core.security.CredentialRepository
-import com.rudra.daykit.core.session.AppLockSessionManager
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.DayKitTheme
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.Panel
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.Teal
+import com.daykit.core.security.CredentialRepository
+import com.daykit.core.session.AppLockSessionManager
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.DayKitTheme
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.Panel
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.Teal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

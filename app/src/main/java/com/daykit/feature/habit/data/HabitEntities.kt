@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.habit.data
+package com.daykit.feature.habit.data
 
 import androidx.room.Entity
 import androidx.room.Index

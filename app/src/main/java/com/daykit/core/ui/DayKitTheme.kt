@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.ui
+package com.daykit.core.ui
 
 import android.app.Activity
 import android.content.Context

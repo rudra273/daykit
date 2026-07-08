@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.applock.domain
+package com.daykit.feature.applock.domain
 
 data class InstalledApp(
     val packageName: String,

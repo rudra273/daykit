@@ -1,29 +1,29 @@
-package com.rudra.daykit
+package com.daykit
 
 import android.content.Context
-import com.rudra.daykit.core.backup.BackupCrypto
-import com.rudra.daykit.core.backup.DriveBackupScheduler
-import com.rudra.daykit.core.backup.DayKitBackupService
-import com.rudra.daykit.core.backup.GoogleDriveBackupClient
-import com.rudra.daykit.core.data.DatabasePassphraseProvider
-import com.rudra.daykit.core.data.DayKitDatabase
-import com.rudra.daykit.core.data.SecureSettingRepository
-import com.rudra.daykit.core.security.AndroidKeyStoreCrypto
-import com.rudra.daykit.core.security.CredentialRepository
-import com.rudra.daykit.core.security.PasswordHasher
-import com.rudra.daykit.core.security.SensitiveValueCipher
-import com.rudra.daykit.feature.applock.data.AppLockRepository
-import com.rudra.daykit.feature.applock.data.LockedPackageCache
-import com.rudra.daykit.feature.applock.domain.InstalledAppProvider
-import com.rudra.daykit.feature.expense.data.ExpenseBackupContributor
-import com.rudra.daykit.feature.expense.data.ExpenseRepository
-import com.rudra.daykit.feature.habit.data.HabitBackupContributor
-import com.rudra.daykit.feature.habit.data.HabitRepository
-import com.rudra.daykit.feature.keystore.data.KeyStoreBackupContributor
-import com.rudra.daykit.feature.keystore.data.KeyStoreRepository
-import com.rudra.daykit.feature.notes.data.SecureNoteBackupContributor
-import com.rudra.daykit.feature.notes.data.SecureNoteRepository
-import com.rudra.daykit.feature.reminder.data.ReminderRepository
+import com.daykit.core.backup.BackupCrypto
+import com.daykit.core.backup.DriveBackupScheduler
+import com.daykit.core.backup.DayKitBackupService
+import com.daykit.core.backup.GoogleDriveBackupClient
+import com.daykit.core.data.DatabasePassphraseProvider
+import com.daykit.core.data.DayKitDatabase
+import com.daykit.core.data.SecureSettingRepository
+import com.daykit.core.security.AndroidKeyStoreCrypto
+import com.daykit.core.security.CredentialRepository
+import com.daykit.core.security.PasswordHasher
+import com.daykit.core.security.SensitiveValueCipher
+import com.daykit.feature.applock.data.AppLockRepository
+import com.daykit.feature.applock.data.LockedPackageCache
+import com.daykit.feature.applock.domain.InstalledAppProvider
+import com.daykit.feature.expense.data.ExpenseBackupContributor
+import com.daykit.feature.expense.data.ExpenseRepository
+import com.daykit.feature.habit.data.HabitBackupContributor
+import com.daykit.feature.habit.data.HabitRepository
+import com.daykit.feature.keystore.data.KeyStoreBackupContributor
+import com.daykit.feature.keystore.data.KeyStoreRepository
+import com.daykit.feature.notes.data.SecureNoteBackupContributor
+import com.daykit.feature.notes.data.SecureNoteRepository
+import com.daykit.feature.reminder.data.ReminderRepository
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext

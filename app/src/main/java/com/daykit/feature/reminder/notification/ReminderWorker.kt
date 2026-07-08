@@ -1,9 +1,9 @@
-package com.rudra.daykit.feature.reminder.notification
+package com.daykit.feature.reminder.notification
 
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.rudra.daykit.DayKitApplication
+import com.daykit.DayKitApplication
 
 class ReminderWorker(
     appContext: Context,

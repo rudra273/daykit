@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.permissions
+package com.daykit.core.permissions
 
 data class AppLockPermissionState(
     val usageAccess: Boolean,

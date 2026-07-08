@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.widget
+package com.daykit.feature.widget
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -6,7 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
-import com.rudra.daykit.R
+import com.daykit.R
 
 class ExpenseQuickAddWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {

@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.filelocker.ui
+package com.daykit.feature.filelocker.ui
 
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -46,12 +46,12 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.rudra.daykit.core.ui.AppBackButton
-import com.rudra.daykit.core.ui.GlassBackground
-import com.rudra.daykit.core.ui.GlassLoadingIndicator
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.glassSurface
+import com.daykit.core.ui.AppBackButton
+import com.daykit.core.ui.GlassBackground
+import com.daykit.core.ui.GlassLoadingIndicator
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.glassSurface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

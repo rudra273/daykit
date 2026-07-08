@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.data
+package com.daykit.core.data
 
 import android.content.Context
 import androidx.room.Database
@@ -6,22 +6,22 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.rudra.daykit.feature.applock.data.LockedAppDao
-import com.rudra.daykit.feature.applock.data.LockedAppEntity
-import com.rudra.daykit.feature.expense.data.ExpenseDao
-import com.rudra.daykit.feature.expense.data.ExpenseEntryEntity
-import com.rudra.daykit.feature.expense.data.ExpenseMonthEntity
-import com.rudra.daykit.feature.expense.data.MonthlyBillAmountEntity
-import com.rudra.daykit.feature.expense.data.MonthlyBillEntity
-import com.rudra.daykit.feature.habit.data.HabitDao
-import com.rudra.daykit.feature.habit.data.HabitEntity
-import com.rudra.daykit.feature.habit.data.HabitLogEntity
-import com.rudra.daykit.feature.keystore.data.KeyStoreEntryDao
-import com.rudra.daykit.feature.keystore.data.KeyStoreEntryEntity
-import com.rudra.daykit.feature.notes.data.SecureNoteDao
-import com.rudra.daykit.feature.notes.data.SecureNoteEntity
-import com.rudra.daykit.feature.reminder.data.ReminderDao
-import com.rudra.daykit.feature.reminder.data.ReminderEntity
+import com.daykit.feature.applock.data.LockedAppDao
+import com.daykit.feature.applock.data.LockedAppEntity
+import com.daykit.feature.expense.data.ExpenseDao
+import com.daykit.feature.expense.data.ExpenseEntryEntity
+import com.daykit.feature.expense.data.ExpenseMonthEntity
+import com.daykit.feature.expense.data.MonthlyBillAmountEntity
+import com.daykit.feature.expense.data.MonthlyBillEntity
+import com.daykit.feature.habit.data.HabitDao
+import com.daykit.feature.habit.data.HabitEntity
+import com.daykit.feature.habit.data.HabitLogEntity
+import com.daykit.feature.keystore.data.KeyStoreEntryDao
+import com.daykit.feature.keystore.data.KeyStoreEntryEntity
+import com.daykit.feature.notes.data.SecureNoteDao
+import com.daykit.feature.notes.data.SecureNoteEntity
+import com.daykit.feature.reminder.data.ReminderDao
+import com.daykit.feature.reminder.data.ReminderEntity
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(

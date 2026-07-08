@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.security
+package com.daykit.core.security
 
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt

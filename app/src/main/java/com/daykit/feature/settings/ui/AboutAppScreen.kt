@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.settings.ui
+package com.daykit.feature.settings.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -25,11 +25,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.rudra.daykit.core.ui.AppBackButton
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.GlassBackground
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.SoftText
+import com.daykit.core.ui.AppBackButton
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.GlassBackground
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.SoftText
 
 @Composable
 fun AboutAppScreen(

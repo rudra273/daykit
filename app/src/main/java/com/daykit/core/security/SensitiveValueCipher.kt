@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.security
+package com.daykit.core.security
 
 import java.nio.charset.StandardCharsets
 

@@ -1,10 +1,10 @@
-package com.rudra.daykit.feature.reminder.notification
+package com.daykit.feature.reminder.notification
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import com.rudra.daykit.DayKitApplication
+import com.daykit.DayKitApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -41,8 +41,8 @@ class ReminderActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_COMPLETE = "com.rudra.daykit.reminder.COMPLETE"
-        const val ACTION_DISMISSED = "com.rudra.daykit.reminder.DISMISSED"
+        const val ACTION_COMPLETE = "com.daykit.reminder.COMPLETE"
+        const val ACTION_DISMISSED = "com.daykit.reminder.DISMISSED"
         const val EXTRA_REMINDER_ID = "reminder_id"
     }
 }

@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.reminder.data
+package com.daykit.feature.reminder.data
 
 data class Reminder(
     val reminderId: String,

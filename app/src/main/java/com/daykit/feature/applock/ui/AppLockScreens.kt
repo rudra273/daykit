@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.applock.ui
+package com.daykit.feature.applock.ui
 
 import android.content.ActivityNotFoundException
 import androidx.activity.compose.BackHandler
@@ -92,28 +92,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
-import com.rudra.daykit.AppContainer
-import com.rudra.daykit.core.data.SecureSettingRepository
-import com.rudra.daykit.core.permissions.AppLockPermissionState
-import com.rudra.daykit.core.permissions.PermissionIntents
-import com.rudra.daykit.core.ui.AppBackButton
-import com.rudra.daykit.core.ui.GlassLoadingIndicator
-import com.rudra.daykit.core.security.BiometricAuthenticator
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.GlassBackground
-import com.rudra.daykit.core.ui.PanelAlt
-import com.rudra.daykit.core.ui.PrimaryButton
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.SecondaryButton
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.Stroke
-import com.rudra.daykit.core.ui.glassSurface
-import com.rudra.daykit.feature.applock.domain.InstalledApp
-import com.rudra.daykit.feature.applock.domain.SamsungSecureFolderSupport
-import com.rudra.daykit.feature.habit.data.Habit
-import com.rudra.daykit.feature.habit.data.HabitDashboard
-import com.rudra.daykit.feature.habit.data.HabitGoalType
-import com.rudra.daykit.feature.habit.data.HabitLog
+import com.daykit.AppContainer
+import com.daykit.core.data.SecureSettingRepository
+import com.daykit.core.permissions.AppLockPermissionState
+import com.daykit.core.permissions.PermissionIntents
+import com.daykit.core.ui.AppBackButton
+import com.daykit.core.ui.GlassLoadingIndicator
+import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.GlassBackground
+import com.daykit.core.ui.PanelAlt
+import com.daykit.core.ui.PrimaryButton
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.SecondaryButton
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.Stroke
+import com.daykit.core.ui.glassSurface
+import com.daykit.feature.applock.domain.InstalledApp
+import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
+import com.daykit.feature.habit.data.Habit
+import com.daykit.feature.habit.data.HabitDashboard
+import com.daykit.feature.habit.data.HabitGoalType
+import com.daykit.feature.habit.data.HabitLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -425,28 +425,28 @@ fun DashboardScreen(
                 }
                 if (showAppLock) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_app_lock,
+                        iconResId = com.daykit.R.drawable.ic_app_lock,
                         title = "App Lock",
                         onClick = onOpenAppLock,
                     )
                 }
                 if (showKeyStore) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_key_store,
+                        iconResId = com.daykit.R.drawable.ic_key_store,
                         title = "Key Store",
                         onClick = onOpenKeyStore,
                     )
                 }
                 if (showNotes) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_secure_notes,
+                        iconResId = com.daykit.R.drawable.ic_secure_notes,
                         title = "Notes",
                         onClick = onOpenNotes,
                     )
                 }
                 if (showFileLocker) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_file_locker,
+                        iconResId = com.daykit.R.drawable.ic_file_locker,
                         title = "File Vault",
                         onClick = onOpenFileLocker,
                     )
@@ -466,21 +466,21 @@ fun DashboardScreen(
                 }
                 if (showHabit) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_todo_tracker,
+                        iconResId = com.daykit.R.drawable.ic_todo_tracker,
                         title = "Habit",
                         onClick = onOpenHabit,
                     )
                 }
                 if (showReminder) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_reminder,
+                        iconResId = com.daykit.R.drawable.ic_reminder,
                         title = "Reminder",
                         onClick = onOpenReminder,
                     )
                 }
                 if (showExpenses) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_expense_tracker,
+                        iconResId = com.daykit.R.drawable.ic_expense_tracker,
                         title = "Expenses",
                         onClick = onOpenExpenses,
                     )
@@ -499,14 +499,14 @@ fun DashboardScreen(
                 }
                 if (showEditor) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_notes_editor,
+                        iconResId = com.daykit.R.drawable.ic_notes_editor,
                         title = "Editor",
                         onClick = onOpenEditor,
                     )
                 }
                 if (showDnsManager) item {
                     ToolGridItem(
-                        iconResId = com.rudra.daykit.R.drawable.ic_dns_manager,
+                        iconResId = com.daykit.R.drawable.ic_dns_manager,
                         title = "DNS",
                         onClick = onOpenDnsManager,
                     )
@@ -1600,7 +1600,7 @@ private fun BrandHeader(
 @Composable
 private fun AppLogoBadge() {
     Image(
-        painter = painterResource(id = com.rudra.daykit.R.drawable.enew),
+        painter = painterResource(id = com.daykit.R.drawable.enew),
         contentDescription = null,
         modifier = Modifier
             .size(64.dp)

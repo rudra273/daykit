@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.session
+package com.daykit.core.session
 
 import java.util.concurrent.ConcurrentHashMap
 

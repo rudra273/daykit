@@ -1,11 +1,11 @@
-package com.rudra.daykit.feature.reminder.notification
+package com.daykit.feature.reminder.notification
 
 import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
-import com.rudra.daykit.feature.reminder.data.Reminder
+import com.daykit.feature.reminder.data.Reminder
 import java.util.concurrent.TimeUnit
 
 class ReminderScheduler(

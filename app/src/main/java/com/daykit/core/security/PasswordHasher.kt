@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.security
+package com.daykit.core.security
 
 import com.lambdapioneer.argon2kt.Argon2Kt
 import com.lambdapioneer.argon2kt.Argon2Mode

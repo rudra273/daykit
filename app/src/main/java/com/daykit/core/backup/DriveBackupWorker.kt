@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.backup
+package com.daykit.core.backup
 
 import android.content.Context
 import androidx.work.CoroutineWorker
@@ -7,8 +7,8 @@ import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
 import com.google.android.gms.tasks.Tasks
-import com.rudra.daykit.AppContainer
-import com.rudra.daykit.core.data.SecureSettingRepository
+import com.daykit.AppContainer
+import com.daykit.core.data.SecureSettingRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

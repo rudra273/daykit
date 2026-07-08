@@ -1,11 +1,11 @@
-package com.rudra.daykit.feature.habit.reminder
+package com.daykit.feature.habit.reminder
 
 import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
-import com.rudra.daykit.feature.habit.data.Habit
+import com.daykit.feature.habit.data.Habit
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit

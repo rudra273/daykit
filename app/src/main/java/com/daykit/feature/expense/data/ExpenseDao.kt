@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.expense.data
+package com.daykit.feature.expense.data
 
 import androidx.room.Dao
 import androidx.room.Insert

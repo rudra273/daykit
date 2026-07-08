@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.applock.data
+package com.daykit.feature.applock.data
 
 import androidx.room.Dao
 import androidx.room.Query

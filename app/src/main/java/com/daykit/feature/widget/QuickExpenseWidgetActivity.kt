@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.widget
+package com.daykit.feature.widget
 
 import android.os.Bundle
 import android.view.Window
@@ -36,14 +36,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.rudra.daykit.DayKitApplication
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.DayKitTheme
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.Panel
-import com.rudra.daykit.core.ui.PanelAlt
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.Stroke
+import com.daykit.DayKitApplication
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.DayKitTheme
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.Panel
+import com.daykit.core.ui.PanelAlt
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.Stroke
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.roundToLong

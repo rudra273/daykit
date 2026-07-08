@@ -1,10 +1,10 @@
-package com.rudra.daykit.core.data
+package com.daykit.core.data
 
 import android.content.Context
 import android.util.Base64
 import androidx.core.content.edit
-import com.rudra.daykit.core.security.AndroidKeyStoreCrypto
-import com.rudra.daykit.core.security.CipherPayload
+import com.daykit.core.security.AndroidKeyStoreCrypto
+import com.daykit.core.security.CipherPayload
 import java.security.SecureRandom
 
 class DatabasePassphraseProvider(

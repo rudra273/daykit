@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.habit.data
+package com.daykit.feature.habit.data
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine

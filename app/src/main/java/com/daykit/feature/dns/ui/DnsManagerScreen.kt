@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.dns.ui
+package com.daykit.feature.dns.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -51,14 +51,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.rudra.daykit.core.ui.AppBackButton
-import com.rudra.daykit.core.ui.Cyan
-import com.rudra.daykit.core.ui.GlassBackground
-import com.rudra.daykit.core.ui.MutedText
-import com.rudra.daykit.core.ui.PrimaryButton
-import com.rudra.daykit.core.ui.SecondaryButton
-import com.rudra.daykit.core.ui.SoftText
-import com.rudra.daykit.core.ui.glassSurface
+import com.daykit.core.ui.AppBackButton
+import com.daykit.core.ui.Cyan
+import com.daykit.core.ui.GlassBackground
+import com.daykit.core.ui.MutedText
+import com.daykit.core.ui.PrimaryButton
+import com.daykit.core.ui.SecondaryButton
+import com.daykit.core.ui.SoftText
+import com.daykit.core.ui.glassSurface
 
 private const val PRIVATE_DNS_SETTINGS_ACTION = "android.settings.PRIVATE_DNS_SETTINGS"
 

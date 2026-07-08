@@ -1,7 +1,7 @@
-package com.rudra.daykit
+package com.daykit
 
 import android.app.Application
-import com.rudra.daykit.core.session.AppLockSessionManager
+import com.daykit.core.session.AppLockSessionManager
 
 class DayKitApplication : Application() {
     lateinit var container: AppContainer

@@ -1,4 +1,4 @@
-package com.rudra.daykit.feature.applock.data
+package com.daykit.feature.applock.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

@@ -1,4 +1,4 @@
-package com.rudra.daykit.core.backup
+package com.daykit.core.backup
 
 enum class DriveBackupSource(val value: String, val label: String) {
     Manual("manual", "Manual"),

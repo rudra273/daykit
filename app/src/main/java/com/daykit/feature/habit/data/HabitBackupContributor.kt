@@ -1,6 +1,6 @@
-package com.rudra.daykit.feature.habit.data
+package com.daykit.feature.habit.data
 
-import com.rudra.daykit.core.backup.BackupContributor
+import com.daykit.core.backup.BackupContributor
 import org.json.JSONArray
 import org.json.JSONObject
 

@@ -122,7 +122,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.rudra.daykit.widget.TOGGLE_HABIT" />
+                <action android:name="com.daykit.widget.TOGGLE_HABIT" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

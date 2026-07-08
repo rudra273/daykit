@@ -1,4 +1,4 @@
-package com.rudra.daykit
+package com.daykit
 
 import org.junit.Test
 

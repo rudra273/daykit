@@ -1,6 +1,6 @@
-package com.rudra.daykit.feature.expense.data
+package com.daykit.feature.expense.data
 
-import com.rudra.daykit.core.backup.BackupContributor
+import com.daykit.core.backup.BackupContributor
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant

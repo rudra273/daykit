@@ -1,11 +1,11 @@
-package com.rudra.daykit.core.permissions
+package com.daykit.core.permissions
 
 import android.app.AppOpsManager
 import android.content.ComponentName
 import android.content.Context
 import android.provider.Settings
 import android.text.TextUtils
-import com.rudra.daykit.feature.applock.service.AppLockAccessibilityService
+import com.daykit.feature.applock.service.AppLockAccessibilityService
 
 object AppLockPermissionChecker {
     fun check(context: Context): AppLockPermissionState {
