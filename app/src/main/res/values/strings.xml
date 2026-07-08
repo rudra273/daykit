@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">DayKit</string>
+    <string name="app_lock_accessibility_description">DayKit detects when a locked app opens and shows the app lock screen. It does not read or collect screen content.</string>
+    <string name="widget_expense_description">Quick add daily expenses from your home screen.</string>
+    <string name="widget_habit_description">Check in active habits from your home screen.</string>
+</resources>
