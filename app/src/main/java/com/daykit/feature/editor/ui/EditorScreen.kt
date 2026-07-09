@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.daykit.feature.editor.ui
 
 import android.content.Context
@@ -10,33 +12,37 @@ import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.provider.OpenableColumns
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SaveAs
@@ -44,8 +50,6 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -57,26 +61,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import com.daykit.core.ui.AppBackButton
-import com.daykit.core.ui.Cyan
-import com.daykit.core.ui.DeepBackground
-import com.daykit.core.ui.GlassBackground
-import com.daykit.core.ui.MutedText
-import com.daykit.core.ui.PanelAlt
-import com.daykit.core.ui.SoftText
-import com.daykit.core.ui.Stroke
-import com.daykit.core.ui.glassSurface
+import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppBackButton
+import com.daykit.core.designsystem.components.AppListRow
+import com.daykit.core.designsystem.components.AppBottomSheet
+import com.daykit.core.designsystem.extendedColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -212,203 +209,241 @@ fun EditorScreen(
         createDocumentLauncher.launch("images.pdf")
     }
 
-    BackHandler { onBack() }
+    var menuOpen by remember { mutableStateOf(false) }
+    var renameOpen by remember { mutableStateOf(false) }
 
-    GlassBackground {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(WindowInsets.statusBars.asPaddingValues())
-                    .padding(horizontal = 18.dp, vertical = 8.dp)
-                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AppBackButton(onClick = onBack)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Editor",
-                            color = SoftText,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = if (isDirty) "Unsaved changes" else "User-owned files",
-                            color = if (isDirty) Cyan else MutedText,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                    EditorActionButton(Icons.Rounded.Add, "New") {
-                        fileName = "untitled.txt"
-                        fileUri = null
-                        content = ""
-                        isDirty = false
-                    }
-                    EditorActionButton(Icons.Rounded.FileOpen, "Open") {
-                        openDocumentLauncher.launch(arrayOf("text/*", "application/json", "text/csv", "application/xml", "application/javascript"))
-                    }
-                }
+    val wordCount = remember(content) {
+        if (content.isBlank()) 0 else content.trim().split(Regex("\\s+")).size
+    }
 
-                OutlinedTextField(
-                    value = fileName,
-                    onValueChange = {
-                        fileName = it
-                        isDirty = true
-                    },
-                    label = { Text("File name", style = MaterialTheme.typography.bodySmall) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Cyan,
-                        unfocusedBorderColor = Stroke,
-                        focusedLabelColor = Cyan,
-                        unfocusedLabelColor = MutedText,
-                        cursorColor = Cyan,
-                        focusedTextColor = SoftText,
-                        unfocusedTextColor = SoftText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.08f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+    fun newDocument() {
+        fileName = "untitled.txt"
+        fileUri = null
+        content = ""
+        isDirty = false
+    }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    EditorCommandButton(
-                        icon = Icons.Rounded.Save,
-                        text = "Save",
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        val uri = fileUri
-                        if (uri != null) {
-                            writeTextTo(uri)
-                        } else {
-                            showMessage("Use Save as to choose a file first")
-                        }
-                    }
-                    EditorCommandButton(
-                        icon = Icons.Rounded.SaveAs,
-                        text = "Save as",
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        pendingSaveTarget = SaveTarget.TextFile
-                        createDocumentLauncher.launch(fileName.cleanFileName("untitled.txt"))
-                    }
-                    EditorCommandButton(
-                        icon = Icons.Rounded.PictureAsPdf,
-                        text = "PDF",
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        pendingSaveTarget = SaveTarget.Pdf
-                        createDocumentLauncher.launch(fileName.withExtension("pdf"))
-                    }
-                    EditorCommandButton(
-                        icon = Icons.Rounded.Share,
-                        text = "Share",
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                runCatching { context.shareableTextUri(fileName.cleanFileName("untitled.txt"), content) }
-                            }
-                            result.onSuccess { context.shareFile(it, fileName.cleanFileName("untitled.txt")) }
-                                .onFailure { showMessage("Share failed") }
-                        }
-                    }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    EditorCommandButton(
-                        icon = Icons.Rounded.Image,
-                        text = "Images to PDF",
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        pickImagesLauncher.launch("image/*")
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .glassSurface(RoundedCornerShape(18.dp), selected = false)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(DeepBackground.copy(alpha = 0.72f))
-                        .padding(14.dp),
-                ) {
-                    if (content.isEmpty()) {
-                        Text(
-                            text = "Write anything here...",
-                            color = MutedText,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    BasicTextField(
-                        value = content,
-                        onValueChange = {
-                            content = it
-                            isDirty = true
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                        textStyle = TextStyle(
-                            color = SoftText,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = MaterialTheme.typography.bodyMedium.fontSize,
-                        ),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
-                        cursorBrush = SolidColor(Cyan),
-                    )
-                }
-            }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 24.dp),
-            )
+    fun saveCurrent() {
+        val uri = fileUri
+        if (uri != null) writeTextTo(uri)
+        else {
+            pendingSaveTarget = SaveTarget.TextFile
+            createDocumentLauncher.launch(fileName.cleanFileName("untitled.txt"))
         }
     }
-}
 
-@Composable
-private fun EditorActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-) {
-    IconButton(onClick = onClick, modifier = Modifier.size(38.dp)) {
-        Icon(icon, contentDescription = contentDescription, tint = Cyan, modifier = Modifier.size(20.dp))
+    fun share() {
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { context.shareableTextUri(fileName.cleanFileName("untitled.txt"), content) }
+            }
+            result.onSuccess { context.shareFile(it, fileName.cleanFileName("untitled.txt")) }
+                .onFailure { showMessage("Share failed") }
+        }
     }
-}
 
-@Composable
-private fun EditorCommandButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = modifier
-            .height(42.dp)
-            .glassSurface(RoundedCornerShape(12.dp), selected = false)
-            .clip(RoundedCornerShape(12.dp))
-            .background(PanelAlt.copy(alpha = 0.18f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        Icon(icon, contentDescription = null, tint = Cyan, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(5.dp))
-        Text(
-            text = text,
-            color = SoftText,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Column(Modifier.fillMaxSize()) {
+            // Document top bar: back, filename + unsaved dot, save, share, overflow
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .height(56.dp)
+                    .padding(horizontal = Spacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppBackButton(onClick = onBack)
+                Spacer(Modifier.width(Spacing.sm))
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clickable { renameOpen = true },
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = fileName,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (isDirty) {
+                            Spacer(Modifier.width(Spacing.sm))
+                            Box(
+                                Modifier
+                                    .size(8.dp)
+                                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                            )
+                        }
+                    }
+                    Text(
+                        text = if (isDirty) "Unsaved changes" else "Saved",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.extendedColors.textMuted,
+                    )
+                }
+                IconButton(onClick = { saveCurrent() }) {
+                    Icon(Icons.Rounded.Save, contentDescription = "Save", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = { share() }) {
+                    Icon(Icons.Rounded.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.onSurface)
+                }
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+
+            // Borderless full-bleed body
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = Spacing.lg)
+                    .imePadding()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                if (content.isEmpty()) {
+                    Text(
+                        text = "Start writing…",
+                        color = MaterialTheme.extendedColors.textMuted,
+                        style = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                        ),
+                    )
+                }
+                BasicTextField(
+                    value = content,
+                    onValueChange = {
+                        content = it
+                        isDirty = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = TextStyle(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                    ),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                )
+            }
+
+            // Word/char footer
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "$wordCount words · ${content.length} chars",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.extendedColors.textMuted,
+                )
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = Spacing.xl),
         )
+    }
+
+    if (menuOpen) {
+        AppBottomSheet(onDismissRequest = { menuOpen = false }) {
+            Text(
+                text = "Document",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            )
+            AppListRow(
+                headline = "New document",
+                leadingIcon = Icons.Rounded.Add,
+                onClick = { menuOpen = false; newDocument() },
+            )
+            AppListRow(
+                headline = "Open…",
+                leadingIcon = Icons.Rounded.FileOpen,
+                onClick = {
+                    menuOpen = false
+                    openDocumentLauncher.launch(arrayOf("text/*", "application/json", "text/csv", "application/xml", "application/javascript"))
+                },
+            )
+            AppListRow(
+                headline = "Save as…",
+                leadingIcon = Icons.Rounded.SaveAs,
+                onClick = {
+                    menuOpen = false
+                    pendingSaveTarget = SaveTarget.TextFile
+                    createDocumentLauncher.launch(fileName.cleanFileName("untitled.txt"))
+                },
+            )
+            AppListRow(
+                headline = "Export as PDF",
+                leadingIcon = Icons.Rounded.PictureAsPdf,
+                onClick = {
+                    menuOpen = false
+                    pendingSaveTarget = SaveTarget.Pdf
+                    createDocumentLauncher.launch(fileName.withExtension("pdf"))
+                },
+            )
+            AppListRow(
+                headline = "Rename",
+                leadingIcon = Icons.Rounded.DriveFileRenameOutline,
+                onClick = { menuOpen = false; renameOpen = true },
+            )
+            AppListRow(
+                headline = "Images to PDF",
+                leadingIcon = Icons.Rounded.Image,
+                onClick = {
+                    menuOpen = false
+                    pickImagesLauncher.launch("image/*")
+                },
+            )
+            Spacer(Modifier.height(Spacing.sm))
+        }
+    }
+
+    if (renameOpen) {
+        var draft by remember { mutableStateOf(fileName) }
+        AppBottomSheet(onDismissRequest = { renameOpen = false }) {
+            Column(Modifier.padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg)) {
+                Text(
+                    text = "File name",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(Spacing.lg))
+                com.daykit.core.designsystem.components.AppTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    label = "File name",
+                    placeholder = "untitled.txt",
+                )
+                Spacer(Modifier.height(Spacing.lg))
+                com.daykit.core.designsystem.components.PrimaryButton(
+                    text = "Done",
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = draft.isNotBlank(),
+                    onClick = {
+                        fileName = draft
+                        isDirty = true
+                        renameOpen = false
+                    },
+                )
+            }
+        }
     }
 }
 

@@ -46,12 +46,9 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.daykit.core.ui.AppBackButton
-import com.daykit.core.ui.GlassBackground
-import com.daykit.core.ui.GlassLoadingIndicator
-import com.daykit.core.ui.MutedText
-import com.daykit.core.ui.SoftText
-import com.daykit.core.ui.glassSurface
+import com.daykit.core.designsystem.components.AppBackButton
+import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.extendedColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -68,53 +65,53 @@ fun FileLockerPreviewScreen(
 ) {
     BackHandler { onBack() }
 
-    GlassBackground {
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(WindowInsets.statusBars.asPaddingValues())
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppBackButton(onClick = onBack)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = "Locked preview",
-                            color = MutedText,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            },
-        ) { padding ->
-            Box(
+    Scaffold(
+        containerColor = Color.Black,
+        topBar = {
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(WindowInsets.statusBars.asPaddingValues())
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (item.mimeType.startsWith("image/")) {
-                    LockedImagePreview(item = item)
-                } else if (item.mimeType.startsWith("video/")) {
-                    LockedVideoPreview(item = item)
-                } else {
+                AppBackButton(onClick = onBack)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Preview is not available for this file type.",
-                        color = MutedText,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = item.name,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "Locked preview",
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
+            }
+        },
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (item.mimeType.startsWith("image/")) {
+                LockedImagePreview(item = item)
+            } else if (item.mimeType.startsWith("video/")) {
+                LockedVideoPreview(item = item)
+            } else {
+                Text(
+                    text = "Preview is not available for this file type.",
+                    color = Color.White.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
     }
@@ -151,11 +148,11 @@ private fun LockedImagePreview(
 
         failed -> Text(
             text = "Could not preview this image.",
-            color = MutedText,
+            color = Color.White.copy(alpha = 0.6f),
             style = MaterialTheme.typography.bodyMedium,
         )
 
-        else -> GlassLoadingIndicator(delayMillis = 0)
+        else -> LoadingIndicator(delayMillis = 0)
     }
 }
 

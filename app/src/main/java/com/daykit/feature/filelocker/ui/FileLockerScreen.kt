@@ -9,46 +9,57 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.graphics.BitmapFactory
 import android.webkit.MimeTypeMap
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,21 +68,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.daykit.core.ui.AppBackButton
-import com.daykit.core.ui.Cyan
-import com.daykit.core.ui.GlassBackground
-import com.daykit.core.ui.GlassLoadingIndicator
-import com.daykit.core.ui.MutedText
-import com.daykit.core.ui.PrimaryButton
-import com.daykit.core.ui.SecondaryButton
-import com.daykit.core.ui.SoftText
-import com.daykit.core.ui.glassSurface
+import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppCard
+import com.daykit.core.designsystem.components.AppExtendedFab
+import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.EmptyState
+import com.daykit.core.designsystem.components.SecondaryButton
+import com.daykit.core.designsystem.components.StatTile
+import com.daykit.core.designsystem.extendedColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -100,21 +112,28 @@ private data class HideResult(
     val failed: Int,
 )
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun FileLockerScreen(
     onBack: () -> Unit,
 ) {
-    BackHandler { onBack() }
-
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     val selectedHiddenUris = remember { mutableStateListOf<Uri>() }
     var hiddenFiles by remember { mutableStateOf(emptyList<HiddenMedia>()) }
     var loading by remember { mutableStateOf(true) }
     var working by remember { mutableStateOf(false) }
     var previewItem by remember { mutableStateOf<FileLockerPreviewItem?>(null) }
-    var message by remember {
-        mutableStateOf("Hidden files stay in Documents/$HIDDEN_FOLDER_NAME and are not encrypted.")
+
+    val selectionMode = selectedHiddenUris.isNotEmpty()
+    val gridState = rememberLazyGridState()
+    val scrolledUnder by remember {
+        derivedStateOf { gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 4 }
+    }
+
+    fun snack(text: String) {
+        scope.launch { snackbarHostState.showSnackbar(text) }
     }
 
     previewItem?.let { item ->
@@ -124,6 +143,8 @@ fun FileLockerScreen(
         )
         return
     }
+
+    BackHandler(enabled = selectionMode) { selectedHiddenUris.clear() }
 
     fun refreshHiddenFiles() {
         scope.launch {
@@ -136,21 +157,20 @@ fun FileLockerScreen(
 
     val destinationFolderLauncher = rememberLauncherForActivityResult(DestinationFolderPickerContract()) { destinationUri ->
         if (destinationUri == null) {
-            message = "Choose a destination folder to unhide selected files."
+            snack("Choose a destination folder to unhide selected files.")
             return@rememberLauncherForActivityResult
         }
         val selectedFiles = hiddenFiles.filter { selectedHiddenUris.contains(it.uri) }
         if (selectedFiles.isEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
             working = true
-            message = "Unhiding ${selectedFiles.size} file(s)..."
             val restored = withContext(Dispatchers.IO) {
                 context.unhideMedia(selectedFiles, destinationUri)
             }
             hiddenFiles = withContext(Dispatchers.IO) { context.queryHiddenMedia() }
             selectedHiddenUris.clear()
             working = false
-            message = "$restored file(s) restored to the selected folder."
+            snack("$restored file(s) restored to the selected folder.")
         }
     }
 
@@ -158,282 +178,293 @@ fun FileLockerScreen(
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
             working = true
-            message = "Hiding ${uris.size} selected file(s)..."
             val result = withContext(Dispatchers.IO) {
                 context.hideMedia(uris)
             }
             hiddenFiles = withContext(Dispatchers.IO) { context.queryHiddenMedia() }
             selectedHiddenUris.clear()
             working = false
-            message = buildString {
-                append("${result.copied} file(s) copied to hidden folder.")
-                if (result.deletedOriginals > 0) append(" ${result.deletedOriginals} original(s) removed.")
-                if (result.failed > 0) append(" ${result.failed} file(s) could not be hidden.")
-                if (result.copied > result.deletedOriginals) {
-                    append(" If any original still appears in Gallery, delete that original manually.")
-                }
-            }
+            snack(
+                buildString {
+                    append("${result.copied} file(s) hidden.")
+                    if (result.failed > 0) append(" ${result.failed} failed.")
+                    if (result.copied > result.deletedOriginals) {
+                        append(" If an original still appears in Gallery, delete it manually.")
+                    }
+                },
+            )
         }
     }
 
-    LaunchedEffect(Unit) {
-        refreshHiddenFiles()
-    }
+    LaunchedEffect(Unit) { refreshHiddenFiles() }
 
-    GlassBackground {
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(WindowInsets.statusBars.asPaddingValues())
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppBackButton(onClick = onBack)
-                    Text(
-                        text = "File Vault",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            },
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+    val totalBytes = remember(hiddenFiles) { hiddenFiles.sumOf { it.sizeBytes } }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (!selectionMode) {
+                AppExtendedFab(
+                    icon = Icons.Rounded.Lock,
+                    text = if (working) "Working…" else "Hide files",
+                    onClick = { if (!working) pickMediaLauncher.launch(Unit) },
+                )
+            }
+        },
+    ) { innerPadding ->
+        Box(Modifier.fillMaxSize().padding(innerPadding)) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                state = gridState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = Spacing.md, end = Spacing.md,
+                    top = 56.dp + Spacing.sm, bottom = Spacing.xxl + 72.dp,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Icon(Icons.Rounded.VisibilityOff, contentDescription = null, tint = Cyan, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Files are not encrypted, not saved in the app database, and not included in backup or restore.",
-                        color = MutedText,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp),
-                ) {
-                    PrimaryButton(
-                        text = if (working) "Working" else "Select Images / Videos",
-                        enabled = !working,
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = {
-                            Icon(Icons.Rounded.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                        },
-                        onClick = { pickMediaLauncher.launch(Unit) },
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Hidden files",
-                        color = SoftText,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.sp,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(
-                        onClick = { refreshHiddenFiles() },
-                        enabled = !working,
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = "Refresh", tint = SoftText, modifier = Modifier.size(20.dp))
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            StatTile(
+                                label = "Hidden files",
+                                value = "${hiddenFiles.size}",
+                                icon = Icons.Rounded.VisibilityOff,
+                                accent = MaterialTheme.extendedColors.accents.purple,
+                                modifier = Modifier.weight(1f),
+                            )
+                            StatTile(
+                                label = "Total size",
+                                value = totalBytes.toReadableSize(),
+                                icon = Icons.Rounded.FolderOpen,
+                                accent = MaterialTheme.extendedColors.accents.blue,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        Spacer(Modifier.height(Spacing.md))
+                        DisclosureCallout()
+                        Spacer(Modifier.height(Spacing.md))
                     }
                 }
 
                 if (loading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(88.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        GlassLoadingIndicator(delayMillis = 0)
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(32.dp),
+                                strokeWidth = 3.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                 } else if (hiddenFiles.isEmpty()) {
-                    GlassPanel(selected = false) {
-                        Text(
-                            text = "No hidden files found.",
-                            color = MutedText,
-                            style = MaterialTheme.typography.bodyMedium,
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        EmptyState(
+                            icon = Icons.Rounded.VisibilityOff,
+                            title = "No hidden files",
+                            description = "Tap \"Hide files\" to move photos and videos into your vault.",
+                            modifier = Modifier.padding(top = Spacing.lg),
                         )
                     }
                 } else {
-                    hiddenFiles.forEach { file ->
-                        HiddenFileRow(
+                    items(hiddenFiles, key = { it.uri.toString() }) { file ->
+                        HiddenMediaTile(
                             file = file,
                             selected = selectedHiddenUris.contains(file.uri),
-                            onPreview = {
-                                previewItem = file.toPreviewItem()
-                            },
-                            onSelectedChange = { selected ->
-                                if (selected) {
-                                    if (!selectedHiddenUris.contains(file.uri)) selectedHiddenUris.add(file.uri)
+                            selectionMode = selectionMode,
+                            onClick = {
+                                if (selectionMode) {
+                                    if (selectedHiddenUris.contains(file.uri)) selectedHiddenUris.remove(file.uri)
+                                    else selectedHiddenUris.add(file.uri)
                                 } else {
-                                    selectedHiddenUris.remove(file.uri)
+                                    previewItem = file.toPreviewItem()
                                 }
                             },
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SecondaryButton(
-                            text = if (selectedHiddenUris.size == hiddenFiles.size) "Clear" else "Select All",
-                            enabled = !working,
-                            onClick = {
-                                if (selectedHiddenUris.size == hiddenFiles.size) {
-                                    selectedHiddenUris.clear()
-                                } else {
-                                    selectedHiddenUris.clear()
-                                    selectedHiddenUris.addAll(hiddenFiles.map { it.uri })
-                                }
-                            },
-                        )
-                        PrimaryButton(
-                            text = if (working) "Restoring" else "Choose Folder",
-                            enabled = selectedHiddenUris.isNotEmpty() && !working,
-                            leadingIcon = {
-                                Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                            },
-                            onClick = {
-                                message = "Choose where to restore selected files."
-                                destinationFolderLauncher.launch(Unit)
+                            onLongClick = {
+                                if (!selectedHiddenUris.contains(file.uri)) selectedHiddenUris.add(file.uri)
                             },
                         )
                     }
                 }
+            }
 
-                Text(
-                    text = message,
-                    color = MutedText,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 4.dp),
+            if (working) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .padding(top = 56.dp)
+                        .fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
                 )
+            }
 
-                Spacer(Modifier.height(24.dp))
+            // Contextual selection bar or normal top bar
+            if (selectionMode) {
+                SelectionTopBar(
+                    count = selectedHiddenUris.size,
+                    onCancel = { selectedHiddenUris.clear() },
+                    onRestore = {
+                        snack("Choose where to restore selected files.")
+                        destinationFolderLauncher.launch(Unit)
+                    },
+                    restoreEnabled = !working,
+                )
+            } else {
+                AppTopBar(title = "File Vault", onBack = onBack, scrolledUnder = scrolledUnder)
             }
         }
     }
 }
 
 @Composable
-private fun HiddenFileRow(
+private fun DisclosureCallout() {
+    AppCard(contentPadding = PaddingValues(Spacing.md)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                Icons.Rounded.VisibilityOff,
+                contentDescription = null,
+                tint = MaterialTheme.extendedColors.textMuted,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                text = "Files are not encrypted, not saved in the app database, and not included in backup or restore.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.extendedColors.textMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SelectionTopBar(
+    count: Int,
+    onCancel: () -> Unit,
+    onRestore: () -> Unit,
+    restoreEnabled: Boolean,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.extendedColors.barTint)
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .height(56.dp)
+            .padding(horizontal = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onCancel) {
+            Icon(Icons.Rounded.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.onSurface)
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            text = "$count selected",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        SecondaryButton(
+            text = "Restore",
+            enabled = restoreEnabled,
+            leadingIcon = { Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            onClick = onRestore,
+        )
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun HiddenMediaTile(
     file: HiddenMedia,
     selected: Boolean,
-    onPreview: () -> Unit,
-    onSelectedChange: (Boolean) -> Unit,
+    selectionMode: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
-    FileRowPanel(selected = selected) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp)
-                .clickable { onSelectedChange(!selected) },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(
-                checked = selected,
-                onCheckedChange = onSelectedChange,
-                modifier = Modifier.size(36.dp),
-                colors = CheckboxDefaults.colors(
-                    checkedColor = Cyan,
-                    uncheckedColor = MutedText,
-                    checkmarkColor = Color.Black,
-                ),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = file.name,
-                    color = SoftText,
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "${file.mimeType.ifBlank { "media file" }} - ${file.sizeBytes.toReadableSize()}",
-                    color = MutedText,
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+    val context = LocalContext.current
+    val isVideo = file.mimeType.startsWith("video/")
+    var thumb by remember(file.uri) { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(file.uri) {
+        if (!isVideo) {
+            thumb = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(file.uri)?.use { input ->
+                        val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
+                        BitmapFactory.decodeStream(input, null, opts)?.asImageBitmap()
+                    }
+                }.getOrNull()
             }
-            Spacer(Modifier.width(8.dp))
-            SecondaryButton(
-                text = "View",
-                textStyle = MaterialTheme.typography.labelMedium,
-                leadingIcon = {
-                    Icon(Icons.Rounded.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                },
-                onClick = onPreview,
-            )
         }
     }
-}
 
-@Composable
-private fun FileRowPanel(
-    selected: Boolean,
-    content: @Composable () -> Unit,
-) {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .glassSurface(
-                shape = RoundedCornerShape(12.dp),
-                selected = selected,
-                tintStrength = 0.05f,
-                shadowElevation = 1f,
+            .aspectRatio(1f)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.extendedColors.inputField)
+            .then(
+                if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium)
+                else Modifier,
             )
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
-        content()
-    }
-}
+        val bmp = thumb
+        if (bmp != null) {
+            Image(
+                bitmap = bmp,
+                contentDescription = file.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    if (isVideo) Icons.Rounded.PlayCircle else Icons.Rounded.Image,
+                    contentDescription = null,
+                    tint = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
 
-@Composable
-private fun GlassPanel(
-    selected: Boolean,
-    content: @Composable () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassSurface(
-                shape = RoundedCornerShape(18.dp),
-                selected = selected,
-                tintStrength = 0.08f,
-                shadowElevation = 2f,
+        // Video play badge (only when we have a thumbnail underneath)
+        if (isVideo && bmp != null) {
+            Icon(
+                Icons.Rounded.PlayCircle,
+                contentDescription = "Video",
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(36.dp),
             )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        content()
+        }
+
+        // Selection indicator
+        if (selectionMode) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(Spacing.xs)
+                    .size(22.dp)
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.4f),
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
