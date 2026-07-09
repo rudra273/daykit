@@ -1,55 +1,53 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+)
+
 package com.daykit.feature.notes.ui
 
+import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Label
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.NoteAlt
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.rounded.Notes
+import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,39 +55,30 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.data.SecureSettingRepository
+import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppBackButton
+import com.daykit.core.designsystem.components.AppAlertDialog
+import com.daykit.core.designsystem.components.AppBottomSheet
+import com.daykit.core.designsystem.components.AppCard
+import com.daykit.core.designsystem.components.AppFab
+import com.daykit.core.designsystem.components.AppSearchBar
+import com.daykit.core.designsystem.components.AppTextField
+import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.EmptyState
+import com.daykit.core.designsystem.components.FilterChipButton
+import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.BiometricAuthenticator
-import com.daykit.core.ui.AppBackButton
-import com.daykit.core.ui.Cyan
-import com.daykit.core.ui.DeepBackground
-import com.daykit.core.ui.GlassFilterButton
-import com.daykit.core.ui.GlassBackground
-import com.daykit.core.ui.GlassLoadingIndicator
-import com.daykit.core.ui.MutedText
-import com.daykit.core.ui.PanelAlt
-import com.daykit.core.ui.PrimaryButton
-import com.daykit.core.ui.SecondaryButton
-import com.daykit.core.ui.SoftText
-import com.daykit.core.ui.Stroke
-import com.daykit.core.ui.glassSurface
+import com.daykit.feature.lock.ui.ToolUnlockScreen
 import com.daykit.feature.notes.data.SecureNote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -105,7 +94,7 @@ fun SecureNotesScreen(
     container: AppContainer,
     onBack: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val activity = context as FragmentActivity
     val scope = rememberCoroutineScope()
     val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
@@ -173,19 +162,25 @@ fun SecureNotesScreen(
     }
 
     if (isToolLocked == null) {
-        GlassBackground {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+        ) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                GlassLoadingIndicator()
+                LoadingIndicator()
             }
         }
         return
     }
 
     if (isToolLocked == true && !unlocked) {
-        NotesUnlockScreen(
+        ToolUnlockScreen(
+            title = "Notes",
+            subtitle = "Unlock private notes",
             pin = unlockPin,
             error = unlockError,
             biometricEnabled = biometricEnabled,
+            icon = Icons.Rounded.Notes,
             onBack = onBack,
             onPinChange = {
                 unlockPin = it.filter(Char::isDigit).take(12)
@@ -259,89 +254,149 @@ fun SecureNotesScreen(
         return
     }
 
-    GlassBackground {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(WindowInsets.statusBars.asPaddingValues())
-                    .padding(horizontal = 20.dp, vertical = 10.dp)
-                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AppBackButton(onClick = onBack)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Notes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("${filteredNotes.size} of ${notes?.size ?: 0} notes", color = Cyan, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+    val gridState = rememberLazyStaggeredGridState()
+    val scrolledUnder by remember {
+        derivedStateOf {
+            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 4
+        }
+    }
 
-                SearchField(query = query, onQueryChange = { query = it })
-
-                if (uniqueLabels.isNotEmpty()) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        items(uniqueLabels) { label ->
-                            LabelChip(
-                                label = label,
-                                selected = selectedLabel == label,
-                                onClick = { selectedLabel = if (selectedLabel == label) null else label },
-                            )
-                        }
-                    }
-                }
-
-                when (val currentNotes = notes) {
-                    null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        GlassLoadingIndicator()
-                    }
-                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
-                        if (currentNotes.isEmpty()) {
-                            item { EmptyNotesState("No secure notes saved") }
-                        } else if (filteredNotes.isEmpty()) {
-                            item { EmptyNotesState("No matching notes") }
-                        }
-                        items(filteredNotes, key = { it.noteId }) { note ->
-                            NoteRow(
-                                note = note,
-                                onClick = { editorState = NoteEditorState.Edit(note) },
-                                onLongPress = { actionNote = note },
-                            )
-                        }
-                        item { Spacer(Modifier.height(64.dp)) }
-                    }
-                }
-            }
-            IconButton(
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            AppFab(
+                icon = Icons.Rounded.Add,
+                contentDescription = "New note",
                 onClick = { editorState = NoteEditorState.Add },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 18.dp)
-                    .size(52.dp)
-                    .glassSurface(RoundedCornerShape(16.dp), selected = true, tintStrength = 0.12f),
-            ) {
-                Icon(Icons.Rounded.Edit, contentDescription = "Add note", tint = Color(0xFF001716), modifier = Modifier.size(22.dp))
+            )
+        },
+    ) { _ ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (val currentNotes = notes) {
+                null -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) { LoadingIndicator() }
+
+                else -> LazyVerticalStaggeredGrid(
+                    state = gridState,
+                    columns = StaggeredGridCells.Fixed(2),
+                    verticalItemSpacing = Spacing.md,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                    contentPadding = PaddingValues(
+                        start = Spacing.lg,
+                        end = Spacing.lg,
+                        top = 56.dp + Spacing.sm,
+                        bottom = Spacing.xxl + 72.dp,
+                    ),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        Text(
+                            text = "${filteredNotes.size} of ${currentNotes.size} notes",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.extendedColors.textMuted,
+                            modifier = Modifier.padding(bottom = Spacing.sm),
+                        )
+                    }
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        AppSearchBar(
+                            query = query,
+                            onQueryChange = { query = it },
+                            placeholder = "Search notes",
+                        )
+                    }
+                    if (uniqueLabels.isNotEmpty()) {
+                        item(span = StaggeredGridItemSpan.FullLine) {
+                            androidx.compose.foundation.layout.FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = Spacing.sm),
+                            ) {
+                                uniqueLabels.forEach { label ->
+                                    FilterChipButton(
+                                        text = label,
+                                        selected = selectedLabel == label,
+                                        onClick = {
+                                            selectedLabel = if (selectedLabel == label) null else label
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (currentNotes.isEmpty()) {
+                        item(span = StaggeredGridItemSpan.FullLine) {
+                            EmptyState(
+                                icon = Icons.Rounded.Notes,
+                                title = "No secure notes",
+                                description = "Tap + to write your first note.",
+                                modifier = Modifier.padding(top = Spacing.xxl),
+                            )
+                        }
+                    } else if (filteredNotes.isEmpty()) {
+                        item(span = StaggeredGridItemSpan.FullLine) {
+                            EmptyState(
+                                icon = Icons.Rounded.SearchOff,
+                                title = "No matching notes",
+                                modifier = Modifier.padding(top = Spacing.xxl),
+                            )
+                        }
+                    }
+
+                    itemsIndexed(filteredNotes, key = { _, it -> it.noteId }) { _, note ->
+                        NoteCard(
+                            note = note,
+                            onClick = { editorState = NoteEditorState.Edit(note) },
+                            onLongPress = { actionNote = note },
+                        )
+                    }
+                }
             }
+
+            AppTopBar(
+                title = "Notes",
+                onBack = onBack,
+                scrolledUnder = scrolledUnder,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
     }
 
     actionNote?.let { note ->
-        NoteActionsDialog(
-            note = note,
-            onDismiss = { actionNote = null },
-            onDelete = {
-                actionNote = null
-                confirmDeleteNote = note
-            },
-        )
+        AppBottomSheet(onDismissRequest = { actionNote = null }) {
+            NoteActionRow(
+                icon = Icons.Rounded.Edit,
+                text = "Edit",
+                onClick = {
+                    val target = note
+                    actionNote = null
+                    editorState = NoteEditorState.Edit(target)
+                },
+            )
+            NoteActionRow(
+                icon = Icons.Rounded.Delete,
+                text = "Delete",
+                destructive = true,
+                onClick = {
+                    actionNote = null
+                    confirmDeleteNote = note
+                },
+            )
+            Spacer(Modifier.height(Spacing.sm))
+        }
     }
 
     confirmDeleteNote?.let { note ->
-        ConfirmDeleteDialog(
-            note = note,
-            onDismiss = { confirmDeleteNote = null },
+        AppAlertDialog(
+            onDismissRequest = { confirmDeleteNote = null },
+            title = "Delete note",
+            text = "Remove this note?",
+            confirmText = "Delete",
+            destructiveConfirm = true,
             onConfirm = {
                 scope.launch {
                     container.secureNoteRepository.deleteNote(note.noteId)
@@ -353,62 +408,102 @@ fun SecureNotesScreen(
 }
 
 @Composable
-private fun NotesUnlockScreen(
-    pin: String,
-    error: String?,
-    biometricEnabled: Boolean,
-    onBack: () -> Unit,
-    onPinChange: (String) -> Unit,
-    onUnlock: () -> Unit,
-    onBiometric: () -> Unit,
+private fun NoteCard(
+    note: SecureNote,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
-    GlassBackground {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(WindowInsets.statusBars.asPaddingValues())
-                .padding(horizontal = 20.dp, vertical = 10.dp)
-                .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AppBackButton(onClick = onBack)
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Notes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("Unlock private notes", color = Cyan, style = MaterialTheme.typography.bodySmall)
+    val interactionSource = remember { MutableInteractionSource() }
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongPress,
+            ),
+        contentPadding = PaddingValues(Spacing.md),
+    ) {
+        Text(
+            text = note.title.ifBlank { "Untitled" },
+            style = MaterialTheme.typography.titleMedium,
+            color = if (note.title.isBlank()) {
+                MaterialTheme.extendedColors.textMuted
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val preview = note.content.trim()
+        if (preview.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = preview,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.extendedColors.textMuted,
+                maxLines = 6,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        val labels = note.labelList()
+        if (labels.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.sm))
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                labels.forEach { label ->
+                    NoteLabelChip(label)
+                }
             }
         }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .glassSurface(RoundedCornerShape(18.dp), selected = false),
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Lock, contentDescription = null, tint = Cyan, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text("Master PIN", fontWeight = FontWeight.SemiBold)
-                }
-                SecureTextField(value = pin, onValueChange = onPinChange, label = "Enter PIN", secure = true, keyboardType = KeyboardType.NumberPassword)
-                error?.let { Text(it, color = Color(0xFFFFA8A8), style = MaterialTheme.typography.bodySmall) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    if (biometricEnabled) {
-                        SecondaryButton(
-                            text = "Fingerprint",
-                            leadingIcon = {
-                                Icon(Icons.Rounded.Fingerprint, contentDescription = null, tint = Cyan, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                            },
-                            modifier = Modifier.weight(1f),
-                            onClick = onBiometric,
-                        )
-                    }
-                    PrimaryButton(text = "Unlock", enabled = pin.length >= 4, modifier = Modifier.weight(1f), onClick = onUnlock)
-                }
-            }
-        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            text = relativeDate(note.updatedAtMillis),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.extendedColors.textMuted,
+        )
     }
+}
+
+@Composable
+private fun NoteLabelChip(label: String) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.extendedColors.inputField,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 2.dp),
+        )
+    }
+}
+
+@Composable
+private fun NoteActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val tint = if (destructive) MaterialTheme.extendedColors.danger else MaterialTheme.colorScheme.onSurface
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(Spacing.md))
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = tint)
     }
 }
 
@@ -424,8 +519,7 @@ private fun NoteEditorPage(
     var selectedLabels by remember(editingNote?.noteId) {
         mutableStateOf(editingNote?.labelList()?.toSet().orEmpty())
     }
-    var labelDialogOpen by remember { mutableStateOf(false) }
-    val noteFocusRequester = remember { FocusRequester() }
+    var labelSheetOpen by remember { mutableStateOf(false) }
 
     fun finish() {
         onBack(title, content, selectedLabels.sorted().joinToString(", "))
@@ -433,65 +527,80 @@ private fun NoteEditorPage(
 
     BackHandler { finish() }
 
-    GlassBackground {
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(WindowInsets.statusBars.asPaddingValues())
-                .padding(horizontal = 18.dp, vertical = 8.dp)
-                .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(padding),
         ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AppBackButton(onClick = { finish() })
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = { labelDialogOpen = true }) {
-                Icon(Icons.Rounded.Label, contentDescription = null, tint = Cyan, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Add label", color = Cyan, fontWeight = FontWeight.SemiBold)
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(18.dp))
-                .background(DeepBackground.copy(alpha = 0.82f))
-                .padding(horizontal = 12.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            PlainNoteTextField(
-                value = title,
-                onValueChange = { title = it },
-                placeholder = "Title",
-                textStyle = MaterialTheme.typography.titleLarge.copy(
-                    color = SoftText,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                imeAction = ImeAction.Next,
-                onNext = { noteFocusRequester.requestFocus() },
+            AppTopBar(
+                title = "",
+                onBack = { finish() },
+                actions = {
+                    androidx.compose.material3.IconButton(onClick = { labelSheetOpen = true }) {
+                        Icon(
+                            Icons.Rounded.Label,
+                            contentDescription = "Add label",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                },
             )
-
-            PlainNoteTextField(
-                value = content,
-                onValueChange = { content = it },
-                placeholder = "Note",
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = SoftText),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .focusRequester(noteFocusRequester),
-                singleLine = false,
-            )
-        }
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.lg)
+                    .imePadding(),
+            ) {
+                NotePlainField(
+                    value = title,
+                    onValueChange = { title = it },
+                    placeholder = "Title",
+                    textStyle = MaterialTheme.typography.titleLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = Spacing.sm),
+                )
+                val selectedList = selectedLabels.sorted()
+                if (selectedList.isNotEmpty()) {
+                    Spacer(Modifier.height(Spacing.sm))
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        selectedList.forEach { label ->
+                            FilterChipButton(
+                                text = label,
+                                selected = true,
+                                onClick = { selectedLabels = selectedLabels - label },
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(Spacing.md))
+                NotePlainField(
+                    value = content,
+                    onValueChange = { content = it },
+                    placeholder = "Write something…",
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    singleLine = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = Spacing.xxl),
+                )
+            }
         }
     }
 
-    if (labelDialogOpen) {
-        LabelPickerDialog(
+    if (labelSheetOpen) {
+        LabelSheet(
             existingLabels = existingLabels,
             selectedLabels = selectedLabels,
             onToggleLabel = { label ->
@@ -501,47 +610,14 @@ private fun NoteEditorPage(
                     selectedLabels + label
                 }
             },
-            onCreateLabel = { label ->
-                selectedLabels = selectedLabels + label.trim()
-            },
-            onDismiss = { labelDialogOpen = false },
+            onCreateLabel = { label -> selectedLabels = selectedLabels + label.trim() },
+            onDismiss = { labelSheetOpen = false },
         )
     }
 }
 
 @Composable
-private fun PlainNoteTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    textStyle: androidx.compose.ui.text.TextStyle,
-    modifier: Modifier = Modifier,
-    singleLine: Boolean = false,
-    imeAction: ImeAction = ImeAction.Default,
-    onNext: () -> Unit = {},
-) {
-    Box(modifier = modifier.padding(horizontal = 8.dp)) {
-        if (value.isEmpty()) {
-            Text(placeholder, color = MutedText, style = textStyle)
-        }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = textStyle,
-            singleLine = singleLine,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = imeAction,
-            ),
-            keyboardActions = KeyboardActions(onNext = { onNext() }),
-            modifier = if (singleLine) Modifier.fillMaxWidth() else Modifier.fillMaxSize(),
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(Cyan),
-        )
-    }
-}
-
-@Composable
-private fun LabelPickerDialog(
+private fun LabelSheet(
     existingLabels: List<String>,
     selectedLabels: Set<String>,
     onToggleLabel: (String) -> Unit,
@@ -551,345 +627,102 @@ private fun LabelPickerDialog(
     var newLabel by remember { mutableStateOf("") }
     val cleanNewLabel = newLabel.trim()
     val visibleLabels = remember(existingLabels, selectedLabels) {
-        (existingLabels + selectedLabels).map { it.trim() }.filter { it.isNotBlank() }.distinct().sorted()
+        (existingLabels + selectedLabels).map { it.trim() }
+            .filter { it.isNotBlank() }.distinct().sorted()
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Labels", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (selectedLabels.isNotEmpty()) {
-                    Text("Added to this note", color = MutedText, style = MaterialTheme.typography.labelSmall)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        items(selectedLabels.toList().sorted()) { label ->
-                            SelectedLabelChip(
-                                label = label,
-                                onRemove = { onToggleLabel(label) },
-                            )
-                        }
-                    }
-                }
-                if (visibleLabels.isNotEmpty()) {
-                    Text("Choose labels", color = MutedText, style = MaterialTheme.typography.labelSmall)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        items(visibleLabels) { label ->
-                            LabelChoiceChip(
-                                label = label,
-                                selected = label in selectedLabels,
-                                onClick = { onToggleLabel(label) },
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = newLabel,
-                    onValueChange = { newLabel = it },
-                    label = { Text("Create label", style = MaterialTheme.typography.bodySmall) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Cyan,
-                        unfocusedBorderColor = Stroke,
-                        focusedLabelColor = Cyan,
-                        unfocusedLabelColor = MutedText,
-                        cursorColor = Cyan,
-                        focusedTextColor = SoftText,
-                        unfocusedTextColor = SoftText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.08f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                    ),
-                    shape = RoundedCornerShape(8.dp),
+    AppBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                "Labels",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (visibleLabels.isNotEmpty()) {
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     modifier = Modifier.fillMaxWidth(),
-                )
+                ) {
+                    visibleLabels.forEach { label ->
+                        FilterChipButton(
+                            text = label,
+                            selected = label in selectedLabels,
+                            onClick = { onToggleLabel(label) },
+                        )
+                    }
+                }
             }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = cleanNewLabel.isNotBlank(),
-                onClick = {
-                    onCreateLabel(cleanNewLabel)
-                    newLabel = ""
+            AppTextField(
+                value = newLabel,
+                onValueChange = { newLabel = it },
+                placeholder = "New label",
+                trailingIcon = {
+                    androidx.compose.material3.IconButton(
+                        enabled = cleanNewLabel.isNotBlank(),
+                        onClick = {
+                            onCreateLabel(cleanNewLabel)
+                            newLabel = ""
+                        },
+                    ) {
+                        Icon(
+                            Icons.Rounded.Add,
+                            contentDescription = "Add label",
+                            tint = if (cleanNewLabel.isNotBlank()) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.extendedColors.textMuted
+                            },
+                        )
+                    }
                 },
-            ) {
-                Text("Add", color = if (cleanNewLabel.isNotBlank()) Cyan else MutedText, fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Done", color = MutedText)
-            }
-        },
-        containerColor = PanelAlt,
-        titleContentColor = SoftText,
-        textContentColor = SoftText,
-        shape = RoundedCornerShape(12.dp),
-    )
+            )
+            Spacer(Modifier.height(Spacing.sm))
+        }
+    }
 }
 
 @Composable
-private fun SearchField(
-    query: String,
-    onQueryChange: (String) -> Unit,
-) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        placeholder = { Text("Search title, content or label", style = MaterialTheme.typography.bodySmall) },
-        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = MutedText, modifier = Modifier.size(18.dp)) },
-        singleLine = true,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Cyan,
-            unfocusedBorderColor = Stroke,
-            focusedTextColor = SoftText,
-            unfocusedTextColor = SoftText,
-            cursorColor = Cyan,
-            focusedContainerColor = Color.White.copy(alpha = 0.08f),
-            unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-        ),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun SecureTextField(
+private fun NotePlainField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
-    secure: Boolean = false,
-    singleLine: Boolean = true,
-    keyboardType: KeyboardType = KeyboardType.Text,
+    placeholder: String,
+    textStyle: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = false,
 ) {
-    var visible by remember { mutableStateOf(false) }
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label, style = MaterialTheme.typography.bodySmall) },
-        singleLine = singleLine,
-        minLines = if (singleLine) 1 else 4,
-        visualTransformation = if (secure && !visible) PasswordVisualTransformation() else VisualTransformation.None,
-        trailingIcon = if (secure) {
-            {
-                IconButton(onClick = { visible = !visible }, modifier = Modifier.size(28.dp)) {
-                    Icon(if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, contentDescription = null, tint = MutedText, modifier = Modifier.size(16.dp))
-                }
-            }
-        } else {
-            null
-        },
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, capitalization = KeyboardCapitalization.Sentences),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Cyan,
-            unfocusedBorderColor = Stroke,
-            focusedLabelColor = Cyan,
-            unfocusedLabelColor = MutedText,
-            cursorColor = Cyan,
-            focusedTextColor = SoftText,
-            unfocusedTextColor = SoftText,
-            focusedContainerColor = Color.White.copy(alpha = 0.08f),
-            unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-        ),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun LabelChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    GlassFilterButton(text = label, selected = selected, onClick = onClick)
-}
-
-@Composable
-private fun LabelChoiceChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(12.dp)
-    Row(
-        modifier = Modifier
-            .glassSurface(shape, selected = selected, tintStrength = if (selected) 0.30f else 0.08f)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        if (selected) {
-            Icon(Icons.Rounded.Check, contentDescription = null, tint = Cyan, modifier = Modifier.size(14.dp))
+    Box(modifier = modifier) {
+        if (value.isEmpty()) {
+            Text(placeholder, style = textStyle, color = MaterialTheme.extendedColors.textMuted)
         }
-        Text(
-            text = label,
-            color = if (selected) Cyan else SoftText,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = textStyle,
+            singleLine = singleLine,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = if (singleLine) ImeAction.Next else ImeAction.Default,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
-@Composable
-private fun SelectedLabelChip(
-    label: String,
-    onRemove: () -> Unit,
-) {
-    val shape = RoundedCornerShape(12.dp)
-    Row(
-        modifier = Modifier
-            .glassSurface(shape, selected = true, tintStrength = 0.30f)
-            .background(Cyan.copy(alpha = 0.18f), shape)
-            .border(1.dp, Cyan.copy(alpha = 0.82f), shape)
-            .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(Icons.Rounded.Check, contentDescription = null, tint = Cyan, modifier = Modifier.size(14.dp))
-        Text(
-            text = label,
-            color = Cyan,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
-            Icon(Icons.Rounded.Close, contentDescription = "Remove $label", tint = Cyan, modifier = Modifier.size(14.dp))
-        }
-    }
-}
-
-@Composable
-private fun NoteRow(
-    note: SecureNote,
-    onClick: () -> Unit,
-    onLongPress: () -> Unit,
-) {
-    val clipboard = LocalClipboardManager.current
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassSurface(RoundedCornerShape(18.dp), selected = false)
-            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    note.title,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (note.labels.isNotBlank()) {
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        note.labels,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = Cyan,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        val copyText = buildString {
-                            if (note.title.isNotBlank()) {
-                                append(note.title)
-                            }
-                            if (note.title.isNotBlank() && note.content.isNotBlank()) {
-                                append("\n\n")
-                            }
-                            append(note.content)
-                        }
-                        clipboard.setText(AnnotatedString(copyText))
-                    },
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.ContentCopy,
-                        contentDescription = "Copy note",
-                        tint = MutedText,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
-            Text(note.content, maxLines = 3, overflow = TextOverflow.Ellipsis, color = SoftText.copy(alpha = 0.82f), style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
-@Composable
-private fun NoteActionsDialog(
-    note: SecureNote,
-    onDismiss: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(note.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold) },
-        text = { Text("Tap a note to open it. Long press is for delete.", color = MutedText) },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MutedText)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDelete) {
-                Icon(Icons.Rounded.Delete, contentDescription = null, tint = Color(0xFFFFA8A8), modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Delete", color = Color(0xFFFFA8A8))
-            }
-        },
-        containerColor = PanelAlt,
-        titleContentColor = SoftText,
-        textContentColor = SoftText,
-        shape = RoundedCornerShape(12.dp),
-    )
-}
-
-@Composable
-private fun ConfirmDeleteDialog(
-    note: SecureNote,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Delete Note", fontWeight = FontWeight.Bold) },
-        text = { Text("Remove '${note.title}'?", color = MutedText) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Delete", color = Color(0xFFFFA8A8), fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MutedText)
-            }
-        },
-        containerColor = PanelAlt,
-        titleContentColor = SoftText,
-        textContentColor = SoftText,
-        shape = RoundedCornerShape(12.dp),
-    )
-}
-
-@Composable
-private fun EmptyNotesState(text: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .glassSurface(RoundedCornerShape(18.dp), selected = false),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, color = MutedText)
-    }
+private fun relativeDate(millis: Long): String {
+    if (millis <= 0L) return ""
+    return DateUtils.getRelativeTimeSpanString(
+        millis,
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS,
+        DateUtils.FORMAT_ABBREV_RELATIVE,
+    ).toString()
 }
 
 private fun SecureNote.labelList(): List<String> {
