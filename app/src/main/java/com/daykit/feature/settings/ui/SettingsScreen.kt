@@ -265,10 +265,9 @@ fun SettingsScreen(
             // ---- Data ----
             item { SectionHeader("Data") }
             item {
-                AppCard(contentPadding = PaddingValues(0.dp)) {
+                AppCard(contentPadding = PaddingValues(vertical = Spacing.xs)) {
                     AppListRow(
                         headline = "Backup & Restore",
-                        supporting = "Backup password, Google Drive, and local files",
                         leadingIcon = Icons.Rounded.CloudUpload,
                         leadingAccent = accents.blue,
                         trailing = { NavChevron() },
@@ -281,10 +280,9 @@ fun SettingsScreen(
             item { SectionHeader("Security") }
             item {
                 AppCard(contentPadding = PaddingValues(0.dp)) {
-                    // Change PIN
+                    // Change Master PIN
                     AppListRow(
-                        headline = "Change PIN",
-                        supporting = changePinMessage ?: "Change the PIN used to unlock DayKit",
+                        headline = "Change Master PIN",
                         leadingIcon = Icons.Rounded.Lock,
                         leadingAccent = accents.indigo,
                         trailing = { NavChevron() },
@@ -297,8 +295,6 @@ fun SettingsScreen(
                     // Fingerprint
                     AppListRow(
                         headline = "Fingerprint Unlock",
-                        supporting = biometricMessage
-                            ?: if (biometricEnabled == true) "Enabled for DayKit tools" else "Use master PIN only",
                         leadingIcon = Icons.Rounded.Fingerprint,
                         leadingAccent = accents.teal,
                         trailing = {
@@ -336,11 +332,6 @@ fun SettingsScreen(
                     // Screenshot protection
                     AppListRow(
                         headline = "Screenshot Protection",
-                        supporting = if (screenshotProtection == true) {
-                            "Screenshots and screen recording are blocked"
-                        } else {
-                            "Screenshots are allowed until turned on again"
-                        },
                         leadingIcon = Icons.Rounded.VisibilityOff,
                         leadingAccent = accents.purple,
                         trailing = {
@@ -366,7 +357,6 @@ fun SettingsScreen(
                     // Uninstall protection
                     AppListRow(
                         headline = "Uninstall Protection",
-                        supporting = if (isAdminActive) "PIN required to uninstall" else "Anyone can uninstall",
                         leadingIcon = Icons.Rounded.Shield,
                         leadingAccent = accents.red,
                         trailing = {
@@ -456,10 +446,9 @@ fun SettingsScreen(
             // ---- Appearance ----
             item { SectionHeader("Appearance") }
             item {
-                AppCard(contentPadding = PaddingValues(0.dp)) {
+                AppCard(contentPadding = PaddingValues(vertical = Spacing.xs)) {
                     AppListRow(
                         headline = "Appearance",
-                        supporting = "Light, dark, or system",
                         leadingIcon = Icons.Rounded.Palette,
                         leadingAccent = accents.orange,
                         trailing = { NavChevron() },
@@ -471,10 +460,9 @@ fun SettingsScreen(
             // ---- About ----
             item { SectionHeader("About") }
             item {
-                AppCard(contentPadding = PaddingValues(0.dp)) {
+                AppCard(contentPadding = PaddingValues(vertical = Spacing.xs)) {
                     AppListRow(
                         headline = "About DayKit",
-                        supporting = "Tools, security model, and backup details",
                         leadingIcon = Icons.Rounded.Info,
                         leadingAccent = accents.blue,
                         trailing = { NavChevron() },
@@ -483,7 +471,6 @@ fun SettingsScreen(
                     RowDivider(startIndent = Spacing.lg)
                     AppListRow(
                         headline = "Privacy Policy",
-                        supporting = "Data handling, permissions, and your choices",
                         leadingIcon = Icons.Rounded.Policy,
                         leadingAccent = accents.green,
                         trailing = { NavChevron() },
@@ -703,7 +690,6 @@ private fun UtilityToolLockRow(
 ) {
     AppListRow(
         headline = title,
-        supporting = if (locked) "Master PIN required" else "Opens without PIN",
         leadingIcon = icon,
         leadingAccent = accent,
         trailing = {

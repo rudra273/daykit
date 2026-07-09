@@ -1,6 +1,5 @@
 package com.daykit.core.designsystem.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,7 +20,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,10 +48,7 @@ fun AppTopBar(
     titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    val tint by animateColorAsState(
-        targetValue = if (scrolledUnder) MaterialTheme.extendedColors.barTint else Color.Transparent,
-        label = "topbar-tint",
-    )
+    val tint = if (scrolledUnder) MaterialTheme.extendedColors.barTint else Color.Transparent
     Box(
         modifier = modifier
             .fillMaxWidth()

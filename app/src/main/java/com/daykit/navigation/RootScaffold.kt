@@ -45,7 +45,7 @@ fun RootScaffold(
             // Shown instantly on tabs, hidden instantly on tool screens — no slide animation.
             if (onTopLevel) {
                 NavigationBar(
-                    containerColor = MaterialTheme.extendedColors.barTint,
+                    containerColor = MaterialTheme.extendedColors.card,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ) {
                     TopLevelDestination.entries.forEach { dest ->

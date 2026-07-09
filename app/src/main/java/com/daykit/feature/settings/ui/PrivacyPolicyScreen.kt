@@ -95,7 +95,7 @@ fun PrivacyPolicyScreen(
             PolicySection(
                 title = "Usage Access, Overlay, Notifications, And Device Admin",
                 body = listOf(
-                    "Usage Access is used to identify the foreground app for App Lock behavior. DayKit does not use any Accessibility service.",
+                    "Usage Access is used to identify the foreground app for App Lock behavior.",
                     "Overlay permission may be used to display a lock challenge over selected locked apps.",
                     "Notification permission is used for reminders, habits, and app alerts when the user enables those features.",
                     "Device Admin is optional and is used only for uninstall protection. It does not give DayKit access to personal files or messages.",

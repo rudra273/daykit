@@ -1,6 +1,7 @@
 package com.daykit.feature.applock.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.SearchOff
-import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import com.daykit.core.designsystem.components.AppSwitch
@@ -35,20 +35,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
-import com.daykit.core.designsystem.components.AppCard
-import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppSearchBar
 import com.daykit.core.designsystem.components.AppTopBar
@@ -87,7 +88,7 @@ fun AppLockScreen(
     var unlockError by remember { mutableStateOf<String?>(null) }
     var biometricEnabled by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    var selectedTab by remember { mutableStateOf(AppLockTab.Unlocked) }
+    var selectedTab by remember { mutableStateOf(AppLockTab.All) }
     var installedApps by remember { mutableStateOf<List<InstalledApp>?>(null) }
     var toolLocked by remember { mutableStateOf<Boolean?>(null) }
     val isToolLocked = toolLocked
@@ -274,9 +275,6 @@ fun AppLockScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    item(key = "hero") {
-                        ProtectionHeroCard(lockedCount = lockedApps.size)
-                    }
                     item(key = "search") {
                         AppSearchBar(
                             query = query,
@@ -410,34 +408,6 @@ fun AppLockScreen(
     }
 }
 
-@Composable
-private fun ProtectionHeroCard(lockedCount: Int) {
-    AppCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AccentIconTile(
-                icon = Icons.Rounded.Shield,
-                accent = MaterialTheme.extendedColors.accents.blue,
-                size = 44.dp,
-                iconSize = 24.dp,
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = if (lockedCount == 1) "1 app protected" else "$lockedCount apps protected",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Locked apps require your PIN or fingerprint to open.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
-                )
-            }
-        }
-    }
-}
-
 private fun androidx.compose.foundation.lazy.LazyListScope.appRows(
     prefix: String,
     apps: List<InstalledApp>,
@@ -485,7 +455,13 @@ private fun AppLockAppRow(
     AppListRow(
         headline = app.label,
         supporting = supporting,
-        leading = { AppMonogramTile(letter = app.label.firstOrNull()?.uppercase() ?: "#", accent = accent) },
+        leading = {
+            if (app.icon != null) {
+                AppIconTile(icon = app.icon)
+            } else {
+                AppMonogramTile(letter = app.label.firstOrNull()?.uppercase() ?: "#", accent = accent)
+            }
+        },
         trailing = {
             AppSwitch(
                 checked = isLocked,
@@ -493,6 +469,18 @@ private fun AppLockAppRow(
                 enabled = !lockDisabled,
             )
         },
+    )
+}
+
+@Composable
+private fun AppIconTile(icon: android.graphics.drawable.Drawable) {
+    val bitmap = remember(icon) { icon.toBitmap(width = 96, height = 96).asImageBitmap() }
+    Image(
+        bitmap = bitmap,
+        contentDescription = null,
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(10.dp)),
     )
 }
 

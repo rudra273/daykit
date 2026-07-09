@@ -23,6 +23,7 @@ class InstalledAppProvider(
                 InstalledApp(
                     packageName = resolveInfo.activityInfo.packageName,
                     label = label.ifBlank { resolveInfo.activityInfo.packageName },
+                    icon = runCatching { resolveInfo.loadIcon(context.packageManager) }.getOrNull(),
                 )
             }
             .distinctBy { it.packageName }
