@@ -240,6 +240,13 @@ fun KeyStoreScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            AppTopBar(
+                title = "Key Store",
+                onBack = onBack,
+                scrolledUnder = scrolledUnder,
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             AppFab(
@@ -248,7 +255,7 @@ fun KeyStoreScreen(
                 onClick = { editorState = KeyEditorState.Add },
             )
         },
-    ) { _ ->
+    ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
@@ -256,7 +263,7 @@ fun KeyStoreScreen(
                 contentPadding = PaddingValues(
                     start = Spacing.lg,
                     end = Spacing.lg,
-                    top = 56.dp + Spacing.sm,
+                    top = innerPadding.calculateTopPadding() + Spacing.sm,
                     bottom = Spacing.xxl + 72.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -327,13 +334,6 @@ fun KeyStoreScreen(
                     }
                 }
             }
-
-            AppTopBar(
-                title = "Key Store",
-                onBack = onBack,
-                scrolledUnder = scrolledUnder,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
         }
     }
 
@@ -495,7 +495,7 @@ private fun KeyDetailSheet(
     var revealed by remember(entry.entryId) { mutableStateOf(false) }
     AppBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
             modifier = Modifier
@@ -591,7 +591,7 @@ private fun KeyFormSheet(
 
     AppBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
             modifier = Modifier

@@ -263,6 +263,13 @@ fun SecureNotesScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            AppTopBar(
+                title = "Notes",
+                onBack = onBack,
+                scrolledUnder = scrolledUnder,
+            )
+        },
         floatingActionButton = {
             AppFab(
                 icon = Icons.Rounded.Add,
@@ -270,11 +277,11 @@ fun SecureNotesScreen(
                 onClick = { editorState = NoteEditorState.Add },
             )
         },
-    ) { _ ->
+    ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             when (val currentNotes = notes) {
                 null -> Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().padding(innerPadding),
                     contentAlignment = Alignment.Center,
                 ) { LoadingIndicator() }
 
@@ -286,7 +293,7 @@ fun SecureNotesScreen(
                     contentPadding = PaddingValues(
                         start = Spacing.lg,
                         end = Spacing.lg,
-                        top = 56.dp + Spacing.sm,
+                        top = innerPadding.calculateTopPadding() + Spacing.sm,
                         bottom = Spacing.xxl + 72.dp,
                     ),
                     modifier = Modifier.fillMaxSize(),
@@ -356,13 +363,6 @@ fun SecureNotesScreen(
                     }
                 }
             }
-
-            AppTopBar(
-                title = "Notes",
-                onBack = onBack,
-                scrolledUnder = scrolledUnder,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
         }
     }
 
@@ -527,12 +527,9 @@ private fun NoteEditorPage(
 
     BackHandler { finish() }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
             AppTopBar(
                 title = "",
                 onBack = { finish() },
@@ -546,6 +543,13 @@ private fun NoteEditorPage(
                     }
                 },
             )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()

@@ -119,6 +119,7 @@ fun ReminderScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = { AppTopBar(title = "Reminders", onBack = onBack, scrolledUnder = scrolledUnder) },
         floatingActionButton = {
             AppFab(icon = Icons.Rounded.Add, contentDescription = "Add reminder", onClick = { addOpen = true })
         },
@@ -133,7 +134,6 @@ fun ReminderScreen(
                     onDelete = { deleteReminder = it },
                 )
             }
-            AppTopBar(title = "Reminders", onBack = onBack, scrolledUnder = scrolledUnder)
         }
     }
 
@@ -179,7 +179,6 @@ private fun ReminderContent(
 ) {
     if (reminders.isEmpty()) {
         Column(Modifier.fillMaxSize()) {
-            Spacer(Modifier.height(56.dp))
             EmptyState(
                 icon = Icons.Rounded.NotificationsActive,
                 title = "No reminders yet",
@@ -206,7 +205,7 @@ private fun ReminderContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = Spacing.lg, end = Spacing.lg,
-            top = 56.dp + Spacing.sm, bottom = Spacing.xxl + 72.dp,
+            top = Spacing.sm, bottom = Spacing.xxl + 72.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {

@@ -2,6 +2,7 @@ package com.daykit.core.designsystem.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -35,13 +36,18 @@ import com.daykit.core.designsystem.extendedColors
  * App top bar. Transparent at rest; when [scrolledUnder] it fades in a frosted
  * backdrop (via [frostState]) or a solid tint fallback plus a hairline divider.
  */
+/** Standard header height, excluding the status-bar inset. Every screen uses this via [AppTopBar]. */
+val AppTopBarHeight = 56.dp
+
 @Composable
 fun AppTopBar(
     title: String,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
     onBack: (() -> Unit)? = null,
     scrolledUnder: Boolean = false,
     frostState: FrostState? = null,
+    titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val tint by animateColorAsState(
@@ -60,7 +66,7 @@ fun AppTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .height(56.dp)
+                .height(AppTopBarHeight)
                 .padding(horizontal = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -68,14 +74,35 @@ fun AppTopBar(
                 AppBackButton(onClick = onBack)
                 Spacer(Modifier.width(Spacing.sm))
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            if (titleContent != null) {
+                Box(modifier = Modifier.weight(1f)) { titleContent() }
+            } else if (subtitle != null) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.extendedColors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            } else {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             actions()
         }
         if (scrolledUnder) {

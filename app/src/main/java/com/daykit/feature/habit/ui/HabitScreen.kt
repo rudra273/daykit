@@ -355,6 +355,7 @@ private fun HabitHome(
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = { AppTopBar(title = "Habits", onBack = onBack) },
         floatingActionButton = {
             AppFab(
                 icon = Icons.Rounded.Add,
@@ -363,7 +364,6 @@ private fun HabitHome(
             )
         },
     ) { innerPadding ->
-        val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         Box(modifier = Modifier.fillMaxSize()) {
             when (val current = dashboard) {
                 null -> Box(
@@ -378,7 +378,7 @@ private fun HabitHome(
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        top = topInset + 56.dp + Spacing.sm,
+                        top = innerPadding.calculateTopPadding() + Spacing.sm,
                         start = Spacing.lg,
                         end = Spacing.lg,
                         bottom = innerPadding.calculateBottomPadding() + 96.dp,
@@ -417,12 +417,6 @@ private fun HabitHome(
                     }
                 }
             }
-
-            AppTopBar(
-                title = "Habits",
-                onBack = onBack,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
         }
     }
 }

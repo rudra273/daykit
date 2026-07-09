@@ -86,6 +86,7 @@ import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
+import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.util.Money
@@ -160,8 +161,47 @@ fun ExpenseScreen(
         container.expenseRepository.ensureMonth(monthKey)
     }
 
+    val listState = rememberLazyListState()
+    val scrolledUnder by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            if (manageBillsOpen) {
+                AppTopBar(
+                    title = "Monthly bills",
+                    subtitle = "${allBills.count { it.active }} active",
+                    onBack = { manageBillsOpen = false },
+                )
+            } else {
+                AppTopBar(
+                    title = "Expenses",
+                    subtitle = monthLabel(selectedMonth),
+                    onBack = onBack,
+                    scrolledUnder = scrolledUnder,
+                    actions = {
+                        IconButton(onClick = { selectedMonth = selectedMonth.minusMonths(1) }) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                                contentDescription = "Previous month",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                        IconButton(onClick = { selectedMonth = selectedMonth.plusMonths(1) }) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                contentDescription = "Next month",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    },
+                )
+            }
+        },
         floatingActionButton = {
             if (!manageBillsOpen) {
                 AppFab(
@@ -181,19 +221,12 @@ fun ExpenseScreen(
                 ManageBillsContent(
                     bills = allBills,
                     addBillOpen = addBillOpen,
-                    onBack = { manageBillsOpen = false },
                     onToggleAddBill = { addBillOpen = !addBillOpen },
                     onEditBill = { editBill = it },
                     onUpdateAmount = { updateBillAmount = it },
                     onStopBill = { stopBill = it },
                 )
             } else {
-                val listState = rememberLazyListState()
-                val scrolledUnder by remember {
-                    derivedStateOf {
-                        listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4
-                    }
-                }
                 when (val currentSummary = summary) {
                     null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         LoadingIndicator()
@@ -215,14 +248,6 @@ fun ExpenseScreen(
                         onStopBill = { stopBill = it },
                     )
                 }
-
-                ExpenseHeader(
-                    selectedMonth = selectedMonth,
-                    scrolledUnder = scrolledUnder,
-                    onPrevious = { selectedMonth = selectedMonth.minusMonths(1) },
-                    onNext = { selectedMonth = selectedMonth.plusMonths(1) },
-                    onBack = onBack,
-                )
             }
         }
     }
@@ -383,58 +408,6 @@ fun ExpenseScreen(
     }
 }
 
-@Composable
-private fun ExpenseHeader(
-    selectedMonth: YearMonth,
-    scrolledUnder: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onBack: () -> Unit,
-) {
-    val tint = if (scrolledUnder) MaterialTheme.extendedColors.barTint else Color.Transparent
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(tint),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppBackButton(onClick = onBack)
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Expenses",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    monthLabel(selectedMonth),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            IconButton(onClick = onPrevious) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                    contentDescription = "Previous month",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            IconButton(onClick = onNext) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = "Next month",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ExpenseMainList(
@@ -466,7 +439,7 @@ private fun ExpenseMainList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = Spacing.lg, end = Spacing.lg,
-            top = 56.dp + Spacing.sm, bottom = Spacing.xxl + 72.dp,
+            top = Spacing.sm, bottom = Spacing.xxl + 72.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
@@ -866,34 +839,12 @@ private fun SpendChartCard(
 private fun ManageBillsContent(
     bills: List<MonthlyBill>,
     addBillOpen: Boolean,
-    onBack: () -> Unit,
     onToggleAddBill: () -> Unit,
     onEditBill: (MonthlyBill) -> Unit,
     onUpdateAmount: (MonthlyBill) -> Unit,
     onStopBill: (MonthlyBill) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppBackButton(onClick = onBack)
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Monthly bills",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    "${bills.count { it.active }} active",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(

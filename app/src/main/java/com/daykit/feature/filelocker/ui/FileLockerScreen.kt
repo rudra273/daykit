@@ -202,6 +202,21 @@ fun FileLockerScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            if (selectionMode) {
+                SelectionTopBar(
+                    count = selectedHiddenUris.size,
+                    onCancel = { selectedHiddenUris.clear() },
+                    onRestore = {
+                        snack("Choose where to restore selected files.")
+                        destinationFolderLauncher.launch(Unit)
+                    },
+                    restoreEnabled = !working,
+                )
+            } else {
+                AppTopBar(title = "File Vault", onBack = onBack, scrolledUnder = scrolledUnder)
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (!selectionMode) {
@@ -213,14 +228,14 @@ fun FileLockerScreen(
             }
         },
     ) { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(innerPadding)) {
+        Box(Modifier.fillMaxSize().padding(bottom = innerPadding.calculateBottomPadding())) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = Spacing.md, end = Spacing.md,
-                    top = 56.dp + Spacing.sm, bottom = Spacing.xxl + 72.dp,
+                    top = innerPadding.calculateTopPadding() + Spacing.sm, bottom = Spacing.xxl + 72.dp,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -294,26 +309,9 @@ fun FileLockerScreen(
                 LinearProgressIndicator(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(top = 56.dp)
                         .fillMaxWidth(),
                     color = MaterialTheme.colorScheme.primary,
                 )
-            }
-
-            // Contextual selection bar or normal top bar
-            if (selectionMode) {
-                SelectionTopBar(
-                    count = selectedHiddenUris.size,
-                    onCancel = { selectedHiddenUris.clear() },
-                    onRestore = {
-                        snack("Choose where to restore selected files.")
-                        destinationFolderLauncher.launch(Unit)
-                    },
-                    restoreEnabled = !working,
-                )
-            } else {
-                AppTopBar(title = "File Vault", onBack = onBack, scrolledUnder = scrolledUnder)
             }
         }
     }

@@ -146,10 +146,6 @@ fun DnsManagerScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                item {
-                    Spacer(Modifier.height(56.dp))
-                }
-
                 // Hero explainer
                 item {
                     AppCard {

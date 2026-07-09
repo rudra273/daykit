@@ -13,15 +13,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -71,6 +67,7 @@ import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTextField
+import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.RowDivider
@@ -251,19 +248,7 @@ fun SettingsScreen(
     val accents = MaterialTheme.extendedColors.accents
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        AppTopBar(title = "Settings")
 
         if (!settingsLoaded) {
             Box(

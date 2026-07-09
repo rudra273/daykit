@@ -73,6 +73,7 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBackButton
 import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppBottomSheet
+import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.extendedColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -248,56 +249,48 @@ fun EditorScreen(
             .background(MaterialTheme.colorScheme.background),
     ) {
         Column(Modifier.fillMaxSize()) {
-            // Document top bar: back, filename + unsaved dot, save, share, overflow
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .height(56.dp)
-                    .padding(horizontal = Spacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppBackButton(onClick = onBack)
-                Spacer(Modifier.width(Spacing.sm))
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .clickable { renameOpen = true },
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = fileName,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        if (isDirty) {
-                            Spacer(Modifier.width(Spacing.sm))
-                            Box(
-                                Modifier
-                                    .size(8.dp)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+            AppTopBar(
+                title = fileName,
+                onBack = onBack,
+                titleContent = {
+                    Column(Modifier.clickable { renameOpen = true }) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = fileName,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
                             )
+                            if (isDirty) {
+                                Spacer(Modifier.width(Spacing.sm))
+                                Box(
+                                    Modifier
+                                        .size(8.dp)
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                )
+                            }
                         }
+                        Text(
+                            text = if (isDirty) "Unsaved changes" else "Saved",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.extendedColors.textMuted,
+                        )
                     }
-                    Text(
-                        text = if (isDirty) "Unsaved changes" else "Saved",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.extendedColors.textMuted,
-                    )
-                }
-                IconButton(onClick = { saveCurrent() }) {
-                    Icon(Icons.Rounded.Save, contentDescription = "Save", tint = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = { share() }) {
-                    Icon(Icons.Rounded.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.onSurface)
-                }
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurface)
-                }
-            }
+                },
+                actions = {
+                    IconButton(onClick = { saveCurrent() }) {
+                        Icon(Icons.Rounded.Save, contentDescription = "Save", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = { share() }) {
+                        Icon(Icons.Rounded.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                },
+            )
 
             // Borderless full-bleed body
             Box(

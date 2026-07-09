@@ -232,10 +232,22 @@ fun AppLockScreen(
         }
     }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { _ ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            AppTopBar(
+                title = "App Lock",
+                onBack = onBack,
+                scrolledUnder = installedApps != null && scrolledUnder,
+            )
+        },
+    ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             if (installedApps == null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    contentAlignment = Alignment.Center,
+                ) {
                     LoadingIndicator()
                 }
             } else {
@@ -257,7 +269,7 @@ fun AppLockScreen(
                     contentPadding = PaddingValues(
                         start = Spacing.lg,
                         end = Spacing.lg,
-                        top = 56.dp + Spacing.sm,
+                        top = innerPadding.calculateTopPadding() + Spacing.sm,
                         bottom = Spacing.xxl,
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -394,13 +406,6 @@ fun AppLockScreen(
                     }
                 }
             }
-
-            AppTopBar(
-                title = "App Lock",
-                onBack = onBack,
-                scrolledUnder = installedApps != null && scrolledUnder,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
         }
     }
 }
