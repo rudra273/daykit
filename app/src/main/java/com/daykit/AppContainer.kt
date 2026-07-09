@@ -8,6 +8,7 @@ import com.daykit.core.backup.GoogleDriveBackupClient
 import com.daykit.core.data.DatabasePassphraseProvider
 import com.daykit.core.data.DayKitDatabase
 import com.daykit.core.data.SecureSettingRepository
+import com.daykit.core.data.SettingFlagCache
 import com.daykit.core.security.AndroidKeyStoreCrypto
 import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.PasswordHasher
@@ -31,6 +32,7 @@ class AppContainer(context: Context) {
     val sensitiveValueCipher = SensitiveValueCipher(keyStoreCrypto)
     val credentialRepository = CredentialRepository(appContext, PasswordHasher())
     val lockedPackageCache = LockedPackageCache(appContext)
+    val settingFlagCache = SettingFlagCache(appContext)
 
     val database: DayKitDatabase by lazy {
         val passphraseProvider = DatabasePassphraseProvider(appContext, keyStoreCrypto)
@@ -38,7 +40,7 @@ class AppContainer(context: Context) {
     }
 
     val secureSettingRepository: SecureSettingRepository by lazy {
-        SecureSettingRepository(database.secureSettingDao(), sensitiveValueCipher)
+        SecureSettingRepository(database.secureSettingDao(), sensitiveValueCipher, settingFlagCache)
     }
 
     val appLockRepository: AppLockRepository by lazy {

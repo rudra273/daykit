@@ -2,34 +2,51 @@ package com.daykit.core.data
 
 import com.daykit.core.security.CipherPayload
 import com.daykit.core.security.SensitiveValueCipher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.withContext
 
 class SecureSettingRepository(
     private val dao: SecureSettingDao,
     private val cipher: SensitiveValueCipher,
+    private val flagCache: SettingFlagCache,
 ) {
-    suspend fun getBoolean(key: String): Boolean? {
-        return dao.get(key)?.decrypt()?.toBooleanStrictOrNull()
+    suspend fun getBoolean(key: String): Boolean? = withContext(Dispatchers.Default) {
+        val value = dao.get(key)?.decrypt()?.toBooleanStrictOrNull()
+        flagCache.put(key, value)
+        value
     }
 
     fun observeBoolean(key: String): Flow<Boolean?> {
-        return dao.observe(key).map { it?.decrypt()?.toBooleanStrictOrNull() }
+        return dao.observe(key)
+            .map { it?.decrypt()?.toBooleanStrictOrNull() }
+            .onEach { flagCache.put(key, it) }
+            .flowOn(Dispatchers.Default)
+            .onStart { if (flagCache.contains(key)) emit(flagCache.get(key)) }
+            .distinctUntilChanged()
     }
 
-    suspend fun getString(key: String): String? {
-        return dao.get(key)?.decrypt()
+    suspend fun getString(key: String): String? = withContext(Dispatchers.Default) {
+        dao.get(key)?.decrypt()
     }
 
     fun observeString(key: String): Flow<String?> {
-        return dao.observe(key).map { it?.decrypt() }
+        return dao.observe(key)
+            .map { it?.decrypt() }
+            .flowOn(Dispatchers.Default)
     }
 
     suspend fun putBoolean(key: String, value: Boolean) {
         putString(key, value.toString())
+        flagCache.put(key, value)
     }
 
-    suspend fun putString(key: String, value: String) {
+    suspend fun putString(key: String, value: String) = withContext(Dispatchers.Default) {
         val payload = cipher.encryptString(value.toString(), aad = key)
         dao.upsert(
             SecureSettingEntity(
@@ -43,6 +60,7 @@ class SecureSettingRepository(
 
     suspend fun delete(key: String) {
         dao.delete(key)
+        flagCache.put(key, null)
     }
 
     private fun SecureSettingEntity.decrypt(): String {

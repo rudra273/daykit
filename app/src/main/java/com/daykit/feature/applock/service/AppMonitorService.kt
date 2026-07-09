@@ -1,5 +1,9 @@
 package com.daykit.feature.applock.service
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,7 +13,10 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import com.daykit.DayKitApplication
+import com.daykit.MainActivity
+import com.daykit.R
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.permissions.AppLockPermissionChecker
 import com.daykit.core.session.AppLockSessionManager
@@ -45,13 +52,23 @@ class AppMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // Foreground promotion keeps the monitor alive while DayKit is backgrounded;
+        // as a plain background service the OS killed it within minutes, leaving
+        // locked apps unprotected until DayKit was reopened.
+        startForeground(NOTIFICATION_ID, buildNotification())
+        val container = (application as DayKitApplication).container
         detector = ForegroundAppDetector(this)
         settingsPackage = SettingsPackageResolver.resolve(this)
         overlayController = LockOverlayController(
             context = this,
-            credentialRepository = (application as DayKitApplication).container.credentialRepository,
+            credentialRepository = container.credentialRepository,
             onBiometricRequested = { packageName -> launchActivityLockScreen(packageName) },
         )
+        // Seed synchronously from the prefs caches so there is no window where the
+        // monitor loop runs with an empty locked set or stale biometric flag.
+        lockedPackages = container.appLockRepository.getLockedPackages()
+        biometricEnabled = container.settingFlagCache
+            .get(SecureSettingRepository.KEY_BIOMETRIC_ENABLED) == true
         registerSessionResetReceiver()
         observeLockedApps()
         observeBiometricSetting()
@@ -93,8 +110,6 @@ class AppMonitorService : Service() {
     private fun observeLockedApps() {
         val repository = (application as DayKitApplication).container.appLockRepository
         scope.launch {
-            lockedPackages = repository.getLockedPackages()
-
             repository.observeLockedApps()
                 .catch { lockedPackages = emptySet() }
                 .collect { apps ->
@@ -192,11 +207,43 @@ class AppMonitorService : Service() {
         }.getOrDefault(packageName)
     }
 
+    private fun buildNotification(): Notification {
+        val channel = NotificationChannel(
+            NOTIFICATION_CHANNEL_ID,
+            "App Lock protection",
+            NotificationManager.IMPORTANCE_MIN,
+        ).apply {
+            description = "Keeps App Lock monitoring active"
+            setShowBadge(false)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_app_lock)
+            .setContentTitle("App Lock is protecting your apps")
+            .setContentIntent(contentIntent)
+            .setOngoing(true)
+            .build()
+    }
+
     companion object {
         private const val POLL_INTERVAL_MILLIS = 750L
+        private const val NOTIFICATION_CHANNEL_ID = "app_lock_monitor"
+        private const val NOTIFICATION_ID = 1001
 
         fun start(context: Context) {
-            runCatching { context.startService(Intent(context, AppMonitorService::class.java)) }
+            runCatching {
+                ContextCompat.startForegroundService(
+                    context,
+                    Intent(context, AppMonitorService::class.java),
+                )
+            }
         }
 
         fun stop(context: Context) {
