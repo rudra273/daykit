@@ -1600,7 +1600,7 @@ private fun BrandHeader(
 @Composable
 private fun AppLogoBadge() {
     Image(
-        painter = painterResource(id = com.daykit.R.drawable.enew),
+        painter = painterResource(id = com.daykit.R.drawable.ic_app_lock),
         contentDescription = null,
         modifier = Modifier
             .size(64.dp)

@@ -157,14 +157,12 @@ private suspend fun setSettingsLocked(
 @Composable
 fun SettingsScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    bottomBarPadding: androidx.compose.foundation.layout.PaddingValues,
     onOpenBackupRestore: () -> Unit,
+    onOpenAppearance: () -> Unit,
     onOpenAboutApp: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
-    onOpenTheme: () -> Unit,
 ) {
-    BackHandler { onBack() }
-
     val context = LocalContext.current
     val activity = context as FragmentActivity
     val scope = rememberCoroutineScope()
@@ -279,8 +277,6 @@ fun SettingsScreen(
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppBackButton(onClick = onBack)
-                    Spacer(Modifier.width(12.dp))
                     Text(
                         text = "Settings",
                         style = MaterialTheme.typography.titleLarge,
@@ -779,9 +775,9 @@ fun SettingsScreen(
 
             SettingsNavigationRow(
                 icon = Icons.Rounded.Palette,
-                title = "Theme",
-                subtitle = "Choose the app theme",
-                onClick = onOpenTheme,
+                title = "Appearance",
+                subtitle = "Light, dark, or system",
+                onClick = onOpenAppearance,
             )
 
             SettingsSectionTitle("Information")

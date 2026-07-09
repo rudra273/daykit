@@ -38,7 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.daykit.DayKitApplication
 import com.daykit.core.ui.Cyan
-import com.daykit.core.ui.DayKitTheme
+import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.ui.MutedText
 import com.daykit.core.ui.Panel
 import com.daykit.core.ui.PanelAlt

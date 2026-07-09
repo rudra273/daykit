@@ -61,7 +61,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.daykit.core.security.CredentialRepository
 import com.daykit.core.session.AppLockSessionManager
 import com.daykit.core.ui.Cyan
-import com.daykit.core.ui.DayKitTheme
+import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.ui.MutedText
 import com.daykit.core.ui.Panel
 import com.daykit.core.ui.SoftText

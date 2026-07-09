@@ -3,6 +3,7 @@ package com.daykit
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -24,28 +25,14 @@ import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.permissions.AppLockPermissionChecker
 import com.daykit.core.permissions.AppLockPermissionState
 import com.daykit.core.security.BiometricAuthenticator
-import com.daykit.core.ui.DayKitTheme
-import com.daykit.core.ui.GlassLoadingIndicator
+import com.daykit.core.designsystem.DayKitTheme
+import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.feature.applock.data.LockedApp
 import com.daykit.feature.applock.service.AppMonitorService
-import com.daykit.feature.applock.ui.AppLockScreen
 import com.daykit.feature.applock.ui.BiometricSetupScreen
-import com.daykit.feature.applock.ui.DashboardScreen
 import com.daykit.feature.applock.ui.PermissionGrantScreen
 import com.daykit.feature.applock.ui.SetupCredentialScreen
-import com.daykit.feature.dns.ui.DnsManagerScreen
-import com.daykit.feature.editor.ui.EditorScreen
-import com.daykit.feature.expense.ui.ExpenseScreen
-import com.daykit.feature.filelocker.ui.FileLockerScreen
-import com.daykit.feature.habit.ui.HabitScreen
-import com.daykit.feature.keystore.ui.KeyStoreScreen
-import com.daykit.feature.notes.ui.SecureNotesScreen
-import com.daykit.feature.reminder.ui.ReminderScreen
-import com.daykit.feature.settings.ui.AboutAppScreen
-import com.daykit.feature.settings.ui.BackupRestoreScreen
-import com.daykit.feature.settings.ui.PrivacyPolicyScreen
-import com.daykit.feature.settings.ui.SettingsScreen
-import com.daykit.feature.settings.ui.ThemeScreen
+import com.daykit.navigation.RootScaffold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
@@ -57,6 +44,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         setContentView()
     }
@@ -73,24 +61,6 @@ class MainActivity : FragmentActivity() {
     }
 }
 
-private enum class MainRoute {
-    Dashboard,
-    AppLock,
-    KeyStore,
-    Notes,
-    Editor,
-    Habit,
-    Reminder,
-    Expenses,
-    DnsManager,
-    FileLocker,
-    BackupRestore,
-    AboutApp,
-    PrivacyPolicy,
-    Settings,
-    Theme,
-}
-
 @Composable
 private fun DayKitApp(
     activity: FragmentActivity,
@@ -102,7 +72,6 @@ private fun DayKitApp(
     val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
 
     var credentialReady by remember { mutableStateOf(container.credentialRepository.hasCredential()) }
-    var route by remember { mutableStateOf(MainRoute.Dashboard) }
     var permissions by remember { mutableStateOf(AppLockPermissionChecker.check(context)) }
     var biometricMessage by remember { mutableStateOf<String?>(null) }
     var biometricPreferenceLoaded by remember { mutableStateOf(false) }
@@ -221,94 +190,17 @@ private fun DayKitApp(
             onRefresh = { permissions = AppLockPermissionChecker.check(context) },
         )
 
-        route == MainRoute.Dashboard -> DashboardScreen(
+        else -> RootScaffold(
+            activity = activity,
             container = container,
             lockedCount = lockedApps.size,
-            onOpenAppLock = { route = MainRoute.AppLock },
-            onOpenKeyStore = { route = MainRoute.KeyStore },
-            onOpenNotes = { route = MainRoute.Notes },
-            onOpenEditor = { route = MainRoute.Editor },
-            onOpenHabit = { route = MainRoute.Habit },
-            onOpenReminder = { route = MainRoute.Reminder },
-            onOpenExpenses = { route = MainRoute.Expenses },
-            onOpenDnsManager = { route = MainRoute.DnsManager },
-            onOpenFileLocker = { route = MainRoute.FileLocker },
-            onOpenSettings = { route = MainRoute.Settings },
-        )
-
-        route == MainRoute.AppLock -> AppLockScreen(
-            container = container,
-            onBack = { route = MainRoute.Dashboard },
-            onSelectionChanged = {
+            onAppLockSelectionChanged = {
                 permissions = AppLockPermissionChecker.check(context)
                 accessibilityEnabled = AppLockPermissionChecker.hasAccessibilityService(context)
                 if (permissions.allGranted && !accessibilityEnabled) {
                     AppMonitorService.start(context)
                 }
             },
-        )
-
-        route == MainRoute.KeyStore -> KeyStoreScreen(
-            container = container,
-            onBack = { route = MainRoute.Dashboard },
-        )
-
-        route == MainRoute.Notes -> SecureNotesScreen(
-            container = container,
-            onBack = { route = MainRoute.Dashboard },
-        )
-
-        route == MainRoute.Editor -> EditorScreen(
-            onBack = { route = MainRoute.Dashboard },
-        )
-
-        route == MainRoute.Expenses -> ExpenseScreen(
-            container = container,
-            onBack = { route = MainRoute.Dashboard },
-        )
-
-        route == MainRoute.Habit -> HabitScreen(
-            container = container,
-            onBack = { route = MainRoute.Dashboard },
-        )
-
-        route == MainRoute.Reminder -> ReminderScreen(
-            container = container,
-            onBack = { route = MainRoute.Dashboard },
-        )
-
-        route == MainRoute.DnsManager -> DnsManagerScreen(
-            onBack = { route = MainRoute.Dashboard },
-        )
-
-        route == MainRoute.FileLocker -> FileLockerScreen(
-            onBack = { route = MainRoute.Dashboard },
-        )
-
-        route == MainRoute.BackupRestore -> BackupRestoreScreen(
-            container = container,
-            onBack = { route = MainRoute.Settings },
-        )
-
-        route == MainRoute.AboutApp -> AboutAppScreen(
-            onBack = { route = MainRoute.Settings },
-        )
-
-        route == MainRoute.PrivacyPolicy -> PrivacyPolicyScreen(
-            onBack = { route = MainRoute.Settings },
-        )
-
-        route == MainRoute.Theme -> ThemeScreen(
-            onBack = { route = MainRoute.Settings },
-        )
-
-        route == MainRoute.Settings -> SettingsScreen(
-            container = container,
-            onBack = { route = MainRoute.Dashboard },
-            onOpenBackupRestore = { route = MainRoute.BackupRestore },
-            onOpenAboutApp = { route = MainRoute.AboutApp },
-            onOpenPrivacyPolicy = { route = MainRoute.PrivacyPolicy },
-            onOpenTheme = { route = MainRoute.Theme },
         )
     }
 }
@@ -319,6 +211,6 @@ private fun StartupLoadingScreen() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        GlassLoadingIndicator()
+        LoadingIndicator()
     }
 }
