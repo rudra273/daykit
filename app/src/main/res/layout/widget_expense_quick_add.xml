@@ -14,7 +14,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:text="Expenses"
-        android:textColor="#FFFAFAFA"
+        android:textColor="@color/text_primary"
         android:textSize="15sp"
         android:textStyle="bold" />
 
@@ -26,7 +26,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:text="Add today's spend"
-        android:textColor="#FFA1A1AA"
+        android:textColor="@color/text_muted"
         android:textSize="12sp" />
 
     <TextView
@@ -37,7 +37,7 @@
         android:background="@drawable/widget_button_background"
         android:gravity="center"
         android:text="Add $"
-        android:textColor="#FF09090B"
+        android:textColor="@color/on_brand_primary"
         android:textSize="14sp"
         android:textStyle="bold" />
 </LinearLayout>

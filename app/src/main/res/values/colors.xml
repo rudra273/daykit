@@ -1,8 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="deep_navy">#FF050914</color>
-    <color name="indigo_primary">#FF101A4D</color>
-    <color name="teal_accent">#FF18E0D2</color>
+    <!-- Base -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Meta Classic palette — LIGHT (default). Night overrides in values-night/colors.xml. -->
+    <color name="brand_primary">#FF1877F2</color>
+    <color name="on_brand_primary">#FFFFFFFF</color>
+    <color name="window_bg">#FFFFFFFF</color>
+    <color name="surface">#FFF0F2F5</color>
+    <color name="text_primary">#FF050505</color>
+    <color name="text_muted">#FF65676B</color>
+    <color name="divider">#FFE4E6EB</color>
+    <color name="success">#FF31A24C</color>
+    <color name="danger">#FFE41E3F</color>
+
+    <!-- Widget surfaces -->
+    <color name="widget_container">#FFFFFFFF</color>
+    <color name="widget_stroke">#FFE4E6EB</color>
+    <color name="widget_button">#FF1877F2</color>
+    <color name="widget_button_muted">#FFF0F2F5</color>
+
+    <!-- Legacy aliases retained so any un-migrated ref still resolves. -->
+    <color name="deep_navy">#FF18191A</color>
+    <color name="indigo_primary">#FF1877F2</color>
+    <color name="teal_accent">#FF1877F2</color>
 </resources>

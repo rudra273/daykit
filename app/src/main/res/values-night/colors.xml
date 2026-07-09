@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Meta Classic palette — DARK overrides. -->
+    <color name="brand_primary">#FF2D88FF</color>
+    <color name="on_brand_primary">#FFFFFFFF</color>
+    <color name="window_bg">#FF18191A</color>
+    <color name="surface">#FF242526</color>
+    <color name="text_primary">#FFE4E6EB</color>
+    <color name="text_muted">#FFB0B3B8</color>
+    <color name="divider">#FF3E4042</color>
+    <color name="success">#FF45BD62</color>
+    <color name="danger">#FFF02849</color>
+
+    <!-- Widget surfaces -->
+    <color name="widget_container">#FF242526</color>
+    <color name="widget_stroke">#FF3E4042</color>
+    <color name="widget_button">#FF2D88FF</color>
+    <color name="widget_button_muted">#FF3A3B3C</color>
+
+    <!-- Legacy aliases -->
+    <color name="deep_navy">#FF18191A</color>
+    <color name="indigo_primary">#FF2D88FF</color>
+    <color name="teal_accent">#FF2D88FF</color>
+</resources>

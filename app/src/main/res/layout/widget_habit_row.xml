@@ -12,7 +12,7 @@
         android:layout_height="22dp"
         android:background="@drawable/widget_habit_open_background"
         android:gravity="center"
-        android:textColor="#FF09090B"
+        android:textColor="@color/on_brand_primary"
         android:textSize="13sp"
         android:textStyle="bold" />
 
@@ -24,7 +24,7 @@
         android:layout_weight="1"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="#FFFAFAFA"
+        android:textColor="@color/text_primary"
         android:textSize="13sp"
         android:textStyle="bold" />
 
@@ -33,6 +33,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:textColor="#FFA1A1AA"
+        android:textColor="@color/text_muted"
         android:textSize="11sp" />
 </LinearLayout>

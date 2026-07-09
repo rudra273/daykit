@@ -13,7 +13,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:text="Habit Check In"
-        android:textColor="#FFFAFAFA"
+        android:textColor="@color/text_primary"
         android:textSize="15sp"
         android:textStyle="bold" />
 
@@ -36,6 +36,6 @@
         android:layout_weight="1"
         android:gravity="center"
         android:text="No active habits"
-        android:textColor="#FFA1A1AA"
+        android:textColor="@color/text_muted"
         android:textSize="12sp" />
 </LinearLayout>

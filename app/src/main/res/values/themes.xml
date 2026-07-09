@@ -1,15 +1,17 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.DayKit" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/indigo_primary</item>
-        <item name="colorPrimaryVariant">@color/deep_navy</item>
-        <item name="colorOnPrimary">@color/white</item>
-        <item name="colorSecondary">@color/teal_accent</item>
-        <item name="colorSecondaryVariant">@color/teal_accent</item>
-        <item name="colorOnSecondary">@color/black</item>
-        <item name="android:navigationBarColor">@color/deep_navy</item>
-        <item name="android:statusBarColor">@color/deep_navy</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorPrimaryVariant">@color/brand_primary</item>
+        <item name="colorOnPrimary">@color/on_brand_primary</item>
+        <item name="colorSecondary">@color/brand_primary</item>
+        <item name="colorSecondaryVariant">@color/brand_primary</item>
+        <item name="colorOnSecondary">@color/on_brand_primary</item>
+        <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:navigationBarColor">@color/window_bg</item>
+        <item name="android:statusBarColor">@color/window_bg</item>
+        <!-- Light window → dark bar icons (light mode). Night file flips these. -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
     <style name="Theme.DayKit.Lock" parent="Theme.DayKit">
@@ -22,7 +24,7 @@
     </style>
 
     <style name="Theme.DayKit.WidgetDialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
-        <item name="android:colorAccent">@color/teal_accent</item>
+        <item name="android:colorAccent">@color/brand_primary</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:backgroundDimEnabled">true</item>
         <item name="android:windowIsFloating">true</item>
