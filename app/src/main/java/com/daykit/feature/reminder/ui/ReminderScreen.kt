@@ -6,44 +6,46 @@ import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Event
-import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,10 +53,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -62,18 +65,19 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
-import com.daykit.core.ui.AppBackButton
-import com.daykit.core.ui.Cyan
-import com.daykit.core.ui.DangerRed
-import com.daykit.core.ui.GlassBackground
-import com.daykit.core.ui.GlassLoadingIndicator
-import com.daykit.core.ui.MutedText
-import com.daykit.core.ui.PanelAlt
-import com.daykit.core.ui.PrimaryButton
-import com.daykit.core.ui.SecondaryButton
-import com.daykit.core.ui.SoftText
-import com.daykit.core.ui.Stroke
-import com.daykit.core.ui.glassSurface
+import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AccentIconTile
+import com.daykit.core.designsystem.components.AppAlertDialog
+import com.daykit.core.designsystem.components.AppBottomSheet
+import com.daykit.core.designsystem.components.AppCard
+import com.daykit.core.designsystem.components.AppFab
+import com.daykit.core.designsystem.components.AppTextField
+import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.EmptyState
+import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.components.SecondaryButton
+import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.reminder.data.Reminder
 import com.daykit.feature.reminder.notification.ReminderNotifier
 import com.daykit.feature.reminder.notification.ReminderScheduler
@@ -81,8 +85,10 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun ReminderScreen(
@@ -98,385 +104,428 @@ fun ReminderScreen(
     var addOpen by remember { mutableStateOf(false) }
     var deleteReminder by remember { mutableStateOf<Reminder?>(null) }
 
-    BackHandler(enabled = !addOpen && deleteReminder == null, onBack = onBack)
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val scrolledUnder by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4 }
+    }
 
-    GlassBackground {
-        if (addOpen) {
-            ReminderEditorPage(
-                onDismiss = { addOpen = false },
-                onSave = { title, scheduledAtMillis ->
-                    scope.launch {
-                        val reminder = container.reminderRepository.addReminder(title, scheduledAtMillis)
-                        scheduler.schedule(reminder)
-                        requestNotificationPermissionIfNeeded(context as? Activity)
-                        addOpen = false
-                    }
-                },
-            )
-            return@GlassBackground
+    fun complete(reminder: Reminder) {
+        scope.launch {
+            container.reminderRepository.markComplete(reminder.reminderId)
+            scheduler.cancel(reminder.reminderId)
+            NotificationManagerCompat.from(context).cancel(ReminderNotifier.notificationId(reminder.reminderId))
         }
+    }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(WindowInsets.statusBars.asPaddingValues())
-                .padding(horizontal = 20.dp, vertical = 10.dp)
-                .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ReminderTopBar(onBack = onBack, onAdd = { addOpen = true })
-
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            AppFab(icon = Icons.Rounded.Add, contentDescription = "Add reminder", onClick = { addOpen = true })
+        },
+    ) { innerPadding ->
+        Box(Modifier.fillMaxSize().padding(innerPadding)) {
             when (val current = reminders) {
-                null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    GlassLoadingIndicator()
-                }
-
-                else -> ReminderList(
+                null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
+                else -> ReminderContent(
                     reminders = current,
-                    onComplete = { reminder ->
-                        scope.launch {
-                            container.reminderRepository.markComplete(reminder.reminderId)
-                            scheduler.cancel(reminder.reminderId)
-                            NotificationManagerCompat.from(context).cancel(ReminderNotifier.notificationId(reminder.reminderId))
-                        }
-                    },
-                    onDelete = { reminder ->
-                        deleteReminder = reminder
-                    },
+                    listState = listState,
+                    onComplete = ::complete,
+                    onDelete = { deleteReminder = it },
                 )
             }
+            AppTopBar(title = "Reminders", onBack = onBack, scrolledUnder = scrolledUnder)
         }
+    }
 
-        deleteReminder?.let { reminder ->
-            DeleteReminderDialog(
-                reminder = reminder,
-                onDismiss = { deleteReminder = null },
-                onConfirm = {
-                    deleteReminder = null
-                        scope.launch {
-                            container.reminderRepository.deleteReminder(reminder.reminderId)
-                            scheduler.cancel(reminder.reminderId)
-                            NotificationManagerCompat.from(context).cancel(ReminderNotifier.notificationId(reminder.reminderId))
-                        }
-                },
-            )
-        }
+    if (addOpen) {
+        ReminderAddSheet(
+            onDismiss = { addOpen = false },
+            onSave = { title, scheduledAtMillis ->
+                scope.launch {
+                    val reminder = container.reminderRepository.addReminder(title, scheduledAtMillis)
+                    scheduler.schedule(reminder)
+                    requestNotificationPermissionIfNeeded(context as? Activity)
+                    addOpen = false
+                }
+            },
+        )
+    }
+
+    deleteReminder?.let { reminder ->
+        AppAlertDialog(
+            onDismissRequest = { deleteReminder = null },
+            title = "Delete reminder",
+            text = "Remove \"${reminder.title}\"?",
+            confirmText = "Delete",
+            destructiveConfirm = true,
+            onConfirm = {
+                deleteReminder = null
+                scope.launch {
+                    container.reminderRepository.deleteReminder(reminder.reminderId)
+                    scheduler.cancel(reminder.reminderId)
+                    NotificationManagerCompat.from(context).cancel(ReminderNotifier.notificationId(reminder.reminderId))
+                }
+            },
+        )
     }
 }
 
 @Composable
-private fun ReminderTopBar(onBack: () -> Unit, onAdd: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        AppBackButton(onClick = onBack)
-        Column(modifier = Modifier.weight(1f)) {
-            Text("Reminder", color = SoftText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("Notifications stay until you complete them.", color = MutedText, style = MaterialTheme.typography.bodySmall)
-        }
-        IconButton(onClick = onAdd, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Rounded.Add, contentDescription = "Add reminder", tint = Cyan)
-        }
-    }
-}
-
-@Composable
-private fun ReminderList(
+private fun ReminderContent(
     reminders: List<Reminder>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     onComplete: (Reminder) -> Unit,
     onDelete: (Reminder) -> Unit,
 ) {
     if (reminders.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No reminders yet", color = MutedText, style = MaterialTheme.typography.bodyMedium)
+        Column(Modifier.fillMaxSize()) {
+            Spacer(Modifier.height(56.dp))
+            EmptyState(
+                icon = Icons.Rounded.NotificationsActive,
+                title = "No reminders yet",
+                description = "Tap + to add one. Notifications stay until you complete them.",
+                modifier = Modifier.padding(top = Spacing.xxl),
+            )
         }
         return
     }
 
+    val now = System.currentTimeMillis()
+    val active = reminders.filter { !it.completed }.sortedBy { it.scheduledAtMillis }
+    val completed = reminders.filter { it.completed }.sortedByDescending { it.scheduledAtMillis }
+    val startOfTomorrow = LocalDate.now().plusDays(1)
+        .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+    val overdue = active.filter { it.scheduledAtMillis < now }
+    val today = active.filter { it.scheduledAtMillis in now until startOfTomorrow }
+    val upcoming = active.filter { it.scheduledAtMillis >= startOfTomorrow }
+    val next = active.firstOrNull()
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(
+            start = Spacing.lg, end = Spacing.lg,
+            top = 56.dp + Spacing.sm, bottom = Spacing.xxl + 72.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        items(reminders, key = { it.reminderId }) { reminder ->
-            ReminderRow(
-                reminder = reminder,
-                onComplete = { onComplete(reminder) },
-                onDelete = { onDelete(reminder) },
-            )
+        if (next != null) {
+            item { UpNextCard(reminder = next, onComplete = { onComplete(next) }) }
         }
+        section("Overdue", overdue, accentDanger = true, onComplete, onDelete)
+        section("Today", today, accentDanger = false, onComplete, onDelete)
+        section("Upcoming", upcoming, accentDanger = false, onComplete, onDelete)
+        if (completed.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Completed",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.padding(top = Spacing.sm, start = Spacing.xs),
+                )
+            }
+            items(completed, key = { it.reminderId }) { r ->
+                ReminderRow(reminder = r, accentDanger = false, onComplete = { onComplete(r) }, onDelete = { onDelete(r) })
+            }
+        }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.section(
+    title: String,
+    reminders: List<Reminder>,
+    accentDanger: Boolean,
+    onComplete: (Reminder) -> Unit,
+    onDelete: (Reminder) -> Unit,
+) {
+    if (reminders.isEmpty()) return
+    item(key = "header-$title") {
+        SectionHeaderRow(title = title, count = reminders.size, danger = accentDanger)
+    }
+    items(reminders, key = { it.reminderId }) { r ->
+        ReminderRow(reminder = r, accentDanger = accentDanger, onComplete = { onComplete(r) }, onDelete = { onDelete(r) })
+    }
+}
+
+@Composable
+private fun SectionHeaderRow(title: String, count: Int, danger: Boolean) {
+    Row(
+        modifier = Modifier.padding(top = Spacing.sm, start = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.textMuted,
+        )
+        Spacer(Modifier.size(Spacing.sm))
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.extendedColors.textMuted,
+        )
+    }
+}
+
+@Composable
+private fun UpNextCard(reminder: Reminder, onComplete: () -> Unit) {
+    AppCard {
+        Text(
+            text = "Up next",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.extendedColors.textMuted,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AccentIconTile(
+                icon = Icons.Rounded.NotificationsActive,
+                accent = MaterialTheme.extendedColors.accents.orange,
+                size = 44.dp,
+                iconSize = 24.dp,
+            )
+            Spacer(Modifier.size(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = reminder.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = relativeText(reminder.scheduledAtMillis),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.extendedColors.textMuted,
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        PrimaryButton(
+            text = "Mark complete",
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            onClick = onComplete,
+        )
     }
 }
 
 @Composable
 private fun ReminderRow(
     reminder: Reminder,
+    accentDanger: Boolean,
     onComplete: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassSurface(RoundedCornerShape(16.dp), selected = !reminder.completed, tintStrength = 0.10f)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(
-            if (reminder.completed) Icons.Rounded.Check else Icons.Rounded.Notifications,
-            contentDescription = null,
-            tint = if (reminder.completed) MutedText else Cyan,
-            modifier = Modifier.size(22.dp),
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                reminder.title,
-                color = SoftText,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                reminder.scheduledAtMillis.toReminderText(),
-                color = MutedText,
-                style = MaterialTheme.typography.bodySmall,
-            )
+    AppCard(contentPadding = PaddingValues(Spacing.md)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Tap-to-complete circle
             if (reminder.completed) {
-                Text("Acknowledged", color = MutedText, style = MaterialTheme.typography.labelSmall)
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .border(
+                            2.dp,
+                            if (accentDanger) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.textMuted,
+                            CircleShape,
+                        )
+                        .clickable(onClick = onComplete),
+                )
             }
-        }
-        if (!reminder.completed) {
-            IconButton(onClick = onComplete, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Rounded.Check, contentDescription = "Complete", tint = Cyan, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.size(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = reminder.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (reminder.completed) MaterialTheme.extendedColors.textMuted else MaterialTheme.colorScheme.onSurface,
+                    textDecoration = if (reminder.completed) TextDecoration.LineThrough else null,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = reminder.scheduledAtMillis.toAbsoluteText(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (accentDanger) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.textMuted,
+                )
             }
-        }
-        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = MutedText, modifier = Modifier.size(20.dp))
+            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    Icons.Rounded.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ReminderEditorPage(
+private fun ReminderAddSheet(
     onDismiss: () -> Unit,
     onSave: (String, Long) -> Unit,
 ) {
     var title by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(LocalDate.now()) }
-    var hour by remember { mutableStateOf(hour12(LocalDateTime.now().plusMinutes(5).hour).toString()) }
-    var minute by remember { mutableStateOf(LocalDateTime.now().plusMinutes(5).minute.toString().padStart(2, '0')) }
-    var period by remember { mutableStateOf(if (LocalDateTime.now().plusMinutes(5).hour < 12) DayPeriod.AM else DayPeriod.PM) }
+    val default = LocalDateTime.now().plusMinutes(5)
+    var date by remember { mutableStateOf(default.toLocalDate()) }
+    var time by remember { mutableStateOf(default.toLocalTime()) }
 
-    val scheduledAtMillis = remember(date, hour, minute, period) {
-        val localDateTime = LocalDateTime.of(
-            date,
-            java.time.LocalTime.of(
-                hour24(hour.toIntOrNull() ?: 8, period),
-                (minute.toIntOrNull() ?: 0).coerceIn(0, 59),
-            ),
-        )
-        localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    var dateOpen by remember { mutableStateOf(false) }
+    var timeOpen by remember { mutableStateOf(false) }
+
+    val scheduledAtMillis = remember(date, time) {
+        LocalDateTime.of(date, time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
     val canSave = title.trim().isNotBlank() && scheduledAtMillis > System.currentTimeMillis()
 
-    BackHandler(onBack = onDismiss)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(WindowInsets.statusBars.asPaddingValues())
-            .padding(horizontal = 20.dp, vertical = 10.dp)
-            .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            AppBackButton(onClick = onDismiss)
+    AppBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg)) {
             Text(
-                "Add Reminder",
-                color = SoftText,
+                text = "New reminder",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface,
             )
-        }
-
-        OutlinedTextField(
-            value = title,
-            onValueChange = { title = it.take(80) },
-            label = { Text("Reminder") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            colors = reminderFieldColors(),
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        ReminderDateField(date = date, onDateChange = { date = it })
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = hour,
-                onValueChange = { hour = it.filter(Char::isDigit).take(2) },
-                label = { Text("Hour") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                colors = reminderFieldColors(),
-                modifier = Modifier.weight(1f),
+            Spacer(Modifier.height(Spacing.lg))
+            AppTextField(
+                value = title,
+                onValueChange = { title = it.take(80) },
+                label = "Reminder",
+                placeholder = "What should we remind you about?",
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
-            OutlinedTextField(
-                value = minute,
-                onValueChange = { minute = it.filter(Char::isDigit).take(2) },
-                label = { Text("Minute") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                colors = reminderFieldColors(),
-                modifier = Modifier.weight(1f),
+            Spacer(Modifier.height(Spacing.md))
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SecondaryButton(
+                    text = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                    modifier = Modifier.weight(1f),
+                    leadingIcon = { Icon(Icons.Rounded.Event, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    onClick = { dateOpen = true },
+                )
+                SecondaryButton(
+                    text = time.format(DateTimeFormatter.ofPattern("h:mm a")),
+                    modifier = Modifier.weight(1f),
+                    leadingIcon = { Icon(Icons.Rounded.Schedule, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    onClick = { timeOpen = true },
+                )
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = if (canSave) "Notification stays until you tap complete." else "Choose a future date and time.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.extendedColors.textMuted,
             )
-            SecondaryButton(
-                text = period.name,
-                modifier = Modifier.height(56.dp),
-                onClick = { period = if (period == DayPeriod.AM) DayPeriod.PM else DayPeriod.AM },
-            )
-        }
-
-        Text(
-            if (canSave) "Notification will stay until Complete is tapped." else "Choose a future date and time.",
-            color = MutedText,
-            style = MaterialTheme.typography.bodySmall,
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = onDismiss)
+            Spacer(Modifier.height(Spacing.lg))
             PrimaryButton(
-                text = "Save",
-                modifier = Modifier.weight(1f),
+                text = "Add reminder",
+                modifier = Modifier.fillMaxWidth(),
                 enabled = canSave,
                 onClick = { onSave(title, scheduledAtMillis) },
             )
         }
     }
-}
 
-@Composable
-private fun DeleteReminderDialog(
-    reminder: Reminder,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Delete Reminder", fontWeight = FontWeight.Bold) },
-        text = {
-            Text(
-                "Remove '${reminder.title}'?",
-                color = MutedText,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Delete", color = DangerRed, fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MutedText)
-            }
-        },
-        containerColor = PanelAlt,
-        titleContentColor = SoftText,
-        textContentColor = SoftText,
-        shape = RoundedCornerShape(12.dp),
-    )
-}
-
-@Composable
-private fun ReminderDateField(
-    date: LocalDate,
-    onDateChange: (LocalDate) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    val state = rememberDatePickerState(initialSelectedDateMillis = date.toMillis())
-
-    SecondaryButton(
-        text = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
-        modifier = Modifier.fillMaxWidth(),
-        leadingIcon = {
-            Icon(Icons.Rounded.Event, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.size(8.dp))
-        },
-        onClick = { open = true },
-    )
-
-    if (open) {
+    if (dateOpen) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = date.toMillis())
         DatePickerDialog(
-            onDismissRequest = { open = false },
+            onDismissRequest = { dateOpen = false },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        state.selectedDateMillis?.let { onDateChange(it.toLocalDate()) }
-                        open = false
-                    },
-                ) {
-                    Text("Select", color = Cyan, fontWeight = FontWeight.Bold)
-                }
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { date = it.toLocalDate() }
+                    dateOpen = false
+                }) { Text("Select") }
             },
-            dismissButton = {
-                TextButton(onClick = { open = false }) {
-                    Text("Cancel", color = MutedText)
-                }
-            },
-            colors = androidx.compose.material3.DatePickerDefaults.colors(containerColor = PanelAlt),
+            dismissButton = { TextButton(onClick = { dateOpen = false }) { Text("Cancel") } },
+            colors = DatePickerDefaults.colors(containerColor = MaterialTheme.extendedColors.card),
         ) {
             DatePicker(state = state)
         }
     }
+
+    if (timeOpen) {
+        TimePickerDialog(
+            onDismiss = { timeOpen = false },
+            onConfirm = { h, m ->
+                time = LocalTime.of(h, m)
+                timeOpen = false
+            },
+            initialHour = time.hour,
+            initialMinute = time.minute,
+        )
+    }
 }
 
 @Composable
-private fun reminderFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Cyan,
-    unfocusedBorderColor = Stroke,
-    focusedTextColor = SoftText,
-    unfocusedTextColor = SoftText,
-    focusedLabelColor = Cyan,
-    unfocusedLabelColor = MutedText,
-    cursorColor = Cyan,
-)
-
-private enum class DayPeriod {
-    AM,
-    PM,
+private fun TimePickerDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit,
+    initialHour: Int,
+    initialMinute: Int,
+) {
+    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.extendedColors.card,
+        shape = MaterialTheme.shapes.large,
+        title = { Text("Pick a time", style = MaterialTheme.typography.titleLarge) },
+        text = {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TimePicker(state = state)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text("Set") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = MaterialTheme.extendedColors.textMuted)
+            }
+        },
+    )
 }
 
-private fun hour12(hour: Int): Int {
-    return when (val value = hour.coerceIn(0, 23) % 12) {
-        0 -> 12
-        else -> value
+private fun relativeText(millis: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = millis - now
+    val abs = kotlin.math.abs(diff)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(abs)
+    val hours = TimeUnit.MILLISECONDS.toHours(abs)
+    val days = TimeUnit.MILLISECONDS.toDays(abs)
+    val phrase = when {
+        minutes < 1 -> "now"
+        minutes < 60 -> "$minutes min"
+        hours < 24 -> "$hours hr"
+        else -> "$days day${if (days == 1L) "" else "s"}"
     }
+    return if (diff < 0) "$phrase overdue" else "in $phrase"
 }
 
-private fun hour24(hour: Int, period: DayPeriod): Int {
-    val normalized = hour.coerceIn(1, 12)
-    return when (period) {
-        DayPeriod.AM -> if (normalized == 12) 0 else normalized
-        DayPeriod.PM -> if (normalized == 12) 12 else normalized + 12
-    }
-}
-
-private fun Long.toReminderText(): String {
+private fun Long.toAbsoluteText(): String {
     return Instant.ofEpochMilli(this)
         .atZone(ZoneId.systemDefault())
         .toLocalDateTime()
         .format(DateTimeFormatter.ofPattern("dd MMM yyyy, h:mm a"))
 }
 
-private fun LocalDate.toMillis(): Long {
-    return atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-}
+private fun LocalDate.toMillis(): Long =
+    atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-private fun Long.toLocalDate(): LocalDate {
-    return Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
-}
+private fun Long.toLocalDate(): LocalDate =
+    Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
 
 private fun requestNotificationPermissionIfNeeded(activity: Activity?) {
     if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
