@@ -79,8 +79,8 @@ fun AccentIconTile(
     icon: ImageVector,
     accent: Color,
     modifier: Modifier = Modifier,
-    size: androidx.compose.ui.unit.Dp = 36.dp,
-    iconSize: androidx.compose.ui.unit.Dp = 20.dp,
+    size: androidx.compose.ui.unit.Dp = 30.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 17.dp,
     contentDescription: String? = null,
 ) {
     Box(
@@ -103,10 +103,10 @@ fun StatTile(
     accent: Color = MaterialTheme.colorScheme.primary,
     icon: ImageVector? = null,
 ) {
-    AppCard(modifier = modifier, contentPadding = PaddingValues(14.dp)) {
+    AppCard(modifier = modifier, contentPadding = PaddingValues(12.dp)) {
         if (icon != null) {
-            AccentIconTile(icon = icon, accent = accent, size = 32.dp, iconSize = 18.dp)
-            Spacer(Modifier.height(8.dp))
+            AccentIconTile(icon = icon, accent = accent, size = 28.dp, iconSize = 16.dp)
+            Spacer(Modifier.height(6.dp))
         }
         Text(
             text = value,

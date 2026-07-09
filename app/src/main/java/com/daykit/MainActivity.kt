@@ -78,15 +78,11 @@ private fun DayKitApp(
     var biometricEnabled by remember { mutableStateOf<Boolean?>(null) }
     var screenshotProtection by remember { mutableStateOf(true) }
     var lockedApps by remember { mutableStateOf(emptyList<LockedApp>()) }
-    var accessibilityEnabled by remember {
-        mutableStateOf(AppLockPermissionChecker.hasAccessibilityService(context))
-    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 permissions = AppLockPermissionChecker.check(context)
-                accessibilityEnabled = AppLockPermissionChecker.hasAccessibilityService(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -135,10 +131,8 @@ private fun DayKitApp(
             .collect { apps -> lockedApps = apps }
     }
 
-    LaunchedEffect(permissions.allGranted, credentialReady, lockedApps.size, accessibilityEnabled) {
-        if (accessibilityEnabled) {
-            AppMonitorService.stop(context)
-        } else if (permissions.allGranted && credentialReady) {
+    LaunchedEffect(permissions.allGranted, credentialReady, lockedApps.size) {
+        if (permissions.allGranted && credentialReady) {
             AppMonitorService.start(context)
         }
     }
@@ -196,8 +190,7 @@ private fun DayKitApp(
             lockedCount = lockedApps.size,
             onAppLockSelectionChanged = {
                 permissions = AppLockPermissionChecker.check(context)
-                accessibilityEnabled = AppLockPermissionChecker.hasAccessibilityService(context)
-                if (permissions.allGranted && !accessibilityEnabled) {
+                if (permissions.allGranted) {
                     AppMonitorService.start(context)
                 }
             },

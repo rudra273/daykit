@@ -55,7 +55,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -1470,7 +1470,7 @@ private fun HabitEditorPage(
                             Icon(Icons.Rounded.Notifications, contentDescription = null, tint = MaterialTheme.extendedColors.textMuted, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(Spacing.sm))
                             Text("Daily reminder", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                            Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
+                            AppSwitch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
                         }
                         if (reminderEnabled) {
                             Spacer(Modifier.height(Spacing.sm))

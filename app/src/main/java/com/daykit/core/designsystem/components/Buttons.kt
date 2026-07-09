@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.extendedColors
 
-private val ButtonHeight = 44.dp
+private val ButtonHeight = 40.dp
 
 @Composable
 fun PrimaryButton(

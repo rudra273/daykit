@@ -85,8 +85,7 @@ fun AboutAppScreen(
                 title = "App Lock",
                 body = listOf(
                     "App Lock stores the selected locked package list locally on the device so the app can keep working after restart or reboot.",
-                    "Accessibility access is optional and improves locked-app detection. When enabled, DayKit detects window changes for the limited purpose of showing the lock screen for apps selected by the user.",
-                    "Usage access and overlay permission are used as the fallback app-lock path when Accessibility is not enabled.",
+                    "Usage access is used to detect when a locked app opens, and overlay permission is used to show the lock challenge over it.",
                     "App Lock package selections are not backed up to cloud or local backup files.",
                 ),
             )

@@ -59,11 +59,6 @@ class AppMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (AppLockPermissionChecker.hasAccessibilityService(this)) {
-            mainHandler.post { overlayController.dismiss() }
-            stopSelf()
-            return START_NOT_STICKY
-        }
         if (!AppLockPermissionChecker.hasUsageAccess(this)) {
             stopSelf()
             return START_NOT_STICKY
@@ -75,9 +70,7 @@ class AppMonitorService : Service() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(sessionResetReceiver) }
-        if (!AppLockPermissionChecker.hasAccessibilityService(this)) {
-            resetLockSession()
-        }
+        resetLockSession()
         mainHandler.post { overlayController.dismiss() }
         scope.cancel()
         super.onDestroy()
@@ -126,12 +119,6 @@ class AppMonitorService : Service() {
     private fun monitorForegroundApps() {
         scope.launch {
             while (true) {
-                if (AppLockPermissionChecker.hasAccessibilityService(this@AppMonitorService)) {
-                    mainHandler.post { overlayController.dismiss() }
-                    stopSelf()
-                    return@launch
-                }
-
                 val foregroundApp = runCatching { detector.currentForegroundApp() }.getOrNull()
                 val foregroundPackage = foregroundApp?.packageName
                 if (foregroundPackage != lastForegroundPackage) {

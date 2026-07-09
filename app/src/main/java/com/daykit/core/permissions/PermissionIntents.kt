@@ -10,10 +10,6 @@ object PermissionIntents {
         return Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
     }
 
-    fun accessibilitySettings(): Intent {
-        return Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-    }
-
     fun overlaySettings(context: Context): Intent {
         return Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,

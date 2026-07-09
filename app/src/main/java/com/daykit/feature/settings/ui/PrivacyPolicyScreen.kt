@@ -67,7 +67,7 @@ fun PrivacyPolicyScreen(
                 title = "Overview",
                 body = listOf(
                     "DayKit is a local-first privacy utility. The app is designed to keep user-created data on the device unless the user intentionally creates an encrypted local backup or connects Google Drive backup.",
-                    "This policy explains what data the app accesses, how the data is used, what is stored locally, what may be placed into encrypted backup files, and how optional permissions such as Accessibility are used.",
+                    "This policy explains what data the app accesses, how the data is used, what is stored locally, what may be placed into encrypted backup files, and how optional permissions are used.",
                 ),
             )
             PolicySection(
@@ -93,19 +93,10 @@ fun PrivacyPolicyScreen(
                 ),
             )
             PolicySection(
-                title = "Accessibility Permission",
-                body = listOf(
-                    "Accessibility access is optional. The app can function without it, but App Lock detection may be less reliable.",
-                    "If the user enables Accessibility for DayKit, the app uses Accessibility window events to detect when a user opens an app selected for locking, then shows the DayKit lock screen.",
-                    "DayKit does not use Accessibility to read screen text, collect passwords, collect typed content, make purchases, send messages, perform clicks on behalf of the user, or transmit screen content.",
-                    "Accessibility data is used only on the device for App Lock behavior and is not included in cloud backup.",
-                ),
-            )
-            PolicySection(
                 title = "Usage Access, Overlay, Notifications, And Device Admin",
                 body = listOf(
-                    "Usage Access may be used to identify the foreground app for App Lock behavior when Accessibility is not enabled.",
-                    "Overlay permission may be used to display a lock challenge over selected locked apps in the fallback App Lock flow.",
+                    "Usage Access is used to identify the foreground app for App Lock behavior. DayKit does not use any Accessibility service.",
+                    "Overlay permission may be used to display a lock challenge over selected locked apps.",
                     "Notification permission is used for reminders, habits, and app alerts when the user enables those features.",
                     "Device Admin is optional and is used only for uninstall protection. It does not give DayKit access to personal files or messages.",
                 ),
@@ -138,7 +129,7 @@ fun PrivacyPolicyScreen(
             PolicySection(
                 title = "User Choices",
                 body = listOf(
-                    "Users can choose whether to enable Accessibility, Usage Access, Overlay permission, notifications, Device Admin, Google Drive backup, automatic backup, and optional backup of Expenses and Habits.",
+                    "Users can choose whether to enable Usage Access, Overlay permission, notifications, Device Admin, Google Drive backup, automatic backup, and optional backup of Expenses and Habits.",
                     "Users can use local encrypted backup without Google Drive by creating a local backup file.",
                     "Users can stop future Drive backups by turning automatic backup off or removing the backup password.",
                 ),

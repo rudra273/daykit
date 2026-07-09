@@ -37,7 +37,7 @@ import com.daykit.core.designsystem.extendedColors
  * backdrop (via [frostState]) or a solid tint fallback plus a hairline divider.
  */
 /** Standard header height, excluding the status-bar inset. Every screen uses this via [AppTopBar]. */
-val AppTopBarHeight = 56.dp
+val AppTopBarHeight = 52.dp
 
 @Composable
 fun AppTopBar(
@@ -118,7 +118,7 @@ fun AppBackButton(
 ) {
     FilledIconButton(
         onClick = onClick,
-        modifier = modifier.size(38.dp),
+        modifier = modifier.size(34.dp),
         shape = CircleShape,
         colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = MaterialTheme.extendedColors.inputField,
@@ -128,7 +128,7 @@ fun AppBackButton(
         Icon(
             Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = "Back",
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(18.dp),
         )
     }
 }

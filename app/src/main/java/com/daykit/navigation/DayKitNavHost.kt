@@ -1,5 +1,7 @@
 package com.daykit.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.fragment.app.FragmentActivity
@@ -35,7 +37,15 @@ fun DayKitNavHost(
 ) {
     val back: () -> Unit = { navController.popBackStack() }
 
-    NavHost(navController = navController, startDestination = Routes.HOME) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.HOME,
+        // Instant screen switches — no fade/scale animation.
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
+    ) {
         // ── Tabs ──
         composable(Routes.HOME) {
             HomeScreen(

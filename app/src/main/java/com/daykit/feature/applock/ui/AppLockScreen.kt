@@ -23,7 +23,7 @@ import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -487,7 +487,7 @@ private fun AppLockAppRow(
         supporting = supporting,
         leading = { AppMonogramTile(letter = app.label.firstOrNull()?.uppercase() ?: "#", accent = accent) },
         trailing = {
-            Switch(
+            AppSwitch(
                 checked = isLocked,
                 onCheckedChange = { onCheckedChange(it) },
                 enabled = !lockDisabled,

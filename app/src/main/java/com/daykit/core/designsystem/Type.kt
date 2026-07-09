@@ -15,62 +15,62 @@ private val Default = FontFamily.Default
 val DayKitTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 57.sp, lineHeight = 64.sp,
+        fontSize = 52.sp, lineHeight = 58.sp,
     ),
     displayMedium = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 45.sp, lineHeight = 52.sp,
+        fontSize = 40.sp, lineHeight = 46.sp,
     ),
     displaySmall = TextStyle(
-        fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 36.sp, lineHeight = 44.sp,
+        fontFamily = Default, fontWeight = FontWeight.SemiBold,
+        fontSize = 30.sp, lineHeight = 36.sp,
     ),
     headlineLarge = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Bold,
-        fontSize = 32.sp, lineHeight = 40.sp,
+        fontSize = 28.sp, lineHeight = 34.sp,
     ),
     headlineMedium = TextStyle(
-        fontFamily = Default, fontWeight = FontWeight.Bold,
-        fontSize = 28.sp, lineHeight = 36.sp,
+        fontFamily = Default, fontWeight = FontWeight.SemiBold,
+        fontSize = 23.sp, lineHeight = 28.sp,
     ),
     headlineSmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp, lineHeight = 32.sp,
+        fontSize = 20.sp, lineHeight = 25.sp,
     ),
     titleLarge = TextStyle(
-        fontFamily = Default, fontWeight = FontWeight.Bold,
-        fontSize = 22.sp, lineHeight = 28.sp,
+        fontFamily = Default, fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp, lineHeight = 23.sp,
     ),
     titleMedium = TextStyle(
-        fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 17.sp, lineHeight = 24.sp,
+        fontFamily = Default, fontWeight = FontWeight.Medium,
+        fontSize = 15.sp, lineHeight = 20.sp,
     ),
     titleSmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 15.sp, lineHeight = 20.sp,
+        fontSize = 13.sp, lineHeight = 17.sp,
     ),
     bodyLarge = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.15.sp,
+        fontSize = 15.sp, lineHeight = 21.sp, letterSpacing = 0.1.sp,
     ),
     bodyMedium = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 14.sp, lineHeight = 20.sp,
+        fontSize = 13.sp, lineHeight = 18.sp,
     ),
     bodySmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 12.sp, lineHeight = 16.sp,
+        fontSize = 11.sp, lineHeight = 15.sp,
     ),
     labelLarge = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp, lineHeight = 20.sp,
+        fontSize = 13.sp, lineHeight = 18.sp,
     ),
     labelMedium = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 12.sp, lineHeight = 16.sp,
+        fontSize = 11.sp, lineHeight = 15.sp,
     ),
     labelSmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Medium,
-        fontSize = 11.sp, lineHeight = 14.sp,
+        fontSize = 10.sp, lineHeight = 13.sp,
     ),
 )

@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Fingerprint
@@ -37,7 +36,7 @@ import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -74,8 +73,6 @@ import com.daykit.core.designsystem.components.RowDivider
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
-import com.daykit.core.permissions.AppLockPermissionChecker
-import com.daykit.core.permissions.PermissionIntents
 import com.daykit.core.security.BiometricAuthenticator
 import com.daykit.core.security.DayKitDeviceAdmin
 import com.daykit.feature.applock.domain.SettingsPackageResolver
@@ -160,9 +157,6 @@ fun SettingsScreen(
     var keyStoreToolLocked by remember { mutableStateOf<Boolean?>(null) }
     var notesToolLocked by remember { mutableStateOf<Boolean?>(null) }
     var screenshotProtection by remember { mutableStateOf<Boolean?>(null) }
-    var accessibilityEnabled by remember {
-        mutableStateOf(AppLockPermissionChecker.hasAccessibilityService(context))
-    }
     val settingsLoaded = biometricEnabled != null &&
         appLockToolLocked != null &&
         keyStoreToolLocked != null &&
@@ -185,7 +179,6 @@ fun SettingsScreen(
     var adminDisableError by remember { mutableStateOf<String?>(null) }
     var pendingUtilityDisable by remember { mutableStateOf<UtilityLockDisableRequest?>(null) }
     var utilityDisableError by remember { mutableStateOf<String?>(null) }
-    var showAccessibilityDisclosure by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         container.secureSettingRepository
@@ -233,7 +226,6 @@ fun SettingsScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 val wasAdmin = isAdminActive
                 isAdminActive = isDeviceAdminActive(context)
-                accessibilityEnabled = AppLockPermissionChecker.hasAccessibilityService(context)
                 if (!wasAdmin && isAdminActive) {
                     scope.launch {
                         setSettingsLocked(container, settingsPackage, locked = true)
@@ -310,7 +302,7 @@ fun SettingsScreen(
                         leadingIcon = Icons.Rounded.Fingerprint,
                         leadingAccent = accents.teal,
                         trailing = {
-                            Switch(
+                            AppSwitch(
                                 checked = biometricEnabled == true,
                                 onCheckedChange = { enable ->
                                     biometricMessage = null
@@ -352,7 +344,7 @@ fun SettingsScreen(
                         leadingIcon = Icons.Rounded.VisibilityOff,
                         leadingAccent = accents.purple,
                         trailing = {
-                            Switch(
+                            AppSwitch(
                                 checked = screenshotProtection == true,
                                 onCheckedChange = { enable ->
                                     if (enable) {
@@ -383,7 +375,7 @@ fun SettingsScreen(
                                     ActiveBadge()
                                     Spacer(Modifier.width(Spacing.sm))
                                 }
-                                Switch(
+                                AppSwitch(
                                     checked = isAdminActive,
                                     onCheckedChange = { enable ->
                                         if (enable) {
@@ -410,28 +402,6 @@ fun SettingsScreen(
                             ),
                         )
                     }
-                    RowDivider(startIndent = Spacing.lg)
-                    // Reliable App Lock (accessibility)
-                    AppListRow(
-                        headline = "Reliable App Lock",
-                        supporting = if (accessibilityEnabled) {
-                            "Accessibility detection is enabled"
-                        } else {
-                            "Enable stronger locked-app detection"
-                        },
-                        leadingIcon = Icons.Rounded.AccessibilityNew,
-                        leadingAccent = accents.green,
-                        trailing = { NavChevron() },
-                        onClick = {
-                            if (accessibilityEnabled) {
-                                runCatching {
-                                    context.startActivity(PermissionIntents.accessibilitySettings())
-                                }
-                            } else {
-                                showAccessibilityDisclosure = true
-                            }
-                        },
-                    )
                 }
             }
 
@@ -695,59 +665,6 @@ fun SettingsScreen(
         )
     }
 
-    // ---- Accessibility disclosure ----
-    if (showAccessibilityDisclosure) {
-        AppBottomSheet(onDismissRequest = { showAccessibilityDisclosure = false }) {
-            Column(
-                modifier = Modifier.padding(
-                    start = Spacing.lg,
-                    end = Spacing.lg,
-                    bottom = Spacing.lg,
-                ),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Text(
-                    text = "Accessibility access for App Lock",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    "DayKit uses Accessibility access only to detect when apps you selected for App Lock open, then show the DayKit lock screen.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
-                )
-                Text(
-                    "DayKit does not read screen text, collect typed content, collect passwords, perform clicks, make purchases, send messages, or share Accessibility data.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
-                )
-                Text(
-                    "This permission is optional. If you agree, Android settings will open so you can enable DayKit manually.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
-                ) {
-                    AppTextButton(
-                        text = "Not now",
-                        color = MaterialTheme.extendedColors.textMuted,
-                        onClick = { showAccessibilityDisclosure = false },
-                    )
-                    PrimaryButton(
-                        text = "I agree",
-                        onClick = {
-                            showAccessibilityDisclosure = false
-                            runCatching {
-                                context.startActivity(PermissionIntents.accessibilitySettings())
-                            }
-                        },
-                    )
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -790,7 +707,7 @@ private fun UtilityToolLockRow(
         leadingIcon = icon,
         leadingAccent = accent,
         trailing = {
-            Switch(checked = locked, onCheckedChange = onLockedChange)
+            AppSwitch(checked = locked, onCheckedChange = onLockedChange)
         },
     )
 }

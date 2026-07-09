@@ -1,11 +1,8 @@
 package com.daykit.core.permissions
 
 import android.app.AppOpsManager
-import android.content.ComponentName
 import android.content.Context
 import android.provider.Settings
-import android.text.TextUtils
-import com.daykit.feature.applock.service.AppLockAccessibilityService
 
 object AppLockPermissionChecker {
     fun check(context: Context): AppLockPermissionState {
@@ -24,19 +21,5 @@ object AppLockPermissionChecker {
             context.packageName,
         )
         return mode == AppOpsManager.MODE_ALLOWED
-    }
-
-    fun hasAccessibilityService(context: Context): Boolean {
-        val expectedService = ComponentName(context, AppLockAccessibilityService::class.java)
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-        ) ?: return false
-
-        val splitter = TextUtils.SimpleStringSplitter(':')
-        splitter.setString(enabledServices)
-        return splitter.any { service ->
-            ComponentName.unflattenFromString(service) == expectedService
-        }
     }
 }

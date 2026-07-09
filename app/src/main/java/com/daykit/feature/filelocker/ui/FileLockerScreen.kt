@@ -80,6 +80,7 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppExtendedFab
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.StatTile
@@ -349,7 +350,7 @@ private fun SelectionTopBar(
             .fillMaxWidth()
             .background(MaterialTheme.extendedColors.barTint)
             .windowInsetsPadding(WindowInsets.statusBars)
-            .height(56.dp)
+            .height(AppTopBarHeight)
             .padding(horizontal = Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
