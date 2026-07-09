@@ -1,20 +1,19 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.daykit.feature.settings.ui
 
 import android.app.Activity
 import android.accounts.Account
 import android.accounts.AccountManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -25,37 +24,31 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.WarningAmber
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,14 +56,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -87,13 +76,19 @@ import com.daykit.core.backup.DriveBackupSchedule
 import com.daykit.core.backup.DriveBackupSource
 import com.daykit.core.backup.DayKitBackupService
 import com.daykit.core.data.SecureSettingRepository
-import com.daykit.core.ui.AppBackButton
-import com.daykit.core.ui.GlassLoadingIndicator
-import com.daykit.core.ui.Cyan
-import com.daykit.core.ui.GlassBackground
-import com.daykit.core.ui.MutedText
-import com.daykit.core.ui.SoftText
-import com.daykit.core.ui.glassSurface
+import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppBottomSheet
+import com.daykit.core.designsystem.components.AppCard
+import com.daykit.core.designsystem.components.AppListRow
+import com.daykit.core.designsystem.components.AppTextButton
+import com.daykit.core.designsystem.components.AppTextField
+import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.components.RowDivider
+import com.daykit.core.designsystem.components.SecondaryButton
+import com.daykit.core.designsystem.components.SectionHeader
+import com.daykit.core.designsystem.extendedColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -275,7 +270,7 @@ fun BackupRestoreScreen(
             }.onFailure { error ->
                 showSnackbar("Local backup failed: ${error.message ?: "unknown error"}")
             }
-            passwordChars.fill('\u0000')
+            passwordChars.fill(' ')
             localBusy = false
         }
     }
@@ -387,7 +382,7 @@ fun BackupRestoreScreen(
                 }
                 showSnackbar("Backup complete")
             }.onFailure { error ->
-                passwordChars.fill('\u0000')
+                passwordChars.fill(' ')
                 showSnackbar("Backup failed: ${error.message ?: "unknown error"}")
             }
             driveBusy = false
@@ -452,7 +447,7 @@ fun BackupRestoreScreen(
                 activeSheet = null
                 restartApp()
             }.onFailure {
-                passwordChars.fill('\u0000')
+                passwordChars.fill(' ')
                 restoreError = "Incorrect password"
             }
             driveBusy = false
@@ -486,7 +481,7 @@ fun BackupRestoreScreen(
             }.onFailure {
                 restoreError = "Incorrect password"
             }
-            passwordChars.fill('\u0000')
+            passwordChars.fill(' ')
             localBusy = false
         }
     }
@@ -565,237 +560,250 @@ fun BackupRestoreScreen(
         }
     }
 
-    GlassBackground {
-        Scaffold(
-            containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(WindowInsets.statusBars.asPaddingValues())
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppBackButton(onClick = onBack)
-                    Spacer(Modifier.width(12.dp))
-                    Text("Backup & Restore", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                }
-            },
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    "BACKUP SETTINGS",
-                    color = SoftText,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    "Back up app data to your Google account and restore it on a new device. Create and remember a backup password to keep your data safe.",
-                    color = SoftText.copy(alpha = 0.78f),
-                    style = MaterialTheme.typography.bodySmall,
+    val scrollState = rememberScrollState()
+    val scrolledUnder by remember { derivedStateOf { scrollState.value > 0 } }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            AppTopBar(
+                title = "Backup & Restore",
+                onBack = onBack,
+                scrolledUnder = scrolledUnder,
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                "Back up app data to your Google account and restore it on a new device. Create and remember a backup password to keep your data safe.",
+                color = MaterialTheme.extendedColors.textMuted,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+
+            if (!backupPasswordLoaded) {
+                LoadingPanel()
+            } else {
+                BackupStatusCard(
+                    lastBackup = lastBackupText,
+                    size = lastBackupSizeText,
+                    account = accountSubtitle,
+                    schedule = driveSchedule.shortLabel(),
+                    backingUp = driveBusy && pendingDriveAction == null,
+                    onBackupNow = {
+                        if (!passwordSet) {
+                            showSnackbar("Set a backup password first")
+                        } else {
+                            requestDriveAuthorization(BackupDriveAuthorizationAction.BackupNow)
+                        }
+                    },
+                    onShowAll = {
+                        activeSheet = BackupSheet.BackupList
+                        requestDriveAuthorization(BackupDriveAuthorizationAction.Refresh)
+                    },
                 )
 
-                if (!backupPasswordLoaded) {
-                    LoadingPanel()
-                } else {
-                    SettingsActionRow(
-                        title = "Backup password",
-                        subtitle = if (passwordSet) "Password set" else "Not set",
+                SectionHeader(text = "Backup password")
+                AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValuesZero) {
+                    AppListRow(
+                        headline = "Backup password",
+                        supporting = if (passwordSet) "Password set" else "Not set",
+                        leadingIcon = Icons.Rounded.Key,
+                        leadingAccent = MaterialTheme.extendedColors.accents.teal,
                         onClick = {
                             clearPasswordDrafts()
                             passwordSheetMode = if (passwordSet) "options" else "set"
                             activeSheet = BackupSheet.Password
                         },
                     )
-
-                    BackupStatusCard(
-                        lastBackup = lastBackupText,
-                        size = lastBackupSizeText,
-                        backingUp = driveBusy && pendingDriveAction == null,
-                        onBackupNow = {
-                            if (!passwordSet) {
-                                showSnackbar("Set a backup password first")
-                            } else {
-                                requestDriveAuthorization(BackupDriveAuthorizationAction.BackupNow)
-                            }
-                        },
-                        onShowAll = {
-                            activeSheet = BackupSheet.BackupList
-                            requestDriveAuthorization(BackupDriveAuthorizationAction.Refresh)
-                        },
-                    )
-
-                    PlainTextActionRow(
-                        title = "Google account",
-                        subtitle = accountSubtitle,
-                        onClick = ::chooseGoogleAccount,
-                    )
-                    PlainTextActionRow(
-                        title = "Automatic backups",
-                        subtitle = driveSchedule.shortLabel(),
-                        onClick = { activeSheet = BackupSheet.Schedule },
-                    )
-                    BackupContentOptions(
-                        includeExpenses = includeExpenses != false,
-                        includeHabits = includeHabits != false,
-                        onExpensesChange = { enabled ->
-                            scope.launch {
-                                container.secureSettingRepository.putBoolean(
-                                    SecureSettingRepository.KEY_BACKUP_INCLUDE_EXPENSES,
-                                    enabled,
-                                )
-                            }
-                        },
-                        onHabitsChange = { enabled ->
-                            scope.launch {
-                                container.secureSettingRepository.putBoolean(
-                                    SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS,
-                                    enabled,
-                                )
-                            }
-                        },
-                    )
-                    ManualBackupCard(
-                        busy = localBusy,
-                        onBackup = ::startLocalBackup,
-                        onRestore = ::startLocalRestore,
-                    )
-                    WarningCallout()
                 }
 
-                Spacer(Modifier.height(14.dp))
+                SectionHeader(text = "Google Drive")
+                AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValuesZero) {
+                    AppListRow(
+                        headline = "Google account",
+                        supporting = accountSubtitle,
+                        leadingIcon = Icons.Rounded.CloudUpload,
+                        leadingAccent = MaterialTheme.extendedColors.accents.blue,
+                        onClick = ::chooseGoogleAccount,
+                    )
+                    RowDivider()
+                    AppListRow(
+                        headline = "Automatic backups",
+                        supporting = driveSchedule.shortLabel(),
+                        leadingIcon = Icons.Rounded.Schedule,
+                        leadingAccent = MaterialTheme.extendedColors.accents.indigo,
+                        onClick = { activeSheet = BackupSheet.Schedule },
+                    )
+                }
+
+                SectionHeader(text = "What's included")
+                BackupContentOptions(
+                    includeExpenses = includeExpenses != false,
+                    includeHabits = includeHabits != false,
+                    onExpensesChange = { enabled ->
+                        scope.launch {
+                            container.secureSettingRepository.putBoolean(
+                                SecureSettingRepository.KEY_BACKUP_INCLUDE_EXPENSES,
+                                enabled,
+                            )
+                        }
+                    },
+                    onHabitsChange = { enabled ->
+                        scope.launch {
+                            container.secureSettingRepository.putBoolean(
+                                SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS,
+                                enabled,
+                            )
+                        }
+                    },
+                )
+
+                SectionHeader(text = "Local file")
+                ManualBackupCard(
+                    busy = localBusy,
+                    onBackup = ::startLocalBackup,
+                    onRestore = ::startLocalRestore,
+                )
+
+                WarningCallout()
             }
+
+            Spacer(Modifier.height(Spacing.lg))
         }
     }
 
-    activeSheet?.let { dialog ->
-        AlertDialog(
+    activeSheet?.let { sheet ->
+        AppBottomSheet(
             onDismissRequest = {
                 activeSheet = null
                 restoreError = null
                 pendingLocalRestoreUri = null
                 clearPasswordDrafts()
             },
-            title = null,
-            text = {
-                when (dialog) {
-                BackupSheet.Password -> PasswordSheet(
-                    passwordSet = passwordSet,
-                    mode = passwordSheetMode,
-                    oldPassword = oldPasswordDraft,
-                    password = passwordDraft,
-                    confirmPassword = passwordConfirmDraft,
-                    showRemoveWarning = showRemovePasswordWarning,
-                    onModeChange = {
-                        passwordSheetMode = it
-                        clearPasswordDrafts()
-                    },
-                    onOldPasswordChange = { oldPasswordDraft = it },
-                    onPasswordChange = { passwordDraft = it },
-                    onConfirmPasswordChange = { passwordConfirmDraft = it },
-                    onRemoveClick = { showRemovePasswordWarning = true },
-                    onCancel = { activeSheet = null },
-                    onSave = {
-                        val saved = savedBackupPassword.orEmpty()
-                        when {
-                            passwordSheetMode == "change" && oldPasswordDraft != saved -> showSnackbar("Old password is incorrect")
-                            passwordDraft.length < 8 -> showSnackbar("Use at least 8 characters")
-                            passwordDraft != passwordConfirmDraft -> showSnackbar("Passwords do not match")
-                            else -> scope.launch {
-                                container.secureSettingRepository.putString(SecureSettingRepository.KEY_BACKUP_PASSWORD, passwordDraft)
+        ) {
+            Column(
+                modifier = Modifier.padding(
+                    start = Spacing.lg,
+                    end = Spacing.lg,
+                    bottom = Spacing.lg,
+                ),
+            ) {
+                when (sheet) {
+                    BackupSheet.Password -> PasswordSheet(
+                        passwordSet = passwordSet,
+                        mode = passwordSheetMode,
+                        oldPassword = oldPasswordDraft,
+                        password = passwordDraft,
+                        confirmPassword = passwordConfirmDraft,
+                        showRemoveWarning = showRemovePasswordWarning,
+                        onModeChange = {
+                            passwordSheetMode = it
+                            clearPasswordDrafts()
+                        },
+                        onOldPasswordChange = { oldPasswordDraft = it },
+                        onPasswordChange = { passwordDraft = it },
+                        onConfirmPasswordChange = { passwordConfirmDraft = it },
+                        onRemoveClick = { showRemovePasswordWarning = true },
+                        onCancel = { activeSheet = null },
+                        onSave = {
+                            val saved = savedBackupPassword.orEmpty()
+                            when {
+                                passwordSheetMode == "change" && oldPasswordDraft != saved -> showSnackbar("Old password is incorrect")
+                                passwordDraft.length < 8 -> showSnackbar("Use at least 8 characters")
+                                passwordDraft != passwordConfirmDraft -> showSnackbar("Passwords do not match")
+                                else -> scope.launch {
+                                    container.secureSettingRepository.putString(SecureSettingRepository.KEY_BACKUP_PASSWORD, passwordDraft)
+                                    clearPasswordDrafts()
+                                    activeSheet = null
+                                    showSnackbar("Backup password saved")
+                                }
+                            }
+                        },
+                        onConfirmRemove = {
+                            scope.launch {
+                                container.secureSettingRepository.delete(SecureSettingRepository.KEY_BACKUP_PASSWORD)
+                                container.secureSettingRepository.putString(
+                                    SecureSettingRepository.KEY_DRIVE_BACKUP_SCHEDULE,
+                                    DriveBackupSchedule.Off.value,
+                                )
+                                container.driveBackupScheduler.applySchedule(DriveBackupSchedule.Off)
                                 clearPasswordDrafts()
                                 activeSheet = null
-                                showSnackbar("Backup password saved")
+                                showSnackbar("Backup password removed")
                             }
-                        }
-                    },
-                    onConfirmRemove = {
-                        scope.launch {
-                            container.secureSettingRepository.delete(SecureSettingRepository.KEY_BACKUP_PASSWORD)
-                            container.secureSettingRepository.putString(
-                                SecureSettingRepository.KEY_DRIVE_BACKUP_SCHEDULE,
-                                DriveBackupSchedule.Off.value,
-                            )
-                            container.driveBackupScheduler.applySchedule(DriveBackupSchedule.Off)
-                            clearPasswordDrafts()
+                        },
+                    )
+                    BackupSheet.BackupList -> BackupListSheet(
+                        backups = driveBackups.take(3),
+                        loading = driveBusy,
+                        onRestore = { backup ->
+                            pendingDriveRestore = backup
+                            restorePassword = ""
+                            restoreError = null
+                            activeSheet = BackupSheet.RestorePassword
+                        },
+                    )
+                    BackupSheet.ExistingBackup -> ExistingBackupPrompt(
+                        backup = pendingDriveRestore,
+                        onRestore = {
+                            restorePassword = ""
+                            restoreError = null
+                            activeSheet = BackupSheet.RestorePassword
+                        },
+                        onCreateBackup = {
                             activeSheet = null
-                            showSnackbar("Backup password removed")
-                        }
-                    },
-                )
-                BackupSheet.BackupList -> BackupListSheet(
-                    backups = driveBackups.take(3),
-                    loading = driveBusy,
-                    onRestore = { backup ->
-                        pendingDriveRestore = backup
-                        restorePassword = ""
-                        restoreError = null
-                        activeSheet = BackupSheet.RestorePassword
-                    },
-                )
-                BackupSheet.ExistingBackup -> ExistingBackupPrompt(
-                    backup = pendingDriveRestore,
-                    onRestore = {
-                        restorePassword = ""
-                        restoreError = null
-                        activeSheet = BackupSheet.RestorePassword
-                    },
-                    onCreateBackup = {
-                        activeSheet = null
-                        requestDriveAuthorization(BackupDriveAuthorizationAction.BackupNowConfirmed)
-                    },
-                    onLater = { activeSheet = null },
-                )
-                BackupSheet.RestorePassword -> RestorePasswordSheet(
-                    backup = pendingDriveRestore,
-                    password = restorePassword,
-                    error = restoreError,
-                    restoring = driveBusy,
-                    onPasswordChange = {
-                        restorePassword = it
-                        restoreError = null
-                    },
-                    onRestore = {
-                        if (restorePassword.length < 8) {
-                            restoreError = "Incorrect password"
-                        } else {
-                            requestDriveAuthorization(BackupDriveAuthorizationAction.Restore)
-                        }
-                    },
-                )
-                BackupSheet.LocalRestorePassword -> LocalRestorePasswordSheet(
-                    password = restorePassword,
-                    error = restoreError,
-                    restoring = localBusy,
-                    onPasswordChange = {
-                        restorePassword = it
-                        restoreError = null
-                    },
-                    onRestore = ::restoreLocalBackup,
-                )
-                BackupSheet.Schedule -> ScheduleSheet(
-                    selected = driveSchedule,
-                    onSelect = ::setSchedule,
-                )
+                            requestDriveAuthorization(BackupDriveAuthorizationAction.BackupNowConfirmed)
+                        },
+                        onLater = { activeSheet = null },
+                    )
+                    BackupSheet.RestorePassword -> RestorePasswordSheet(
+                        backup = pendingDriveRestore,
+                        password = restorePassword,
+                        error = restoreError,
+                        restoring = driveBusy,
+                        onPasswordChange = {
+                            restorePassword = it
+                            restoreError = null
+                        },
+                        onRestore = {
+                            if (restorePassword.length < 8) {
+                                restoreError = "Incorrect password"
+                            } else {
+                                requestDriveAuthorization(BackupDriveAuthorizationAction.Restore)
+                            }
+                        },
+                    )
+                    BackupSheet.LocalRestorePassword -> LocalRestorePasswordSheet(
+                        password = restorePassword,
+                        error = restoreError,
+                        restoring = localBusy,
+                        onPasswordChange = {
+                            restorePassword = it
+                            restoreError = null
+                        },
+                        onRestore = ::restoreLocalBackup,
+                    )
+                    BackupSheet.Schedule -> ScheduleSheet(
+                        selected = driveSchedule,
+                        onSelect = ::setSchedule,
+                    )
+                }
             }
-            },
-            confirmButton = {},
-            containerColor = Color(0xFF202220),
-            titleContentColor = SoftText,
-            textContentColor = SoftText,
-            shape = RoundedCornerShape(14.dp),
-        )
+        }
     }
 }
+
+private val PaddingValuesZero = androidx.compose.foundation.layout.PaddingValues(0.dp)
 
 private fun includedBackupToolKeys(
     includeExpenses: Boolean,
@@ -816,21 +824,15 @@ private fun BackupContentOptions(
     onExpensesChange: (Boolean) -> Unit,
     onHabitsChange: (Boolean) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassSurface(RoundedCornerShape(12.dp), selected = false, tintStrength = 0.06f)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-            Text("Backup content", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                "Key Store and Secure Notes are always included. App Lock is never included.",
-                color = MutedText,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            BackupContentSwitchRow("Expenses", includeExpenses, onExpensesChange)
-            BackupContentSwitchRow("Habits", includeHabits, onHabitsChange)
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Key Store and Secure Notes are always included. App Lock is never included.",
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        BackupContentSwitchRow("Expenses", includeExpenses, onExpensesChange)
+        BackupContentSwitchRow("Habits", includeHabits, onHabitsChange)
     }
 }
 
@@ -844,61 +846,13 @@ private fun BackupContentSwitchRow(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = SoftText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(
+            title,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
         Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-@Composable
-private fun SettingsActionRow(
-    title: String,
-    subtitle: String?,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassSurface(RoundedCornerShape(12.dp), selected = false, tintStrength = 0.06f)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            subtitle?.let {
-                Text(it, color = MutedText, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MutedText, modifier = Modifier.size(18.dp))
-    }
-}
-
-@Composable
-private fun PlainTextActionRow(
-    title: String,
-    subtitle: String?,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 2.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            subtitle?.let {
-                Text(it, color = MutedText, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MutedText, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -906,37 +860,64 @@ private fun PlainTextActionRow(
 private fun BackupStatusCard(
     lastBackup: String,
     size: String,
+    account: String,
+    schedule: String,
     backingUp: Boolean,
     onBackupNow: () -> Unit,
     onShowAll: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassSurface(RoundedCornerShape(12.dp), selected = false, tintStrength = 0.06f)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Last backup  $lastBackup", color = SoftText, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-            Text("Size  $size", color = SoftText, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BackupButton(
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Google Drive backup",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        StatusLine("Last backup", lastBackup)
+        Spacer(Modifier.height(Spacing.xs))
+        StatusLine("Size", size)
+        Spacer(Modifier.height(Spacing.xs))
+        StatusLine("Account", account)
+        Spacer(Modifier.height(Spacing.xs))
+        StatusLine("Schedule", schedule)
+        Spacer(Modifier.height(Spacing.md))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            PrimaryButton(
                 text = if (backingUp) "Backing up..." else "Back up now",
                 modifier = Modifier.weight(1f),
                 enabled = !backingUp,
-                icon = Icons.Rounded.CloudUpload,
+                leadingIcon = {
+                    Icon(Icons.Rounded.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
                 onClick = onBackupNow,
             )
-            BackupButton(
+            SecondaryButton(
                 text = "Show all",
                 modifier = Modifier.weight(1f),
                 enabled = !backingUp,
-                icon = null,
                 onClick = onShowAll,
             )
         }
+    }
+}
+
+@Composable
+private fun StatusLine(
+    label: String,
+    value: String,
+) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
@@ -946,29 +927,33 @@ private fun ManualBackupCard(
     onBackup: () -> Unit,
     onRestore: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 2.dp, vertical = 7.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Manual backup", color = SoftText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-            Text("Save or restore an encrypted local file.", color = MutedText, style = MaterialTheme.typography.bodySmall)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BackupButton(
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Manual backup",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            "Save or restore an encrypted local file.",
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            SecondaryButton(
                 text = if (busy) "Working..." else "Backup",
                 modifier = Modifier.weight(1f),
                 enabled = !busy,
-                icon = null,
+                leadingIcon = {
+                    Icon(Icons.Rounded.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
                 onClick = onBackup,
             )
-            BackupButton(
+            SecondaryButton(
                 text = "Restore",
                 modifier = Modifier.weight(1f),
                 enabled = !busy,
-                icon = null,
                 onClick = onRestore,
             )
         }
@@ -977,49 +962,21 @@ private fun ManualBackupCard(
 
 @Composable
 private fun WarningCallout() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassSurface(RoundedCornerShape(12.dp), selected = false, tintStrength = 0.05f)
-            .padding(12.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = Color(0xFFFFD28F), modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(
-            "All backups are fully encrypted. If you forget your backup password, there is no way to restore your data - keep it safe.",
-            color = SoftText.copy(alpha = 0.82f),
-            style = MaterialTheme.typography.bodySmall,
-        )
-    }
-}
-
-@Composable
-private fun BackupButton(
-    text: String,
-    modifier: Modifier,
-    enabled: Boolean,
-    icon: ImageVector?,
-    onClick: () -> Unit,
-) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.height(38.dp),
-        shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.White.copy(alpha = 0.04f),
-            disabledContainerColor = Color.White.copy(alpha = 0.03f),
-            contentColor = SoftText,
-            disabledContentColor = MutedText,
-        ),
-        contentPadding = PaddingValues(horizontal = 10.dp),
-    ) {
-        icon?.let {
-            Icon(it, contentDescription = null, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(6.dp))
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                Icons.Rounded.WarningAmber,
+                contentDescription = null,
+                tint = MaterialTheme.extendedColors.warning,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                "All backups are fully encrypted. If you forget your backup password, there is no way to restore your data - keep it safe.",
+                color = MaterialTheme.extendedColors.textMuted,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
-        Text(text, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, maxLines = 1)
     }
 }
 
@@ -1031,7 +988,7 @@ private fun LoadingPanel() {
             .height(96.dp),
         contentAlignment = Alignment.Center,
     ) {
-        GlassLoadingIndicator()
+        LoadingIndicator()
     }
 }
 
@@ -1053,33 +1010,53 @@ private fun PasswordSheet(
     onConfirmRemove: () -> Unit,
 ) {
     val mismatch = confirmPassword.isNotEmpty() && password != confirmPassword
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("Backup password", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            "Backup password",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
+        )
         if (!passwordSet || mode == "set") {
             BackupPasswordField(password, onPasswordChange, "Password", isError = mismatch)
             BackupPasswordField(confirmPassword, onConfirmPasswordChange, "Confirm password", isError = mismatch)
-            if (mismatch) Text("Passwords do not match", color = Color(0xFFFFA8A8), style = MaterialTheme.typography.bodySmall)
-            BackupButton("Set password", Modifier.fillMaxWidth(), password.length >= 8 && password == confirmPassword, null, onSave)
+            if (mismatch) Text(
+                "Passwords do not match",
+                color = MaterialTheme.extendedColors.danger,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            PrimaryButton(
+                text = "Set password",
+                modifier = Modifier.fillMaxWidth(),
+                enabled = password.length >= 8 && password == confirmPassword,
+                onClick = onSave,
+            )
         } else if (mode == "change") {
             BackupPasswordField(oldPassword, onOldPasswordChange, "Old password")
             BackupPasswordField(password, onPasswordChange, "New password", isError = mismatch)
             BackupPasswordField(confirmPassword, onConfirmPasswordChange, "Confirm new password", isError = mismatch)
-            if (mismatch) Text("Passwords do not match", color = Color(0xFFFFA8A8), style = MaterialTheme.typography.bodySmall)
-            BackupButton("Save password", Modifier.fillMaxWidth(), password.length >= 8 && password == confirmPassword, null, onSave)
+            if (mismatch) Text(
+                "Passwords do not match",
+                color = MaterialTheme.extendedColors.danger,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            PrimaryButton(
+                text = "Save password",
+                modifier = Modifier.fillMaxWidth(),
+                enabled = password.length >= 8 && password == confirmPassword,
+                onClick = onSave,
+            )
         } else {
-            BackupButton("Change password", Modifier.fillMaxWidth(), true, null) { onModeChange("change") }
-            BackupButton("Remove password", Modifier.fillMaxWidth(), true, null, onRemoveClick)
-            BackupButton("Cancel", Modifier.fillMaxWidth(), true, null, onCancel)
+            PrimaryButton(text = "Change password", modifier = Modifier.fillMaxWidth()) { onModeChange("change") }
+            SecondaryButton(text = "Remove password", modifier = Modifier.fillMaxWidth(), onClick = onRemoveClick)
+            SecondaryButton(text = "Cancel", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
         }
         if (showRemoveWarning) {
             Text(
                 "Removing the password disables all backups. Existing encrypted backups still require the old password.",
-                color = Color(0xFFFFD28F),
+                color = MaterialTheme.extendedColors.warning,
                 style = MaterialTheme.typography.bodySmall,
             )
-            BackupButton("Confirm remove password", Modifier.fillMaxWidth(), true, null, onConfirmRemove)
+            PrimaryButton(text = "Confirm remove password", modifier = Modifier.fillMaxWidth(), onClick = onConfirmRemove)
         }
     }
 }
@@ -1090,12 +1067,16 @@ private fun BackupListSheet(
     loading: Boolean,
     onRestore: (DriveBackupFile) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Recent backups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            "Recent backups",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
+        )
         if (loading) {
             LoadingPanel()
         } else if (backups.isEmpty()) {
-            Text("No backups found", color = MutedText)
+            Text("No backups found", color = MaterialTheme.extendedColors.textMuted)
         } else {
             backups.forEach { backup ->
                 Row(
@@ -1103,16 +1084,20 @@ private fun BackupListSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(backup.createdAtDisplay, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                        Text(backup.sizeBytes.displaySize(), color = MutedText, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            backup.createdAtDisplay,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            backup.sizeBytes.displaySize(),
+                            color = MaterialTheme.extendedColors.textMuted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
-                    TextButton(onClick = { onRestore(backup) }) {
-                        Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Restore", color = Cyan)
-                    }
+                    AppTextButton(text = "Restore", onClick = { onRestore(backup) })
                 }
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                RowDivider(startIndent = 0.dp)
             }
         }
     }
@@ -1125,23 +1110,27 @@ private fun ExistingBackupPrompt(
     onCreateBackup: () -> Unit,
     onLater: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Previous backup found", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            "Previous backup found",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
+        )
         Text(
             "A Google Drive backup already exists. Restore it first if this is a fresh install, so you do not replace your old data with a new empty backup.",
-            color = SoftText.copy(alpha = 0.82f),
-            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.bodyMedium,
         )
         backup?.let {
             Text(
                 "${it.createdAtDisplay} - ${it.sizeBytes.displaySize()}",
-                color = MutedText,
+                color = MaterialTheme.extendedColors.textMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        BackupButton("Restore first", Modifier.fillMaxWidth(), backup != null, null, onRestore)
-        BackupButton("Create new backup", Modifier.fillMaxWidth(), true, null, onCreateBackup)
-        BackupButton("Later", Modifier.fillMaxWidth(), true, null, onLater)
+        PrimaryButton(text = "Restore first", modifier = Modifier.fillMaxWidth(), enabled = backup != null, onClick = onRestore)
+        SecondaryButton(text = "Create new backup", modifier = Modifier.fillMaxWidth(), onClick = onCreateBackup)
+        SecondaryButton(text = "Later", modifier = Modifier.fillMaxWidth(), onClick = onLater)
     }
 }
 
@@ -1154,16 +1143,25 @@ private fun RestorePasswordSheet(
     onPasswordChange: (String) -> Unit,
     onRestore: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Restore backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(backup?.createdAtDisplay.orEmpty(), color = MutedText, style = MaterialTheme.typography.bodySmall)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            "Restore backup",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            backup?.createdAtDisplay.orEmpty(),
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.bodyMedium,
+        )
         BackupPasswordField(password, onPasswordChange, "Backup password", isError = error != null)
-        error?.let { Text(it, color = Color(0xFFFFA8A8), style = MaterialTheme.typography.bodySmall) }
-        BackupButton(
+        error?.let {
+            Text(it, color = MaterialTheme.extendedColors.danger, style = MaterialTheme.typography.bodySmall)
+        }
+        PrimaryButton(
             text = if (restoring) "Restoring..." else "Restore",
             modifier = Modifier.fillMaxWidth(),
             enabled = !restoring && password.length >= 8,
-            icon = null,
             onClick = onRestore,
         )
     }
@@ -1177,16 +1175,25 @@ private fun LocalRestorePasswordSheet(
     onPasswordChange: (String) -> Unit,
     onRestore: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Restore local backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text("Enter the password used for this backup file.", color = MutedText, style = MaterialTheme.typography.bodySmall)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            "Restore local backup",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            "Enter the password used for this backup file.",
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.bodyMedium,
+        )
         BackupPasswordField(password, onPasswordChange, "Backup password", isError = error != null)
-        error?.let { Text(it, color = Color(0xFFFFA8A8), style = MaterialTheme.typography.bodySmall) }
-        BackupButton(
+        error?.let {
+            Text(it, color = MaterialTheme.extendedColors.danger, style = MaterialTheme.typography.bodySmall)
+        }
+        PrimaryButton(
             text = if (restoring) "Restoring..." else "Restore",
             modifier = Modifier.fillMaxWidth(),
             enabled = !restoring && password.length >= 8,
-            icon = null,
             onClick = onRestore,
         )
     }
@@ -1197,8 +1204,12 @@ private fun ScheduleSheet(
     selected: DriveBackupSchedule,
     onSelect: (DriveBackupSchedule) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Automatic backups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(
+            "Automatic backups",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
+        )
         listOf(
             DriveBackupSchedule.Daily,
             DriveBackupSchedule.Weekly,
@@ -1219,13 +1230,12 @@ private fun RadioRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
+            .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = onClick)
-        Spacer(Modifier.width(8.dp))
-        Text(text, color = SoftText, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(Spacing.sm))
+        Text(text, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -1237,11 +1247,11 @@ private fun BackupPasswordField(
     isError: Boolean = false,
 ) {
     var visible by remember { mutableStateOf(false) }
-    OutlinedTextField(
+    AppTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
-        label = { Text(label, style = MaterialTheme.typography.bodySmall) },
+        label = label,
         singleLine = true,
         isError = isError,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -1250,25 +1260,12 @@ private fun BackupPasswordField(
                 Icon(
                     if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                     contentDescription = if (visible) "Hide" else "Show",
-                    tint = SoftText,
+                    tint = MaterialTheme.extendedColors.textMuted,
                     modifier = Modifier.size(18.dp),
                 )
             }
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        shape = RoundedCornerShape(10.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Cyan,
-            unfocusedBorderColor = Color.White.copy(alpha = 0.14f),
-            errorBorderColor = Color(0xFFFFA8A8),
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            cursorColor = Cyan,
-            focusedLabelColor = Cyan,
-            unfocusedLabelColor = MutedText,
-            focusedContainerColor = Color.White.copy(alpha = 0.08f),
-            unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-        ),
     )
 }
 

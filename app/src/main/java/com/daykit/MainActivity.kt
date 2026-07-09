@@ -29,9 +29,9 @@ import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.feature.applock.data.LockedApp
 import com.daykit.feature.applock.service.AppMonitorService
-import com.daykit.feature.applock.ui.BiometricSetupScreen
-import com.daykit.feature.applock.ui.PermissionGrantScreen
-import com.daykit.feature.applock.ui.SetupCredentialScreen
+import com.daykit.feature.onboarding.ui.BiometricSetupScreen
+import com.daykit.feature.onboarding.ui.PermissionGrantScreen
+import com.daykit.feature.onboarding.ui.SetupCredentialScreen
 import com.daykit.navigation.RootScaffold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
