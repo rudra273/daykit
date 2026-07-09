@@ -16,9 +16,4 @@
     <color name="widget_stroke">#FF3E4042</color>
     <color name="widget_button">#FF2D88FF</color>
     <color name="widget_button_muted">#FF3A3B3C</color>
-
-    <!-- Legacy aliases -->
-    <color name="deep_navy">#FF18191A</color>
-    <color name="indigo_primary">#FF2D88FF</color>
-    <color name="teal_accent">#FF2D88FF</color>
 </resources>

@@ -20,9 +20,4 @@
     <color name="widget_stroke">#FFE4E6EB</color>
     <color name="widget_button">#FF1877F2</color>
     <color name="widget_button_muted">#FFF0F2F5</color>
-
-    <!-- Legacy aliases retained so any un-migrated ref still resolves. -->
-    <color name="deep_navy">#FF18191A</color>
-    <color name="indigo_primary">#FF1877F2</color>
-    <color name="teal_accent">#FF1877F2</color>
 </resources>

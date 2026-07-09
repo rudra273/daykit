@@ -7,24 +7,17 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,18 +25,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.daykit.DayKitApplication
-import com.daykit.core.ui.Cyan
 import com.daykit.core.designsystem.DayKitTheme
-import com.daykit.core.ui.MutedText
-import com.daykit.core.ui.Panel
-import com.daykit.core.ui.PanelAlt
-import com.daykit.core.ui.SoftText
-import com.daykit.core.ui.Stroke
+import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppTextButton
+import com.daykit.core.designsystem.components.AppTextField
+import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.extendedColors
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.roundToLong
@@ -105,70 +95,34 @@ private fun QuickExpenseWidgetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Panel, RoundedCornerShape(14.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .background(MaterialTheme.extendedColors.card, MaterialTheme.shapes.large)
+            .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text("Add expense", color = SoftText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        WidgetTextField(value = name, onValueChange = { name = it }, label = "Name")
-        WidgetTextField(
+        Text(
+            "Add expense",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        AppTextField(value = name, onValueChange = { name = it }, label = "Name")
+        AppTextField(
             value = amount,
             onValueChange = { amount = it.cleanWidgetAmountInput() },
             label = "Amount",
-            keyboardType = KeyboardType.Decimal,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         WidgetCategoryPicker(category = category, onCategoryChange = { category = it })
-        WidgetTextField(value = note, onValueChange = { note = it.take(160) }, label = "Note")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(38.dp)) {
-                Text("Cancel", color = MutedText)
-            }
-            Button(
-                onClick = { onSave(name, amountMinor ?: 0L, category, note) },
+        AppTextField(value = note, onValueChange = { note = it.take(160) }, label = "Note")
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+            AppTextButton(text = "Cancel", modifier = Modifier.weight(1f), color = MaterialTheme.extendedColors.textMuted, onClick = onDismiss)
+            PrimaryButton(
+                text = "Save",
                 enabled = canSave,
-                modifier = Modifier.weight(1f).height(38.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Cyan,
-                    disabledContainerColor = PanelAlt,
-                    contentColor = Color(0xFF09090B),
-                    disabledContentColor = MutedText,
-                ),
-                shape = RoundedCornerShape(10.dp),
-            ) {
-                Text("Save", fontWeight = FontWeight.Bold)
-            }
+                modifier = Modifier.weight(1f),
+                onClick = { onSave(name, amountMinor ?: 0L, category, note) },
+            )
         }
     }
-}
-
-@Composable
-private fun WidgetTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    keyboardType: KeyboardType = KeyboardType.Text,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label, style = MaterialTheme.typography.bodySmall) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        textStyle = MaterialTheme.typography.bodySmall,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Cyan,
-            unfocusedBorderColor = Stroke,
-            focusedLabelColor = Cyan,
-            unfocusedLabelColor = MutedText,
-            cursorColor = Cyan,
-            focusedTextColor = SoftText,
-            unfocusedTextColor = SoftText,
-            focusedContainerColor = Color.White.copy(alpha = 0.08f),
-            unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-        ),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-    )
 }
 
 @Composable
@@ -178,26 +132,24 @@ private fun WidgetCategoryPicker(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Column {
-        TextButton(
-            onClick = { expanded = true },
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp)),
+                .background(MaterialTheme.extendedColors.inputField, MaterialTheme.shapes.small)
+                .clickable { expanded = true }
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text("Category", color = MutedText, style = MaterialTheme.typography.labelSmall)
-                Text(category, color = SoftText, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-            }
+            Text("Category", color = MaterialTheme.extendedColors.textMuted, style = MaterialTheme.typography.labelSmall)
+            Text(category, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
         }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(PanelAlt),
+            modifier = Modifier.background(MaterialTheme.extendedColors.card),
         ) {
             WIDGET_EXPENSE_CATEGORIES.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(option, color = SoftText) },
+                    text = { Text(option, color = MaterialTheme.colorScheme.onSurface) },
                     onClick = {
                         onCategoryChange(option)
                         expanded = false
