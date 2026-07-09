@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.daykit.DayKitApplication
@@ -41,10 +42,19 @@ class AppMonitorService : Service() {
     private var biometricEnabled = false
     private var lastForegroundPackage: String? = null
     private var activeActivityLockPackage: String? = null
+
+    @Volatile
+    private var screenInteractive = true
     private val sessionResetReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                Intent.ACTION_SCREEN_OFF,
+                Intent.ACTION_SCREEN_OFF -> {
+                    screenInteractive = false
+                    resetLockSession()
+                }
+
+                Intent.ACTION_SCREEN_ON -> screenInteractive = true
+
                 Intent.ACTION_USER_PRESENT -> resetLockSession()
             }
         }
@@ -69,6 +79,7 @@ class AppMonitorService : Service() {
         lockedPackages = container.appLockRepository.getLockedPackages()
         biometricEnabled = container.settingFlagCache
             .get(SecureSettingRepository.KEY_BIOMETRIC_ENABLED) == true
+        screenInteractive = getSystemService(PowerManager::class.java)?.isInteractive != false
         registerSessionResetReceiver()
         observeLockedApps()
         observeBiometricSetting()
@@ -96,6 +107,7 @@ class AppMonitorService : Service() {
     private fun registerSessionResetReceiver() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_USER_PRESENT)
         }
         registerReceiver(sessionResetReceiver, filter)
@@ -134,6 +146,14 @@ class AppMonitorService : Service() {
     private fun monitorForegroundApps() {
         scope.launch {
             while (true) {
+                // No app can come to the foreground while the screen is off, so skip
+                // the usage-stats query entirely; the saved budget funds the faster
+                // interactive poll below.
+                if (!screenInteractive) {
+                    delay(SCREEN_OFF_POLL_INTERVAL_MILLIS)
+                    continue
+                }
+
                 val foregroundApp = runCatching { detector.currentForegroundApp() }.getOrNull()
                 val foregroundPackage = foregroundApp?.packageName
                 if (foregroundPackage != lastForegroundPackage) {
@@ -233,7 +253,8 @@ class AppMonitorService : Service() {
     }
 
     companion object {
-        private const val POLL_INTERVAL_MILLIS = 750L
+        private const val POLL_INTERVAL_MILLIS = 250L
+        private const val SCREEN_OFF_POLL_INTERVAL_MILLIS = 1_500L
         private const val NOTIFICATION_CHANNEL_ID = "app_lock_monitor"
         private const val NOTIFICATION_ID = 1001
 
