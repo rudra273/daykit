@@ -1,18 +1,24 @@
 package com.daykit.feature.notes.data
 
 import com.daykit.core.security.CipherPayload
-import com.daykit.core.security.SensitiveValueCipher
+import com.daykit.core.security.SensitiveDataLockedException
+import com.daykit.core.security.ValueCipher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 class SecureNoteRepository(
     private val dao: SecureNoteDao,
-    private val cipher: SensitiveValueCipher,
+    private val cipher: ValueCipher,
 ) {
     fun observeNotes(): Flow<List<SecureNote>> {
         return dao.observeAll().map { entities ->
             entities.mapNotNull { entity -> entity.toDomainOrNull() }
+        }.catch { error ->
+            // See KeyStoreRepository.observeEntries: swallow the locked-key race
+            // instead of crashing while the unlock gate takes over.
+            if (error is SensitiveDataLockedException) emit(emptyList()) else throw error
         }
     }
 
@@ -66,6 +72,8 @@ class SecureNoteRepository(
         return dao.observeAllImages().map { entities ->
             entities.mapNotNull { it.toImageOrNull() }
                 .groupBy { it.noteId }
+        }.catch { error ->
+            if (error is SensitiveDataLockedException) emit(emptyMap()) else throw error
         }
     }
 

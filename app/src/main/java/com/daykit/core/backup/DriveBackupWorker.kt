@@ -64,7 +64,19 @@ class DriveBackupWorker(
                 includeHabits = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS) != false,
                 // Vault defaults to OFF: only true when the user explicitly enabled it.
                 includeVault = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT) == true,
+                // The background worker never holds the PIN-derived key (it runs in
+                // its own process with a freshly-locked key manager), so the
+                // sensitive tools are always excluded from automatic backups by
+                // design. Manual foreground backup includes them.
+                includeSensitive = false,
             )
+            if (includedToolKeys.isEmpty()) {
+                // Nothing to back up (expenses & habits both disabled, sensitive
+                // always excluded here). Don't upload an empty file — and crucially
+                // don't run retention, which would prune older backups that DO
+                // contain data (e.g. a manual full backup).
+                return@withContext Result.success()
+            }
             val encryptedBackup = container.backupService.exportEncrypted(passwordChars, includedToolKeys)
             val upload = GoogleDriveBackupClient().uploadBackup(
                 accessToken = accessToken,
@@ -107,12 +119,18 @@ private fun includedBackupToolKeys(
     includeExpenses: Boolean,
     includeHabits: Boolean,
     includeVault: Boolean,
+    includeSensitive: Boolean,
 ): Set<String> {
     return buildSet {
-        add(BACKUP_TOOL_KEY_STORE)
-        add(BACKUP_TOOL_NOTES)
+        // Key Store, Secure Notes, and Vault need the PIN-derived key, which is
+        // not available in the background. They are only included when the app is
+        // unlocked (manual backup) — automatic background backup omits them.
+        if (includeSensitive) {
+            add(BACKUP_TOOL_KEY_STORE)
+            add(BACKUP_TOOL_NOTES)
+            if (includeVault) add(BACKUP_TOOL_VAULT)
+        }
         if (includeExpenses) add(BACKUP_TOOL_EXPENSES)
         if (includeHabits) add(BACKUP_TOOL_HABITS)
-        if (includeVault) add(BACKUP_TOOL_VAULT)
     }
 }

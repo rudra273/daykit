@@ -142,7 +142,7 @@ storage; only ever decrypted to RAM (view) or to a user-chosen location (export)
 
 ## HIGH
 
-### H1 — Keystore-derived key not bound to user authentication ⬜
+### H1 — Keystore-derived key not bound to user authentication ✅ DONE
 **Where:** `AndroidKeyStoreCrypto.kt:40-48` (no `setUserAuthenticationRequired`),
 `DatabasePassphraseProvider.kt:29-35` (DB passphrase in plain SharedPreferences,
 wrapped only by the always-available key).
@@ -158,9 +158,74 @@ does this in `BackupCrypto.kt:17`), and/or set `setUserAuthenticationRequired(tr
 with a validity window so the key requires biometric/PIN unlock.
 **Note:** Most invasive change — touches DB open path & key derivation. Do last.
 
+**IMPLEMENTED — PIN-derived key for the sensitive tools (envelope design):**
+- Scope (per user): **Vault, Key Store, Secure Notes** get PIN-derived
+  protection. Expenses/habits/reminders + settings stay on the Keystore key so
+  widgets & background features keep working. DB passphrase unchanged (SQLCipher
+  stays openable in background). **No biometric** (H2 dropped — see below).
+- `SensitiveKeyManager` — random 256-bit MSK wrapped by an Argon2-from-PIN key
+  (`wrappedMsk = AES-GCM(WK, MSK)`), stored wrapped in prefs. Never in Keystore,
+  never in the clear. Envelope means **PIN change re-wraps the same MSK** →
+  data is NOT re-encrypted / orphaned (`rewrap()` called in ChangePinSheet).
+- `ValueCipher` interface; `SensitiveValueCipher` (Keystore, for settings) and
+  `SessionValueCipher` (MSK, throws `SensitiveDataLockedException` when locked).
+- Vault/KeyStore/Notes repos repointed to `sessionValueCipher`; vault DEK now
+  wrapped by MSK instead of Keystore.
+- **Mandatory app-unlock gate** in MainActivity: on cold start & after returning
+  from background, a PIN screen derives the MSK (C1 lockout applies via
+  `verify()` first). MSK **wiped on ON_STOP** (background) → sensitive tools
+  can't be decrypted until re-unlock. MSK initialized at onboarding.
+- Invariant verified: nothing reaches the sensitive repos except via
+  RootScaffold, which only renders after the gate. Widgets / app-lock service /
+  LockActivity / reminders never touch the session key.
+- Backup: automatic (background) backup **excludes** the sensitive tools (no key
+  available) by design; manual foreground backup includes them. Worker degrades
+  gracefully instead of crashing.
+- ✅ full rebuild + `:app:assembleRelease` (R8) + unit tests all pass.
+
+**WIRING AUDIT — follow-up fixes (all verified: debug+release compile, tests pass):**
+- **ON_STOP was too aggressive.** It fires on rotation, config changes, and any
+  full-screen activity WE launch (file/media/account pickers, Drive auth
+  intent-sender) — each wiped the key, so the picker result callback then failed
+  every import/export/backup and the user was bounced to the PIN gate. Fixed two
+  ways: (1) `SensitiveKeyManager.expectingActivityResult` flag set before every
+  launcher `.launch()` — that ON_STOP skips the wipe; (2) a `LOCK_GRACE_MILLIS`
+  (2s) delayed lock, cancelled on quick resume, so rotations/brief glances don't
+  re-prompt. A genuine departure still locks.
+- **Locked-key crash race.** `observeFiles`/`observeEntries`/`observeNotes`/
+  `observeImagesByNote` could re-query in the instant between wipe and the gate
+  recomposing (vault's `toVaultFile()` decrypts without a per-row catch → real
+  crash). Added `.catch { SensitiveDataLockedException -> emit(empty) }` to all
+  four flows.
+- **Key-zeroing corruption window.** `requireKey()`/`key()` returned the cached
+  array by reference; a concurrent `lock()` zeroing it mid-encrypt would write a
+  record under a partially-zeroed key (permanent loss). Now they return a
+  defensive copy and `SessionValueCipher` zeros it in a `finally`.
+- **Drive retention could delete the only sensitive backup.** Auto backups never
+  contain the sensitive tools, so a manual full backup is the sole cloud copy —
+  but pruning kept the newest 3 regardless of source. `DriveBackupRetention` now
+  always protects the most-recent Manual backup (+ tests).
+- **Worker `isUnlocked()` was misleading dead code** (fresh container → always
+  locked). Made it a literal `includeSensitive = false`, and the worker now
+  **skips upload+prune entirely when the backup would be empty** (both
+  expenses/habits off) so it can't rotate away real backups with an empty one.
+- **Change-PIN when MSK uninitialized** now creates the key under the new PIN
+  instead of silently skipping (can't leave the tools permanently unusable).
+
+**BEHAVIOR CHANGES the user must know:**
+- App now asks for the PIN on every cold start and when returning from
+  background (this is inherent to "data only decryptable when unlocked").
+- **Forgetting the PIN = vault/keystore/notes are permanently unrecoverable.**
+  That is what real encryption means; the C1 no-wipe rule protects against
+  guessing, but a genuinely forgotten PIN cannot be recovered.
+- Automatic Drive backup can no longer include vault/keystore/notes — only
+  manual backup (while unlocked) can. Expenses/habits still auto-backup.
+- Not runtime-tested here — verify on device: unlock → tools decrypt; change PIN
+  → data still readable; background → re-prompt; wrong PIN → locked out.
+
 ---
 
-### H2 — Biometric unlock is a UI-only gate, no CryptoObject ⬜
+### H2 — Biometric unlock is a UI-only gate, no CryptoObject ⏭️ WON'T FIX (dropped by decision)
 **Where:** `BiometricAuthenticator.kt:26-28`.
 
 **Problem:** Biometric success just flips a boolean; it never unlocks a
@@ -170,6 +235,12 @@ meaningless.
 **Fix:** Bind the biometric prompt to a Keystore key via
 `BiometricPrompt.CryptoObject` so authentication is required to actually decrypt.
 (Naturally pairs with H1.)
+
+**DECISION: dropped.** User chose PIN-only. Biometric adds convenience but no
+security over a strong PIN here, and biometric cannot derive the PIN-based MSK
+anyway. The new app-unlock gate is PIN-only. Existing biometric on the app-lock /
+tool-unlock screens is a separate UI convenience and was left as-is (it does not
+gate the sensitive MSK — the app-unlock gate does).
 
 ---
 

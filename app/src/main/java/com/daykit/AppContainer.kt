@@ -12,7 +12,9 @@ import com.daykit.core.data.SettingFlagCache
 import com.daykit.core.security.AndroidKeyStoreCrypto
 import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.PasswordHasher
+import com.daykit.core.security.SensitiveKeyManager
 import com.daykit.core.security.SensitiveValueCipher
+import com.daykit.core.security.SessionValueCipher
 import com.daykit.feature.applock.data.AppLockRepository
 import com.daykit.feature.applock.data.LockedPackageCache
 import com.daykit.feature.applock.domain.InstalledAppProvider
@@ -34,6 +36,11 @@ class AppContainer(context: Context) {
     val keyStoreCrypto = AndroidKeyStoreCrypto()
     val sensitiveValueCipher = SensitiveValueCipher(keyStoreCrypto)
     val credentialRepository = CredentialRepository(appContext, PasswordHasher())
+
+    // PIN-derived key for the sensitive tools (vault, key store, secure notes).
+    // The MSK is only in memory while unlocked; sessionValueCipher throws if locked.
+    val sensitiveKeyManager = SensitiveKeyManager(appContext, PasswordHasher())
+    val sessionValueCipher = SessionValueCipher(sensitiveKeyManager)
     val lockedPackageCache = LockedPackageCache(appContext)
     val settingFlagCache = SettingFlagCache(appContext)
 
@@ -51,7 +58,7 @@ class AppContainer(context: Context) {
     }
 
     val keyStoreRepository: KeyStoreRepository by lazy {
-        KeyStoreRepository(database.keyStoreEntryDao(), sensitiveValueCipher)
+        KeyStoreRepository(database.keyStoreEntryDao(), sessionValueCipher)
     }
 
     val expenseRepository: ExpenseRepository by lazy {
@@ -59,7 +66,7 @@ class AppContainer(context: Context) {
     }
 
     val secureNoteRepository: SecureNoteRepository by lazy {
-        SecureNoteRepository(database.secureNoteDao(), sensitiveValueCipher)
+        SecureNoteRepository(database.secureNoteDao(), sessionValueCipher)
     }
 
     val habitRepository: HabitRepository by lazy {
@@ -75,8 +82,7 @@ class AppContainer(context: Context) {
             context = appContext,
             dao = database.vaultFileDao(),
             streamingCrypto = VaultStreamingCrypto(),
-            keyStoreCrypto = keyStoreCrypto,
-            metadataCipher = sensitiveValueCipher,
+            cipher = sessionValueCipher,
         )
     }
 

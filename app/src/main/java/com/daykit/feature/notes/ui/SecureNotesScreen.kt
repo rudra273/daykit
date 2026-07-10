@@ -242,6 +242,9 @@ fun SecureNotesScreen(
             state = currentEditor,
             existingLabels = uniqueLabels,
             repository = container.secureNoteRepository,
+            onExpectActivityResult = {
+                container.sensitiveKeyManager.expectingActivityResult = true
+            },
             onClose = { editorState = null },
         )
         return
@@ -510,6 +513,7 @@ private fun NoteEditorPage(
     state: NoteEditorState,
     existingLabels: List<String>,
     repository: com.daykit.feature.notes.data.SecureNoteRepository,
+    onExpectActivityResult: () -> Unit,
     onClose: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -589,6 +593,7 @@ private fun NoteEditorPage(
                 actions = {
                     androidx.compose.material3.IconButton(
                         onClick = {
+                            onExpectActivityResult()
                             imagePicker.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )

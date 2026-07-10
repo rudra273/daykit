@@ -3,10 +3,11 @@ package com.daykit.feature.filelocker.data
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
-import com.daykit.core.security.AndroidKeyStoreCrypto
 import com.daykit.core.security.CipherPayload
-import com.daykit.core.security.SensitiveValueCipher
+import com.daykit.core.security.SensitiveDataLockedException
+import com.daykit.core.security.ValueCipher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.FileOutputStream
@@ -22,16 +23,16 @@ import java.util.UUID
  *
  * Key hierarchy:
  *  - each file has a random 256-bit data key (DEK)
- *  - the DEK is wrapped by the Android Keystore master key (KEK) and stored in
- *    the (SQLCipher-encrypted) DB — never persisted in the clear
+ *  - the DEK is wrapped by the PIN-derived session key ([cipher]) and stored in
+ *    the (SQLCipher-encrypted) DB — never persisted in the clear, and not
+ *    recoverable without the user's PIN
  *  - the file bytes are stream-encrypted with the DEK via [VaultStreamingCrypto]
  */
 class VaultFileRepository(
     context: Context,
     private val dao: VaultFileDao,
     private val streamingCrypto: VaultStreamingCrypto,
-    private val keyStoreCrypto: AndroidKeyStoreCrypto,
-    private val metadataCipher: SensitiveValueCipher,
+    private val cipher: ValueCipher,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val appContext = context.applicationContext
@@ -41,6 +42,12 @@ class VaultFileRepository(
 
     fun observeFiles(): Flow<List<VaultFile>> =
         dao.observeAll().map { list -> list.map { it.toVaultFile() } }
+            .catch { error ->
+                // Metadata decryption needs the PIN-derived key. If the DB
+                // re-queries between the key being wiped (background) and the
+                // unlock gate recomposing, emit nothing instead of crashing.
+                if (error is SensitiveDataLockedException) emit(emptyList()) else throw error
+            }
 
     /**
      * Imports [uri] into the vault: streams source -> encrypt -> app-private
@@ -70,9 +77,9 @@ class VaultFileRepository(
                 }
             }
 
-            val wrappedDek = keyStoreCrypto.encrypt(dek, DEK_AAD)
-            val nameCipher = metadataCipher.encryptString(meta.name, fileId)
-            val mimeCipher = metadataCipher.encryptString(meta.mimeType, fileId)
+            val wrappedDek = cipher.encryptBytes(dek, DEK_AAD)
+            val nameCipher = cipher.encryptString(meta.name, fileId)
+            val mimeCipher = cipher.encryptString(meta.mimeType, fileId)
             dao.upsert(
                 VaultFileEntity(
                     fileId = fileId,
@@ -159,8 +166,8 @@ class VaultFileRepository(
             val bytes = openDecryptedStream(entity.fileId)?.use { it.readBytes() } ?: ByteArray(0)
             VaultBackupRecord(
                 fileId = entity.fileId,
-                name = metadataCipher.decryptString(CipherPayload(entity.nameCiphertext, entity.nameIv), entity.fileId),
-                mimeType = metadataCipher.decryptString(CipherPayload(entity.mimeCiphertext, entity.mimeIv), entity.fileId),
+                name = cipher.decryptString(CipherPayload(entity.nameCiphertext, entity.nameIv), entity.fileId),
+                mimeType = cipher.decryptString(CipherPayload(entity.mimeCiphertext, entity.mimeIv), entity.fileId),
                 createdAtMillis = entity.createdAtMillis,
                 plaintext = bytes,
             )
@@ -181,9 +188,9 @@ class VaultFileRepository(
                     }
                     fileOut.fd.sync()
                 }
-                val wrappedDek = keyStoreCrypto.encrypt(dek, DEK_AAD)
-                val nameCipher = metadataCipher.encryptString(record.name, record.fileId)
-                val mimeCipher = metadataCipher.encryptString(record.mimeType, record.fileId)
+                val wrappedDek = cipher.encryptBytes(dek, DEK_AAD)
+                val nameCipher = cipher.encryptString(record.name, record.fileId)
+                val mimeCipher = cipher.encryptString(record.mimeType, record.fileId)
                 dao.upsert(
                     VaultFileEntity(
                         fileId = record.fileId,
@@ -208,7 +215,7 @@ class VaultFileRepository(
     }
 
     private fun unwrapDek(entity: VaultFileEntity): ByteArray {
-        return keyStoreCrypto.decrypt(
+        return cipher.decryptBytes(
             payload = CipherPayload(entity.wrappedDekCiphertext, entity.wrappedDekIv),
             aad = DEK_AAD,
         )
@@ -217,8 +224,8 @@ class VaultFileRepository(
     private fun VaultFileEntity.toVaultFile(): VaultFile {
         return VaultFile(
             fileId = fileId,
-            name = metadataCipher.decryptString(CipherPayload(nameCiphertext, nameIv), fileId),
-            mimeType = metadataCipher.decryptString(CipherPayload(mimeCiphertext, mimeIv), fileId),
+            name = cipher.decryptString(CipherPayload(nameCiphertext, nameIv), fileId),
+            mimeType = cipher.decryptString(CipherPayload(mimeCiphertext, mimeIv), fileId),
             sizeBytes = sizeBytes,
             createdAtMillis = createdAtMillis,
         )
@@ -265,7 +272,7 @@ class VaultFileRepository(
         private const val BLOB_EXTENSION = ".bin"
         private const val DEK_BYTES = 32
         private const val GENERIC_MIME_TYPE = "application/octet-stream"
-        private val DEK_AAD = "daykit.vault.file.dek".toByteArray()
+        private const val DEK_AAD = "daykit.vault.file.dek"
         private val secureRandom = SecureRandom()
     }
 }

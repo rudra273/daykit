@@ -25,15 +25,22 @@ import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.permissions.AppLockPermissionChecker
 import com.daykit.core.permissions.AppLockPermissionState
 import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.security.PinVerifyResult
+import com.daykit.core.security.errorMessageOrNull
 import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.feature.applock.data.LockedApp
 import com.daykit.feature.applock.service.AppMonitorService
+import com.daykit.feature.lock.ui.ToolUnlockScreen
 import com.daykit.feature.onboarding.ui.BiometricSetupScreen
 import com.daykit.feature.onboarding.ui.PermissionGrantScreen
 import com.daykit.feature.onboarding.ui.SetupCredentialScreen
 import com.daykit.navigation.RootScaffold
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Lock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +68,14 @@ class MainActivity : FragmentActivity() {
     }
 }
 
+/**
+ * How long the app may sit backgrounded before the sensitive key is wiped. A
+ * brief grace period lets a rotation, a quick app-switch glance, or a returning
+ * picker resume without a fresh PIN prompt, while a genuine departure still
+ * locks the vault.
+ */
+private const val LOCK_GRACE_MILLIS = 2_000L
+
 @Composable
 private fun DayKitApp(
     activity: FragmentActivity,
@@ -72,6 +87,11 @@ private fun DayKitApp(
     val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
 
     var credentialReady by remember { mutableStateOf(container.credentialRepository.hasCredential()) }
+    // MSK unlock state for the sensitive tools. Starts from the manager (unlocked
+    // right after onboarding init), and is wiped whenever the app is backgrounded.
+    var sensitiveUnlocked by remember { mutableStateOf(container.sensitiveKeyManager.isUnlocked()) }
+    var unlockPin by remember { mutableStateOf("") }
+    var unlockError by remember { mutableStateOf<String?>(null) }
     var permissions by remember { mutableStateOf(AppLockPermissionChecker.check(context)) }
     var biometricMessage by remember { mutableStateOf<String?>(null) }
     var biometricPreferenceLoaded by remember { mutableStateOf(false) }
@@ -80,13 +100,49 @@ private fun DayKitApp(
     var lockedApps by remember { mutableStateOf(emptyList<LockedApp>()) }
 
     DisposableEffect(lifecycleOwner) {
+        // ON_STOP fires not only when the user leaves the app, but also for a
+        // rotation, a config change, or any full-screen activity we launch
+        // ourselves (file picker, account chooser). Wiping the key on every one
+        // of those would break imports/exports/backups and re-prompt for the PIN
+        // constantly. So: skip the wipe entirely when we launched the activity
+        // ourselves, and otherwise wipe after a short grace period that is
+        // cancelled if we return to the foreground quickly.
+        var pendingLock: Job? = null
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                permissions = AppLockPermissionChecker.check(context)
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    pendingLock?.cancel()
+                    pendingLock = null
+                    container.sensitiveKeyManager.expectingActivityResult = false
+                    permissions = AppLockPermissionChecker.check(context)
+                    // Reflect any wipe that happened while backgrounded so the
+                    // gate re-shows.
+                    sensitiveUnlocked = container.sensitiveKeyManager.isUnlocked()
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    if (container.sensitiveKeyManager.expectingActivityResult) {
+                        // We opened a picker/chooser; keep the key so its result
+                        // callback can encrypt/decrypt. Reset below on resume.
+                        return@LifecycleEventObserver
+                    }
+                    pendingLock?.cancel()
+                    pendingLock = scope.launch {
+                        delay(LOCK_GRACE_MILLIS)
+                        // Leaving the app wipes the in-memory sensitive key: the
+                        // vault, key store, and secure notes cannot be decrypted
+                        // again until the user re-enters their PIN.
+                        container.sensitiveKeyManager.lock()
+                        sensitiveUnlocked = false
+                    }
+                }
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            pendingLock?.cancel()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     DisposableEffect(screenshotProtection) {
@@ -142,8 +198,13 @@ private fun DayKitApp(
             onCredentialReady = { pin ->
                 scope.launch {
                     withContext(Dispatchers.Default) {
+                        // Save the PIN credential AND create the sensitive-data key,
+                        // wrapped by this PIN. Both derive from the same PIN chars;
+                        // read them before saveCredential wipes its copy.
                         container.credentialRepository.saveCredential(pin.toCharArray())
+                        container.sensitiveKeyManager.initialize(pin.toCharArray())
                     }
+                    sensitiveUnlocked = true
                     credentialReady = true
                 }
             },
@@ -182,6 +243,47 @@ private fun DayKitApp(
         !permissions.allGranted -> PermissionGrantScreen(
             permissions = permissions,
             onRefresh = { permissions = AppLockPermissionChecker.check(context) },
+        )
+
+        // Mandatory session unlock: derives the sensitive-data key from the PIN.
+        // Reached on every cold start and after the app returns from background.
+        !sensitiveUnlocked -> ToolUnlockScreen(
+            title = "Unlock DayKit",
+            subtitle = "Enter your master PIN",
+            pin = unlockPin,
+            error = unlockError,
+            biometricEnabled = false,
+            icon = Icons.Rounded.Lock,
+            onBack = { activity.finish() },
+            onPinChange = {
+                unlockPin = it.filter(Char::isDigit).take(12)
+                unlockError = null
+            },
+            onUnlock = {
+                scope.launch {
+                    val pin = unlockPin
+                    val result = withContext(Dispatchers.Default) {
+                        // C1 lockout runs here; only then derive the key.
+                        val verifyResult = container.credentialRepository.verify(pin.toCharArray())
+                        if (verifyResult is PinVerifyResult.Success) {
+                            container.sensitiveKeyManager.unlock(pin.toCharArray())
+                        }
+                        verifyResult
+                    }
+                    when {
+                        result is PinVerifyResult.Success && container.sensitiveKeyManager.isUnlocked() -> {
+                            unlockPin = ""
+                            unlockError = null
+                            sensitiveUnlocked = true
+                        }
+                        else -> {
+                            unlockPin = ""
+                            unlockError = result.errorMessageOrNull() ?: "Wrong PIN"
+                        }
+                    }
+                }
+            },
+            onBiometric = {},
         )
 
         else -> RootScaffold(

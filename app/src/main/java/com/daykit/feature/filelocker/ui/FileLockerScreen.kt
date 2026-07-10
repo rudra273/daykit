@@ -181,6 +181,7 @@ fun FileLockerScreen(
                     onCancel = { selectedIds.clear() },
                     onExport = {
                         snack("Choose where to export the selected files.")
+                        container.sensitiveKeyManager.expectingActivityResult = true
                         exportFolderLauncher.launch(Unit)
                     },
                     onDelete = {
@@ -207,7 +208,12 @@ fun FileLockerScreen(
                 AppExtendedFab(
                     icon = Icons.Rounded.Lock,
                     text = if (working) "Working…" else "Add files",
-                    onClick = { if (!working) pickMediaLauncher.launch(Unit) },
+                    onClick = {
+                        if (!working) {
+                            container.sensitiveKeyManager.expectingActivityResult = true
+                            pickMediaLauncher.launch(Unit)
+                        }
+                    },
                 )
             }
         },

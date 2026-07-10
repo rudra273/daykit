@@ -509,6 +509,24 @@ fun SettingsScreen(
                             container.credentialRepository.verify(oldPin.toCharArray())
                         }
                         if (result is PinVerifyResult.Success) {
+                            // Re-wrap the sensitive-data key under the new PIN FIRST.
+                            // If this fails we do not change the PIN, so the vault /
+                            // key store / notes can never be orphaned. If the key was
+                            // somehow never created (shouldn't happen post-onboarding),
+                            // create it under the new PIN rather than leaving the tools
+                            // permanently unusable.
+                            val rewrapped = withContext(Dispatchers.Default) {
+                                if (container.sensitiveKeyManager.isInitialized()) {
+                                    container.sensitiveKeyManager.rewrap(oldPin.toCharArray(), newPin.toCharArray())
+                                } else {
+                                    container.sensitiveKeyManager.initialize(newPin.toCharArray())
+                                    true
+                                }
+                            }
+                            if (!rewrapped) {
+                                onError("Could not update PIN. Please try again.")
+                                return@runCatching
+                            }
                             withContext(Dispatchers.Default) {
                                 container.credentialRepository.saveCredential(newPin.toCharArray())
                             }

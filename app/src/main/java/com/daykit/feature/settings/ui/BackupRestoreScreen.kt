@@ -165,10 +165,13 @@ fun BackupRestoreScreen(
         .collectAsStateWithLifecycle(initialValue = false)
 
     val driveSchedule = DriveBackupSchedule.fromValue(driveScheduleValue)
+    // Manual backup runs in the foreground after the app unlock gate, so the
+    // PIN-derived key is available and the sensitive tools can be included.
     val backupToolKeys = includedBackupToolKeys(
         includeExpenses = includeExpenses != false,
         includeHabits = includeHabits != false,
         includeVault = includeVault == true,
+        includeSensitive = true,
     )
     var activeSheet by remember { mutableStateOf<BackupSheet?>(null) }
     var driveBackups by remember { mutableStateOf<List<DriveBackupFile>>(emptyList()) }
@@ -262,6 +265,7 @@ fun BackupRestoreScreen(
             null,
             null,
         )
+        container.sensitiveKeyManager.expectingActivityResult = true
         accountPickerLauncher.launch(intent)
     }
 
@@ -315,10 +319,12 @@ fun BackupRestoreScreen(
             showSnackbar("Set a backup password first")
             return
         }
+        container.sensitiveKeyManager.expectingActivityResult = true
         localBackupLauncher.launch(BackupFileNames.backupName())
     }
 
     fun startLocalRestore() {
+        container.sensitiveKeyManager.expectingActivityResult = true
         localRestoreLauncher.launch(arrayOf(LOCAL_BACKUP_MIME_TYPE, "application/json", "*/*"))
     }
 
@@ -557,6 +563,7 @@ fun BackupRestoreScreen(
                         showSnackbar("Google authorization failed")
                         return@addOnSuccessListener
                     }
+                    container.sensitiveKeyManager.expectingActivityResult = true
                     driveAuthorizationLauncher.launch(
                         IntentSenderRequest.Builder(pendingIntent.intentSender).build(),
                     )
@@ -884,13 +891,16 @@ private fun includedBackupToolKeys(
     includeExpenses: Boolean,
     includeHabits: Boolean,
     includeVault: Boolean,
+    includeSensitive: Boolean,
 ): Set<String> {
     return buildSet {
-        add(BACKUP_TOOL_KEY_STORE)
-        add(BACKUP_TOOL_NOTES)
+        if (includeSensitive) {
+            add(BACKUP_TOOL_KEY_STORE)
+            add(BACKUP_TOOL_NOTES)
+            if (includeVault) add(BACKUP_TOOL_VAULT)
+        }
         if (includeExpenses) add(BACKUP_TOOL_EXPENSES)
         if (includeHabits) add(BACKUP_TOOL_HABITS)
-        if (includeVault) add(BACKUP_TOOL_VAULT)
     }
 }
 

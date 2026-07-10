@@ -1,18 +1,25 @@
 package com.daykit.feature.keystore.data
 
 import com.daykit.core.security.CipherPayload
-import com.daykit.core.security.SensitiveValueCipher
+import com.daykit.core.security.SensitiveDataLockedException
+import com.daykit.core.security.ValueCipher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 class KeyStoreRepository(
     private val dao: KeyStoreEntryDao,
-    private val cipher: SensitiveValueCipher,
+    private val cipher: ValueCipher,
 ) {
     fun observeEntries(): Flow<List<KeyStoreEntry>> {
         return dao.observeAll().map { entities ->
             entities.mapNotNull { entity -> entity.toDomainOrNull() }
+        }.catch { error ->
+            // If the DB re-queries in the instant between the key being wiped
+            // (background) and the unlock gate recomposing, decryption throws.
+            // Emit nothing rather than crash — the gate is about to take over.
+            if (error is SensitiveDataLockedException) emit(emptyList()) else throw error
         }
     }
 
