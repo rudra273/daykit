@@ -270,13 +270,6 @@ fun KeyStoreScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                item(key = "header") {
-                    Text(
-                        text = "${filteredEntries.size} of ${entries?.size ?: 0} saved",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.extendedColors.textMuted,
-                    )
-                }
                 if (uniqueLabels.isNotEmpty()) {
                     item(key = "filters") {
                         LazyRow(
