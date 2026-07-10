@@ -45,7 +45,9 @@ fun RootScaffold(
             // Shown instantly on tabs, hidden instantly on tool screens — no slide animation.
             if (onTopLevel) {
                 NavigationBar(
-                    containerColor = MaterialTheme.extendedColors.card,
+                    // Same gray as the page so the bar blends into the screen
+                    // rather than reading as a separate white footer panel.
+                    containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ) {
                     TopLevelDestination.entries.forEach { dest ->

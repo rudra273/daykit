@@ -91,7 +91,10 @@ fun SectionHeader(
         text = text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.extendedColors.textMuted,
-        modifier = modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        // No start inset: callers already pad their content region, so the label
+        // aligns flush with the cards' left edge instead of double-indenting.
+        // More space above than below so it hugs its group.
+        modifier = modifier.padding(end = Spacing.lg, top = Spacing.md, bottom = Spacing.xs),
     )
 }
 

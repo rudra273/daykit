@@ -40,8 +40,9 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.extendedColors
 
 /**
- * App top bar. Fully opaque [card] background with a hairline divider on every screen,
- * so headers look identical regardless of what scrolls beneath them.
+ * App top bar. Opaque page-[background] fill (same gray as the screen) so the header
+ * blends in rather than reading as a separate panel; an optional hairline divider
+ * ([showDivider]) appears when content scrolls beneath it.
  */
 /** Standard header height, excluding the status-bar inset. Every screen uses this via [AppTopBar]. */
 val AppTopBarHeight = 52.dp
@@ -52,13 +53,16 @@ fun AppTopBar(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
+    showDivider: Boolean = true,
     titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.extendedColors.card),
+            // Same gray as the page so the header blends into the screen rather
+            // than reading as a separate white panel; only cards are white.
+            .background(MaterialTheme.colorScheme.background),
     ) {
         Row(
             modifier = Modifier
@@ -103,7 +107,9 @@ fun AppTopBar(
             }
             actions()
         }
-        RowDivider(modifier = Modifier.align(Alignment.BottomCenter), startIndent = 0.dp)
+        if (showDivider) {
+            RowDivider(modifier = Modifier.align(Alignment.BottomCenter), startIndent = 0.dp)
+        }
     }
 }
 
@@ -123,6 +129,7 @@ fun SearchAppTopBar(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     searchPlaceholder: String = "Search",
+    showDivider: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -134,6 +141,7 @@ fun SearchAppTopBar(
             modifier = modifier,
             title = title,
             onBack = onBack,
+            showDivider = true,
             titleContent = {
                 BasicTextField(
                     value = query,
@@ -179,6 +187,7 @@ fun SearchAppTopBar(
             modifier = modifier,
             title = title,
             onBack = onBack,
+            showDivider = showDivider,
             actions = {
                 IconButton(onClick = { onSearchActiveChange(true) }) {
                     Icon(

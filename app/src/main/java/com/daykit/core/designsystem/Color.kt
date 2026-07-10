@@ -20,8 +20,10 @@ import androidx.compose.ui.graphics.Color
 private val LightPrimary = Color(0xFF1877F2)
 private val LightPrimaryContainer = Color(0xFFE7F3FF)
 private val LightOnPrimaryContainer = Color(0xFF1877F2)
-private val LightBackground = Color(0xFFFFFFFF)
-private val LightSurface = Color(0xFFFFFFFF)
+// Soft gray page background applied to the whole screen — header, content, and
+// bottom nav all sit on this. Only cards are white (via [LightCard]).
+private val LightBackground = Color(0xFFF0F2F5)
+private val LightSurface = Color(0xFFF0F2F5)
 private val LightSurfaceVariant = Color(0xFFF0F2F5)
 private val LightText = Color(0xFF050505)
 private val LightMuted = Color(0xFF65676B)

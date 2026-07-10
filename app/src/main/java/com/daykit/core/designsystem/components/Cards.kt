@@ -28,8 +28,9 @@ import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.designsystem.isAppInDarkTheme
 
 /**
- * The core surface primitive. Light mode: 1dp divider border + faint shadow.
- * Dark mode: no border/shadow — contrast comes from the surface-color step.
+ * The core surface primitive with a soft, claymorphic lift.
+ * Light: white card on white, separated by a very soft low shadow + faint hairline.
+ * Dark: a one-step-lighter fill with a subtle hairline (shadows read poorly on dark).
  */
 @Composable
 fun AppCard(
@@ -44,11 +45,12 @@ fun AppCard(
         containerColor = MaterialTheme.extendedColors.card,
         contentColor = MaterialTheme.colorScheme.onSurface,
     )
-    val elevation = if (dark) CardDefaults.cardElevation()
-    else CardDefaults.cardElevation(defaultElevation = 1.dp)
-    // Dark cards get a faint hairline so edges stay crisp against the background.
-    val border = if (dark) BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
-    else BorderStroke(1.dp, MaterialTheme.extendedColors.divider)
+    // Very soft clay lift in light mode; dark mode separates by color step only.
+    val elevation = if (dark) CardDefaults.cardElevation(defaultElevation = 0.dp)
+    else CardDefaults.cardElevation(defaultElevation = 0.5.dp)
+    // Faint hairline keeps the card edge crisp on both themes.
+    val border = if (dark) BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+    else BorderStroke(1.dp, MaterialTheme.extendedColors.divider.copy(alpha = 0.5f))
 
     if (onClick != null) {
         Card(

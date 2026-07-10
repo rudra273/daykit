@@ -245,7 +245,7 @@ fun SettingsScreen(
     val listState = rememberLazyListState()
 
     Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "Settings")
+        AppTopBar(title = "Settings", showDivider = listState.canScrollBackward)
 
         if (!settingsLoaded) {
             Box(

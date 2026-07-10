@@ -38,7 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AccentIconTile
@@ -66,18 +65,10 @@ fun HomeScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var searchActive by rememberSaveable { mutableStateOf(false) }
-    val habitDashboard by container.habitRepository
-        .observeDashboard()
-        .collectAsStateWithLifecycle(initialValue = null)
 
     val gridState = rememberLazyGridState()
 
     val accents = MaterialTheme.extendedColors.accents
-    val habitsDone = habitDashboard?.let { d ->
-        val total = d.buildHabits.size
-        val done = d.buildHabits.count { h -> d.logFor(h.habitId)?.completed == true }
-        if (total > 0) "$done/$total today" else "Track habits"
-    } ?: "Track habits"
 
     val security = listOf(
         ToolTile(Routes.TOOL_APPLOCK, "App Lock", Icons.Rounded.Lock, { accents.blue },
@@ -104,19 +95,6 @@ fun HomeScreen(
             listOf("dns", "ad block", "private dns")),
     )
 
-    fun statusFor(route: String): String = when (route) {
-        Routes.TOOL_APPLOCK -> if (lockedCount > 0) "$lockedCount apps locked" else "Protect your apps"
-        Routes.TOOL_KEYSTORE -> "Encrypted vault"
-        Routes.TOOL_NOTES -> "Private notes"
-        Routes.TOOL_FILEVAULT -> "Hide photos & videos"
-        Routes.TOOL_HABITS -> habitsDone
-        Routes.TOOL_REMINDERS -> "Never forget"
-        Routes.TOOL_EXPENSES -> "Track spending"
-        Routes.TOOL_EDITOR -> "Write & export"
-        Routes.TOOL_DNS -> "Private DNS setup"
-        else -> ""
-    }
-
     val q = query.trim()
     fun match(t: ToolTile) = q.isBlank() || t.keywords.any { it.contains(q, true) } ||
         t.name.contains(q, true)
@@ -135,6 +113,8 @@ fun HomeScreen(
             searchActive = searchActive,
             onSearchActiveChange = { searchActive = it; if (!it) query = "" },
             searchPlaceholder = "Search tools",
+            // Borderless at rest; the hairline appears only once content scrolls under it.
+            showDivider = gridState.canScrollBackward,
         )
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -157,9 +137,9 @@ fun HomeScreen(
                     )
                 }
             }
-            toolSection("Security", fSecurity, ::statusFor, onOpenTool)
-            toolSection("Productivity", fProductivity, ::statusFor, onOpenTool)
-            toolSection("Other", fOther, ::statusFor, onOpenTool)
+            toolSection("Security", fSecurity, onOpenTool)
+            toolSection("Productivity", fProductivity, onOpenTool)
+            toolSection("Other", fOther, onOpenTool)
         }
     }
 }
@@ -167,33 +147,28 @@ fun HomeScreen(
 private fun androidx.compose.foundation.lazy.grid.LazyGridScope.toolSection(
     title: String,
     tiles: List<ToolTile>,
-    statusFor: (String) -> String,
     onOpenTool: (String) -> Unit,
 ) {
     if (tiles.isEmpty()) return
     item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(title) }
     items(tiles, key = { it.route }) { tile ->
-        ToolCard(tile = tile, status = statusFor(tile.route), onClick = { onOpenTool(tile.route) })
+        ToolCard(tile = tile, onClick = { onOpenTool(tile.route) })
     }
 }
 
 @Composable
-private fun ToolCard(tile: ToolTile, status: String, onClick: () -> Unit) {
-    AppCard(onClick = onClick, contentPadding = PaddingValues(Spacing.lg)) {
-        AccentIconTile(icon = tile.icon, accent = tile.accent(), size = 44.dp, iconSize = 24.dp)
-        Spacer(Modifier.height(Spacing.md))
+private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
+    AppCard(
+        onClick = onClick,
+        contentPadding = PaddingValues(Spacing.lg),
+    ) {
+        AccentIconTile(icon = tile.icon, accent = tile.accent(), size = 42.dp, iconSize = 23.dp)
+        // Taller cards: fixed gap between icon and title gives the card its height.
+        Spacer(Modifier.height(Spacing.xl))
         Text(
             text = tile.name,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = status,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.extendedColors.textMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
