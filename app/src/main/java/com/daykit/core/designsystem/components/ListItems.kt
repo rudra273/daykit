@@ -40,7 +40,9 @@ fun AppListRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 46.dp)
+            // Uniform floor so single-line and two-line rows share the same
+            // height rhythm within a card (matches the "Tool locks" template).
+            .defaultMinSize(minHeight = 56.dp)
             .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier)
             .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,

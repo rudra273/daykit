@@ -155,13 +155,14 @@ fun BackupRestoreScreen(
     val driveLastBackupSizeBytes by container.secureSettingRepository
         .observeString(SecureSettingRepository.KEY_DRIVE_LAST_BACKUP_SIZE_BYTES)
         .collectAsStateWithLifecycle(initialValue = null)
+    // Expenses, Habits and Vault files all default OFF — only backed up when
+    // the user explicitly turns them on.
     val includeExpenses by container.secureSettingRepository
         .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_EXPENSES)
-        .collectAsStateWithLifecycle(initialValue = true)
+        .collectAsStateWithLifecycle(initialValue = false)
     val includeHabits by container.secureSettingRepository
         .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS)
-        .collectAsStateWithLifecycle(initialValue = true)
-    // Vault files default OFF — never backed up unless the user turns this on.
+        .collectAsStateWithLifecycle(initialValue = false)
     val includeVault by container.secureSettingRepository
         .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT)
         .collectAsStateWithLifecycle(initialValue = false)
@@ -170,8 +171,8 @@ fun BackupRestoreScreen(
     // Manual backup runs in the foreground after the app unlock gate, so the
     // PIN-derived key is available and the sensitive tools can be included.
     val backupToolKeys = includedBackupToolKeys(
-        includeExpenses = includeExpenses != false,
-        includeHabits = includeHabits != false,
+        includeExpenses = includeExpenses == true,
+        includeHabits = includeHabits == true,
         includeVault = includeVault == true,
         includeSensitive = true,
     )
@@ -696,9 +697,19 @@ fun BackupRestoreScreen(
                 }
 
                 SectionHeader(text = "What's included")
+                Text(
+                    "Key Store and Secure Notes are always included. App Lock is never included.",
+                    color = MaterialTheme.extendedColors.textMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(
+                        start = Spacing.lg,
+                        end = Spacing.lg,
+                        bottom = Spacing.xs,
+                    ),
+                )
                 BackupContentOptions(
-                    includeExpenses = includeExpenses != false,
-                    includeHabits = includeHabits != false,
+                    includeExpenses = includeExpenses == true,
+                    includeHabits = includeHabits == true,
                     includeVault = includeVault == true,
                     onExpensesChange = { enabled ->
                         scope.launch {
@@ -933,20 +944,9 @@ private fun BackupContentOptions(
         RowDivider(startIndent = Spacing.lg)
         AppListRow(
             headline = "Vault files",
-            supporting = "Photos & videos",
             leadingIcon = Icons.Rounded.Folder,
             leadingAccent = accents.purple,
             trailing = { AppSwitch(checked = includeVault, onCheckedChange = onVaultChange) },
-        )
-        Text(
-            "Key Store and Secure Notes are always included. App Lock is never included.",
-            color = MaterialTheme.extendedColors.textMuted,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(
-                start = Spacing.lg,
-                end = Spacing.lg,
-                bottom = Spacing.md,
-            ),
         )
         if (includeVault) {
             Text(

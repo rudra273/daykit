@@ -60,9 +60,10 @@ class DriveBackupWorker(
         val passwordChars = password.toCharArray()
         runCatching {
             val includedToolKeys = includedBackupToolKeys(
-                includeExpenses = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_EXPENSES) != false,
-                includeHabits = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS) != false,
-                // Vault defaults to OFF: only true when the user explicitly enabled it.
+                // Expenses, Habits and Vault all default OFF: only true when the
+                // user explicitly enabled them.
+                includeExpenses = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_EXPENSES) == true,
+                includeHabits = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS) == true,
                 includeVault = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT) == true,
                 // The background worker never holds the PIN-derived key (it runs in
                 // its own process with a freshly-locked key manager), so the
