@@ -5,6 +5,9 @@ import java.util.concurrent.ConcurrentHashMap
 object AppLockSessionManager {
     private val temporaryAccess = ConcurrentHashMap<String, AccessGrant>()
 
+    /** How long an unlock grant stays valid before the app re-challenges. */
+    private const val GRANT_TTL_MILLIS = 5 * 60_000L
+
     fun allow(packageName: String) {
         temporaryAccess[packageName] = AccessGrant(
             windowId = null,
@@ -13,12 +16,19 @@ object AppLockSessionManager {
     }
 
     fun isAllowed(packageName: String): Boolean {
-        return temporaryAccess.containsKey(packageName)
+        val grant = temporaryAccess[packageName] ?: return false
+        // Grants auto-expire so a locked app cannot stay unlocked indefinitely
+        // while the screen stays on (e.g. user unlocks, leaves, comes back later).
+        if (System.currentTimeMillis() - grant.grantedAtMillis > GRANT_TTL_MILLIS) {
+            temporaryAccess.remove(packageName)
+            return false
+        }
+        return true
     }
 
     fun isAllowedForWindow(packageName: String, windowId: Int): Boolean {
-        val grant = temporaryAccess[packageName] ?: return false
-        return grant.windowId == windowId
+        if (!isAllowed(packageName)) return false
+        return temporaryAccess[packageName]?.windowId == windowId
     }
 
     fun bindWindow(packageName: String, windowId: Int) {

@@ -207,7 +207,7 @@ overwrite/tamper with local data via restore.
 
 ## MEDIUM
 
-### M1 — Release builds un-minified / un-obfuscated ⬜
+### M1 — Release builds un-minified / un-obfuscated ✅ DONE
 **Where:** `build.gradle.kts:64` (`isMinifyEnabled = false`), empty
 `proguard-rules.pro`.
 
@@ -216,9 +216,18 @@ readable in the APK; eases reverse engineering.
 
 **Fix:** Enable R8 minification + obfuscation for release; add keep rules as needed.
 
+**IMPLEMENTED:**
+- `build.gradle.kts` release: `isMinifyEnabled = true`, `isShrinkResources = true`.
+- Full `proguard-rules.pro` with keep rules for Room, SQLCipher (JNI), Tink,
+  argon2kt (JNI), Play Services auth, media3, and our custom
+  `VaultMediaDataSource`. Keeps line numbers, renames source file.
+- ✅ `:app:assembleRelease` BUILD SUCCESSFUL — R8 ran clean, keep rules correct.
+- Result: release APK **90 MB → 20 MB**; `mapping.txt` produced (KEEP this file
+  to de-obfuscate crash reports).
+
 ---
 
-### M2 — `AppLockBootReceiver` exported ⬜
+### M2 — `AppLockBootReceiver` exported ✅ DONE
 **Where:** `AndroidManifest.xml:76-83`.
 
 **Problem:** Must be exported for `BOOT_COMPLETED`, but any app can send
@@ -228,9 +237,14 @@ state check), but tighten.
 **Fix:** Strict action validation (already present); confirm no sensitive action on
 attacker-controllable intent.
 
+**IMPLEMENTED:** Receiver now early-returns unless the action is exactly
+`BOOT_COMPLETED` or `MY_PACKAGE_REPLACED`; documented in code + manifest why it
+stays exported (BOOT_COMPLETED delivery) and why a spoofed intent is harmless
+(only re-checks real state; starting the monitor needs the app's own permissions).
+
 ---
 
-### M3 — Powerful surveillance-shaped permission set; overlay app-lock is bypassable ⬜
+### M3 — Powerful surveillance-shaped permission set; overlay app-lock is bypassable ✅ DONE
 **Where:** `AndroidManifest.xml:6-13`, `LockOverlayController`.
 
 **Problem:** `SYSTEM_ALERT_WINDOW` + `PACKAGE_USAGE_STATS` + Device Admin +
@@ -239,15 +253,31 @@ weak spot (dismissible via recents, permission revocation, safe mode).
 
 **Fix:** Document limits honestly; don't market app-lock as tamper-proof.
 
+**IMPLEMENTED (Privacy Policy screen):**
+- Added an explicit "App Lock is a deterrent, not a guarantee" paragraph naming
+  the real bypasses (recents, safe mode, permission revocation, launch race) and
+  noting it does not encrypt locked apps' data; recommends device screen lock +
+  Secure Folder.
+- **Fixed now-stale claims** (C2/backup shipped): vault text updated from "not
+  encrypted" → "AES-256, app-private, per-file keys"; backup text updated to note
+  vault backup is optional + off by default, and restore requires the master PIN.
+- No false "unbreakable/100%" marketing claims existed elsewhere (checked).
+
 ---
 
-### M4 — Session grants never self-expire ⬜
+### M4 — Session grants never self-expire ✅ DONE
 **Where:** `AppLockSessionManager.kt`.
 
 **Problem:** Grants are timestamped but rely on external revocation; a locked app
 could stay "allowed" indefinitely after backgrounding.
 
 **Fix:** Verify/enforce grant expiry on background or after a timeout.
+
+**IMPLEMENTED:** `AppLockSessionManager.isAllowed()` now expires a grant after a
+5-minute TTL (checked against `grantedAtMillis`, which was already recorded) and
+removes it. `isAllowedForWindow()` delegates to the same check. The monitor polls
+`isAllowed` every cycle, so a locked app re-challenges once its grant ages out
+even if the screen never turned off.
 
 ---
 

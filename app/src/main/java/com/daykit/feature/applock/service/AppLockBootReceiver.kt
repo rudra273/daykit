@@ -13,18 +13,21 @@ import com.daykit.core.permissions.AppLockPermissionChecker
  */
 class AppLockBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_MY_PACKAGE_REPLACED,
-            -> {
-                val container = (context.applicationContext as DayKitApplication).container
-                val shouldMonitor = container.credentialRepository.hasCredential() &&
-                    AppLockPermissionChecker.hasUsageAccess(context) &&
-                    container.appLockRepository.getLockedPackages().isNotEmpty()
-                if (shouldMonitor) {
-                    AppMonitorService.start(context)
-                }
-            }
+        // This receiver is exported (required to receive BOOT_COMPLETED), so a
+        // malicious app could send it a spoofed intent. Guard strictly: only the
+        // two system broadcasts we registered for are honored — anything else is
+        // ignored. Even if spoofed, the only effect is re-checking real state and
+        // starting the monitor, which itself requires the app's own permissions.
+        val action = intent.action
+        if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_MY_PACKAGE_REPLACED) {
+            return
+        }
+        val container = (context.applicationContext as DayKitApplication).container
+        val shouldMonitor = container.credentialRepository.hasCredential() &&
+            AppLockPermissionChecker.hasUsageAccess(context) &&
+            container.appLockRepository.getLockedPackages().isNotEmpty()
+        if (shouldMonitor) {
+            AppMonitorService.start(context)
         }
     }
 }

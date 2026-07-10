@@ -73,6 +73,11 @@
                 android:value="Monitors the foreground app to show a PIN challenge for user-locked apps" />
         </service>
 
+        <!--
+            Exported so the system can deliver BOOT_COMPLETED reliably across OEMs.
+            The receiver strictly validates the action and performs no sensitive
+            work on a spoofed intent (see AppLockBootReceiver).
+        -->
         <receiver
             android:name=".feature.applock.service.AppLockBootReceiver"
             android:exported="true">

@@ -73,15 +73,16 @@ fun PrivacyPolicyScreen(
                     "Expenses and Habits: tracker entries, bills, habit definitions, progress logs, and related timestamps are stored locally.",
                     "App Lock: selected locked package names and app labels are stored locally so App Lock can continue working after app restart or device reboot.",
                     "Settings: tool-lock preferences, backup preferences, selected Google account email for Drive backup, theme preferences, widget preferences, and local app configuration may be stored on the device.",
-                    "File Vault: selected media files are copied to a local Documents/DayKitFileLocker folder. File Vault media is not encrypted by this app and is not stored in the app database.",
+                    "File Vault: selected media files are encrypted with AES-256 and stored in the app's private storage on the device, where other apps and file managers cannot read them. Each file has its own key, protected by the device keystore.",
                 ),
             )
             PolicySection(
                 title = "Backup And Google Drive",
                 body = listOf(
                     "Backups are encrypted on the device before they are saved or uploaded. The backup password is used to derive the backup encryption key, and backup content is encrypted before it leaves the device.",
-                    "Key Store and Secure Notes are always included in encrypted backup files. Expenses and Habits are optional and can be enabled or disabled in Backup & Restore settings.",
-                    "App Lock package selections, theme preferences, widget settings, DNS choices, reminder schedules, editor cache, and File Vault media are not included in app backup files.",
+                    "Key Store and Secure Notes are always included in encrypted backup files. Expenses, Habits, and File Vault files are optional and can be enabled or disabled in Backup & Restore settings. File Vault backup is off by default; vault files are only included when the user explicitly turns it on.",
+                    "Restoring a backup requires the master PIN, because it replaces the data currently on the device.",
+                    "App Lock package selections, theme preferences, widget settings, DNS choices, reminder schedules, and editor cache are not included in app backup files.",
                     "When Google Drive backup is enabled, DayKit requests access to create and manage its own backup files in the user's Google Drive. The app uploads encrypted backup files; it does not upload plain Key Store values, notes, expenses, or habits.",
                     "Google account authorization is used only for the backup and restore actions chosen by the user or for automatic backup when the user enables it.",
                 ),
@@ -91,6 +92,7 @@ fun PrivacyPolicyScreen(
                 body = listOf(
                     "Usage Access is used to identify the foreground app for App Lock behavior.",
                     "Overlay permission may be used to display a lock challenge over selected locked apps.",
+                    "App Lock is a deterrent, not a guarantee. Because Android limits what one app can do to another, a determined person with physical access may bypass App Lock (for example via the recent-apps screen, safe mode, by revoking DayKit's permissions, or during the brief moment an app opens). App Lock does not encrypt the locked apps' own data. For strongest protection, also use your device's screen lock and, where available, per-app protections such as Secure Folder.",
                     "Notification permission is used for reminders, habits, and app alerts when the user enables those features.",
                     "Device Admin is optional and is used only for uninstall protection. It does not give DayKit access to personal files or messages.",
                 ),
