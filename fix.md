@@ -173,7 +173,7 @@ meaningless.
 
 ---
 
-### H3 — Cloud backup restore may be unauthenticated on-device ⬜
+### H3 — Cloud backup restore may be unauthenticated on-device ✅ DONE (restore gate)
 **Where:** Restore flow + `BackupCrypto.kt`, `GoogleDriveBackupClient.kt`.
 
 **Problem:** Backups are encrypted with a user password (good). But confirm the
@@ -181,6 +181,27 @@ meaningless.
 Also verify OAuth scope is `drive.file` (app-created files only), not full `drive`.
 
 **Fix:** Require PIN before restore; confirm minimal OAuth scope.
+
+**IMPLEMENTED — master PIN gate before restore (both Drive & local):**
+- New `BackupSheet.RestorePin` stage + `PendingRestore` enum. After the user
+  enters the backup password and taps Restore, the flow now switches to a
+  `RestorePinSheet` instead of restoring immediately.
+- `confirmRestorePin()` calls `credentialRepository.verify()` — so the restore
+  gate automatically inherits the **C1 escalating lockout** and shows
+  "Too many attempts…" messages. Only `PinVerifyResult.Success` proceeds to the
+  actual restore (`requestDriveAuthorization(...Restore)` / `restoreLocalBackup`).
+- Dismissing the sheet clears the pending-restore + PIN state (no stale gate).
+- Decision: gate **restore only** (destructive/overwrites data). Creating a
+  backup stays frictionless. UI reuses the Settings PIN-confirm pattern.
+- ✅ compiles clean under `:app:compileDebugKotlin --rerun-tasks`.
+
+**OAuth scope — VERIFIED OK:** both the worker and the screen request only
+`https://www.googleapis.com/auth/drive.file` (app-created files), not full
+`drive`. No change needed.
+
+**Note:** restore already required the backup *password* (to decrypt); this adds
+the master-PIN check so a person past the app lock on an unlocked device can't
+overwrite/tamper with local data via restore.
 
 ---
 

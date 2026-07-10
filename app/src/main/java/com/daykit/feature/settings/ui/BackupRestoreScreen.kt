@@ -75,6 +75,8 @@ import com.daykit.core.backup.DriveBackupSchedule
 import com.daykit.core.backup.DriveBackupSource
 import com.daykit.core.backup.DayKitBackupService
 import com.daykit.core.data.SecureSettingRepository
+import com.daykit.core.security.PinVerifyResult
+import com.daykit.core.security.errorMessageOrNull
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
@@ -107,7 +109,14 @@ private enum class BackupSheet {
     ExistingBackup,
     RestorePassword,
     LocalRestorePassword,
+    RestorePin,
     Schedule,
+}
+
+/** Which restore to run once the master PIN is confirmed. */
+private enum class PendingRestore {
+    Drive,
+    Local,
 }
 
 private enum class BackupDriveAuthorizationAction {
@@ -170,6 +179,10 @@ fun BackupRestoreScreen(
     var pendingLocalRestoreUri by remember { mutableStateOf<Uri?>(null) }
     var restorePassword by remember { mutableStateOf("") }
     var restoreError by remember { mutableStateOf<String?>(null) }
+    // Master-PIN gate before any restore overwrites local data.
+    var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
+    var restorePin by remember { mutableStateOf("") }
+    var restorePinError by remember { mutableStateOf<String?>(null) }
     var passwordDraft by remember { mutableStateOf("") }
     var passwordConfirmDraft by remember { mutableStateOf("") }
     var oldPasswordDraft by remember { mutableStateOf("") }
@@ -557,6 +570,30 @@ fun BackupRestoreScreen(
             }
     }
 
+    // Confirms the master PIN, then runs the queued restore. Honors the C1 lockout.
+    fun confirmRestorePin() {
+        val which = pendingRestore ?: return
+        scope.launch {
+            val result = withContext(Dispatchers.Default) {
+                container.credentialRepository.verify(restorePin.toCharArray())
+            }
+            when (result) {
+                is PinVerifyResult.Success -> {
+                    restorePin = ""
+                    restorePinError = null
+                    when (which) {
+                        PendingRestore.Drive -> requestDriveAuthorization(BackupDriveAuthorizationAction.Restore)
+                        PendingRestore.Local -> restoreLocalBackup()
+                    }
+                }
+                else -> {
+                    restorePin = ""
+                    restorePinError = result.errorMessageOrNull()
+                }
+            }
+        }
+    }
+
     fun setSchedule(schedule: DriveBackupSchedule) {
         scope.launch {
             container.secureSettingRepository.putString(SecureSettingRepository.KEY_DRIVE_BACKUP_SCHEDULE, schedule.value)
@@ -700,6 +737,9 @@ fun BackupRestoreScreen(
                 activeSheet = null
                 restoreError = null
                 pendingLocalRestoreUri = null
+                pendingRestore = null
+                restorePin = ""
+                restorePinError = null
                 clearPasswordDrafts()
             },
         ) {
@@ -791,7 +831,11 @@ fun BackupRestoreScreen(
                             if (restorePassword.length < 8) {
                                 restoreError = "Incorrect password"
                             } else {
-                                requestDriveAuthorization(BackupDriveAuthorizationAction.Restore)
+                                // Gate the destructive restore behind the master PIN.
+                                pendingRestore = PendingRestore.Drive
+                                restorePin = ""
+                                restorePinError = null
+                                activeSheet = BackupSheet.RestorePin
                             }
                         },
                     )
@@ -803,7 +847,26 @@ fun BackupRestoreScreen(
                             restorePassword = it
                             restoreError = null
                         },
-                        onRestore = ::restoreLocalBackup,
+                        onRestore = {
+                            if (restorePassword.length < 8) {
+                                restoreError = "Incorrect password"
+                            } else {
+                                pendingRestore = PendingRestore.Local
+                                restorePin = ""
+                                restorePinError = null
+                                activeSheet = BackupSheet.RestorePin
+                            }
+                        },
+                    )
+                    BackupSheet.RestorePin -> RestorePinSheet(
+                        pin = restorePin,
+                        error = restorePinError,
+                        restoring = driveBusy || localBusy,
+                        onPinChange = {
+                            restorePin = it.filter(Char::isDigit).take(12)
+                            restorePinError = null
+                        },
+                        onConfirm = ::confirmRestorePin,
                     )
                     BackupSheet.Schedule -> ScheduleSheet(
                         selected = driveSchedule,
@@ -1188,6 +1251,47 @@ private fun RestorePasswordSheet(
             modifier = Modifier.fillMaxWidth(),
             enabled = !restoring && password.length >= 8,
             onClick = onRestore,
+        )
+    }
+}
+
+@Composable
+private fun RestorePinSheet(
+    pin: String,
+    error: String?,
+    restoring: Boolean,
+    onPinChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            "Confirm master PIN",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            "Restoring replaces the data currently on this device. Enter your master PIN to continue.",
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        AppTextField(
+            value = pin,
+            onValueChange = onPinChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = "Master PIN",
+            singleLine = true,
+            isError = error != null,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        )
+        error?.let {
+            Text(it, color = MaterialTheme.extendedColors.danger, style = MaterialTheme.typography.bodySmall)
+        }
+        PrimaryButton(
+            text = if (restoring) "Restoring..." else "Confirm & restore",
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !restoring && pin.length >= 4,
+            onClick = onConfirm,
         )
     }
 }
