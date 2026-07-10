@@ -26,7 +26,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,9 +80,6 @@ fun TodayScreen(
         .collectAsStateWithLifecycle(initialValue = null)
 
     val listState = rememberLazyListState()
-    val scrolledUnder by remember {
-        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4 }
-    }
 
     val today = LocalDate.now()
     val dateLabel = "${today.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())}, " +
@@ -95,7 +91,7 @@ fun TodayScreen(
     val allEmpty = buildHabits.isEmpty() && pending.isEmpty() && monthSummary == null
 
     Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "Today · $dateLabel", scrolledUnder = scrolledUnder)
+        AppTopBar(title = "Today · $dateLabel")
         if (allEmpty && habitDashboard != null) {
             EmptyState(
                 icon = Icons.Rounded.TrackChanges,

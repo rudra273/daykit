@@ -47,7 +47,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -255,11 +254,6 @@ fun SecureNotesScreen(
     }
 
     val gridState = rememberLazyStaggeredGridState()
-    val scrolledUnder by remember {
-        derivedStateOf {
-            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 4
-        }
-    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -267,7 +261,6 @@ fun SecureNotesScreen(
             AppTopBar(
                 title = "Notes",
                 onBack = onBack,
-                scrolledUnder = scrolledUnder,
             )
         },
         floatingActionButton = {

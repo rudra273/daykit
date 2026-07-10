@@ -59,7 +59,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -129,9 +128,6 @@ fun FileLockerScreen(
 
     val selectionMode = selectedHiddenUris.isNotEmpty()
     val gridState = rememberLazyGridState()
-    val scrolledUnder by remember {
-        derivedStateOf { gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 4 }
-    }
 
     fun snack(text: String) {
         scope.launch { snackbarHostState.showSnackbar(text) }
@@ -215,7 +211,7 @@ fun FileLockerScreen(
                     restoreEnabled = !working,
                 )
             } else {
-                AppTopBar(title = "File Vault", onBack = onBack, scrolledUnder = scrolledUnder)
+                AppTopBar(title = "File Vault", onBack = onBack)
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -348,7 +344,7 @@ private fun SelectionTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.extendedColors.barTint)
+            .background(MaterialTheme.extendedColors.card)
             .windowInsetsPadding(WindowInsets.statusBars)
             .height(AppTopBarHeight)
             .padding(horizontal = Spacing.md),

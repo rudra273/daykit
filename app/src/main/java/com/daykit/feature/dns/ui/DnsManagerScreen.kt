@@ -12,14 +12,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,7 +34,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,7 +53,6 @@ import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
-import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
@@ -88,9 +83,6 @@ fun DnsManagerScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
-    val scrolledUnder by remember {
-        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4 }
-    }
     var customDns by rememberSaveable { mutableStateOf("") }
 
     val providers = listOf(
@@ -138,6 +130,7 @@ fun DnsManagerScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = { AppTopBar(title = "DNS Manager", onBack = onBack) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
@@ -146,7 +139,7 @@ fun DnsManagerScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = Spacing.lg, end = Spacing.lg,
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight + Spacing.sm,
+                    top = Spacing.sm,
                     bottom = Spacing.xxl,
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -283,8 +276,6 @@ fun DnsManagerScreen(
                     }
                 }
             }
-
-            AppTopBar(title = "DNS Manager", onBack = onBack, scrolledUnder = scrolledUnder)
         }
     }
 }

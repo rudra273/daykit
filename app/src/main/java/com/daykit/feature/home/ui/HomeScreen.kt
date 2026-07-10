@@ -27,7 +27,6 @@ import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,9 +70,6 @@ fun HomeScreen(
         .collectAsStateWithLifecycle(initialValue = null)
 
     val gridState = rememberLazyGridState()
-    val scrolledUnder by remember {
-        derivedStateOf { gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 4 }
-    }
 
     val accents = MaterialTheme.extendedColors.accents
     val habitsDone = habitDashboard?.let { d ->
@@ -129,7 +125,7 @@ fun HomeScreen(
     val nothing = fSecurity.isEmpty() && fProductivity.isEmpty() && fOther.isEmpty()
 
     Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "DayKit", scrolledUnder = scrolledUnder)
+        AppTopBar(title = "DayKit")
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,

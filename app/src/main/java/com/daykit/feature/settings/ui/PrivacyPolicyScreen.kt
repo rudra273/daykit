@@ -20,9 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextDecoration
@@ -41,7 +38,6 @@ fun PrivacyPolicyScreen(
     BackHandler { onBack() }
 
     val scrollState = rememberScrollState()
-    val scrolledUnder by remember { derivedStateOf { scrollState.value > 0 } }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -49,7 +45,6 @@ fun PrivacyPolicyScreen(
             AppTopBar(
                 title = "Privacy Policy",
                 onBack = onBack,
-                scrolledUnder = scrolledUnder,
             )
         },
     ) { padding ->

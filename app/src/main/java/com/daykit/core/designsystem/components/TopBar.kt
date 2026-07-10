@@ -1,5 +1,6 @@
 package com.daykit.core.designsystem.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,7 +23,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
@@ -31,8 +31,8 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.extendedColors
 
 /**
- * App top bar. Transparent at rest; when [scrolledUnder] it fades in a frosted
- * backdrop (via [frostState]) or a solid tint fallback plus a hairline divider.
+ * App top bar. Fully opaque [card] background with a hairline divider on every screen,
+ * so headers look identical regardless of what scrolls beneath them.
  */
 /** Standard header height, excluding the status-bar inset. Every screen uses this via [AppTopBar]. */
 val AppTopBarHeight = 52.dp
@@ -43,19 +43,13 @@ fun AppTopBar(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
-    scrolledUnder: Boolean = false,
-    frostState: FrostState? = null,
     titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    val tint = if (scrolledUnder) MaterialTheme.extendedColors.barTint else Color.Transparent
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (scrolledUnder) Modifier.frostedBackdrop(frostState, tint)
-                else Modifier
-            ),
+            .background(MaterialTheme.extendedColors.card),
     ) {
         Row(
             modifier = Modifier
@@ -100,9 +94,7 @@ fun AppTopBar(
             }
             actions()
         }
-        if (scrolledUnder) {
-            RowDivider(modifier = Modifier.align(Alignment.BottomCenter), startIndent = 0.dp)
-        }
+        RowDivider(modifier = Modifier.align(Alignment.BottomCenter), startIndent = 0.dp)
     }
 }
 

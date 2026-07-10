@@ -45,7 +45,6 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -105,9 +104,6 @@ fun ReminderScreen(
     var deleteReminder by remember { mutableStateOf<Reminder?>(null) }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val scrolledUnder by remember {
-        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4 }
-    }
 
     fun complete(reminder: Reminder) {
         scope.launch {
@@ -119,7 +115,7 @@ fun ReminderScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { AppTopBar(title = "Reminders", onBack = onBack, scrolledUnder = scrolledUnder) },
+        topBar = { AppTopBar(title = "Reminders", onBack = onBack) },
         floatingActionButton = {
             AppFab(icon = Icons.Rounded.Add, contentDescription = "Add reminder", onClick = { addOpen = true })
         },

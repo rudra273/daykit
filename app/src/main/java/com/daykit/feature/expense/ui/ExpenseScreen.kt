@@ -53,7 +53,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -162,11 +161,7 @@ fun ExpenseScreen(
     }
 
     val listState = rememberLazyListState()
-    val scrolledUnder by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4
-        }
-    }
+    val manageBillsListState = rememberLazyListState()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -182,7 +177,6 @@ fun ExpenseScreen(
                     title = "Expenses",
                     subtitle = monthLabel(selectedMonth),
                     onBack = onBack,
-                    scrolledUnder = scrolledUnder,
                     actions = {
                         IconButton(onClick = { selectedMonth = selectedMonth.minusMonths(1) }) {
                             Icon(
@@ -220,6 +214,7 @@ fun ExpenseScreen(
             if (manageBillsOpen) {
                 ManageBillsContent(
                     bills = allBills,
+                    listState = manageBillsListState,
                     addBillOpen = addBillOpen,
                     onToggleAddBill = { addBillOpen = !addBillOpen },
                     onEditBill = { editBill = it },
@@ -838,6 +833,7 @@ private fun SpendChartCard(
 @Composable
 private fun ManageBillsContent(
     bills: List<MonthlyBill>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     addBillOpen: Boolean,
     onToggleAddBill: () -> Unit,
     onEditBill: (MonthlyBill) -> Unit,
@@ -846,6 +842,7 @@ private fun ManageBillsContent(
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = Spacing.lg, end = Spacing.lg,

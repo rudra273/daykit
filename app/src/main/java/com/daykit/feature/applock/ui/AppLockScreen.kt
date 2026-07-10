@@ -27,7 +27,6 @@ import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -227,11 +226,6 @@ fun AppLockScreen(
     }
 
     val listState = rememberLazyListState()
-    val scrolledUnder by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4
-        }
-    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -239,7 +233,6 @@ fun AppLockScreen(
             AppTopBar(
                 title = "App Lock",
                 onBack = onBack,
-                scrolledUnder = installedApps != null && scrolledUnder,
             )
         },
     ) { innerPadding ->

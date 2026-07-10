@@ -169,7 +169,7 @@ private val DarkAccentColors = AccentColors(
 
 /**
  * Semantic color layer beyond the M3 [androidx.compose.material3.ColorScheme].
- * [barTint] is the translucent fill for the frosted top bar / bottom navigation bar.
+ * [card] is the opaque fill for the top bar and bottom navigation bar.
  */
 @Immutable
 data class ExtendedColors(
@@ -185,7 +185,6 @@ data class ExtendedColors(
     val divider: Color,
     val textMuted: Color,
     val inputField: Color,
-    val barTint: Color,
     val isDark: Boolean,
     val accents: AccentColors,
 )
@@ -203,7 +202,6 @@ val LightExtendedColors = ExtendedColors(
     divider = LightDivider,
     textMuted = LightMuted,
     inputField = LightInputField,
-    barTint = LightCard.copy(alpha = 0.85f),
     isDark = false,
     accents = LightAccentColors,
 )
@@ -221,7 +219,6 @@ val DarkExtendedColors = ExtendedColors(
     divider = DarkDivider,
     textMuted = DarkMuted,
     inputField = DarkInputField,
-    barTint = DarkCard.copy(alpha = 0.85f),
     isDark = true,
     accents = DarkAccentColors,
 )

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -238,6 +239,7 @@ fun SettingsScreen(
     }
 
     val accents = MaterialTheme.extendedColors.accents
+    val listState = rememberLazyListState()
 
     Column(Modifier.fillMaxSize()) {
         AppTopBar(title = "Settings")
@@ -253,6 +255,7 @@ fun SettingsScreen(
         }
 
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = Spacing.lg,

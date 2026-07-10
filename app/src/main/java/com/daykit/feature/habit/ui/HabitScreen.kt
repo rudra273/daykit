@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -353,6 +354,8 @@ private fun HabitHome(
     onDelete: (Habit) -> Unit,
     onRelapse: (Habit) -> Unit,
 ) {
+    val listState = rememberLazyListState()
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { AppTopBar(title = "Habits", onBack = onBack) },
@@ -376,6 +379,7 @@ private fun HabitHome(
                 }
 
                 else -> LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         top = innerPadding.calculateTopPadding() + Spacing.sm,
@@ -1346,6 +1350,8 @@ private fun HabitEditorPage(
         }
     }
 
+    val editorListState = rememberLazyListState()
+
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize()) {
             AppTopBar(
@@ -1353,6 +1359,7 @@ private fun HabitEditorPage(
                 onBack = onDismiss,
             )
             LazyColumn(
+                state = editorListState,
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(
                     start = Spacing.lg,

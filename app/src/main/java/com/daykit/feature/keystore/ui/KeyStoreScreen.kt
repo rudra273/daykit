@@ -39,7 +39,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -222,11 +221,6 @@ fun KeyStoreScreen(
     }
 
     val listState = rememberLazyListState()
-    val scrolledUnder by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4
-        }
-    }
 
     val uniqueLabels = remember(entries) {
         entries.orEmpty().map { it.label }.filter { it.isNotBlank() }.toSet().toList().sorted()
@@ -243,7 +237,6 @@ fun KeyStoreScreen(
             AppTopBar(
                 title = "Key Store",
                 onBack = onBack,
-                scrolledUnder = scrolledUnder,
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
