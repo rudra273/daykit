@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -56,6 +57,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -142,8 +144,8 @@ fun FileLockerScreen(
         }
     }
 
-    val pickMediaLauncher = rememberLauncherForActivityResult(HideableMediaPickerContract()) { uris ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+    fun importUris(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         scope.launch {
             working = true
             var imported = 0
@@ -154,7 +156,10 @@ fun FileLockerScreen(
                     runCatching {
                         if (repository.importFile(uri)) removedOriginals += 1
                         imported += 1
-                    }.onFailure { failed += 1 }
+                    }.onFailure { error ->
+                        android.util.Log.e("FileVault", "Import failed for $uri", error)
+                        failed += 1
+                    }
                 }
             }
             working = false
@@ -167,6 +172,20 @@ fun FileLockerScreen(
                     }
                 },
             )
+        }
+    }
+
+    val pickMediaLauncher = rememberLauncherForActivityResult(HideableMediaPickerContract()) { uris ->
+        importUris(uris)
+    }
+
+    // Media shared into the app ("share to DayKit"): consume and import once.
+    LaunchedEffect(Unit) {
+        container.pendingVaultShares.collect { shared ->
+            if (shared.isNotEmpty()) {
+                container.pendingVaultShares.value = emptyList()
+                importUris(shared)
+            }
         }
     }
 
@@ -183,6 +202,27 @@ fun FileLockerScreen(
                         snack("Choose where to export the selected files.")
                         container.sensitiveKeyManager.expectingActivityResult = true
                         exportFolderLauncher.launch(Unit)
+                    },
+                    onRestore = {
+                        val toRestore = selectedIds.toList()
+                        scope.launch {
+                            working = true
+                            var restored = 0
+                            withContext(Dispatchers.IO) {
+                                toRestore.forEach { fileId ->
+                                    if (repository.restoreToGallery(fileId)) restored += 1
+                                }
+                            }
+                            selectedIds.clear()
+                            working = false
+                            snack(
+                                if (restored == toRestore.size) {
+                                    "$restored file(s) unlocked back to Gallery."
+                                } else {
+                                    "$restored of ${toRestore.size} file(s) unlocked back to Gallery."
+                                },
+                            )
+                        }
                     },
                     onDelete = {
                         val toDelete = selectedIds.toList()
@@ -328,6 +368,7 @@ private fun SelectionTopBar(
     count: Int,
     onCancel: () -> Unit,
     onExport: () -> Unit,
+    onRestore: () -> Unit,
     onDelete: () -> Unit,
     actionsEnabled: Boolean,
 ) {
@@ -353,6 +394,13 @@ private fun SelectionTopBar(
         IconButton(onClick = onDelete, enabled = actionsEnabled) {
             Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
         }
+        Spacer(Modifier.width(Spacing.xs))
+        SecondaryButton(
+            text = "Unlock",
+            enabled = actionsEnabled,
+            leadingIcon = { Icon(Icons.Rounded.LockOpen, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            onClick = onRestore,
+        )
         Spacer(Modifier.width(Spacing.xs))
         SecondaryButton(
             text = "Export",

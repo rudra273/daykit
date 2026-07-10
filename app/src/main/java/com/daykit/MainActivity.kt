@@ -1,7 +1,10 @@
 package com.daykit
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.core.content.IntentCompat
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -53,7 +56,30 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        handleShareIntent(intent)
         setContentView()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleShareIntent(intent)
+    }
+
+    /**
+     * "Share to DayKit" from Gallery/other apps: stash the shared media URIs so
+     * the file vault imports them once the user is past the unlock gate.
+     */
+    private fun handleShareIntent(intent: Intent?) {
+        val uris = when (intent?.action) {
+            Intent.ACTION_SEND ->
+                listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+            Intent.ACTION_SEND_MULTIPLE ->
+                IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+                    .orEmpty()
+                    .filterNotNull()
+            else -> return
+        }
+        if (uris.isNotEmpty()) container.pendingVaultShares.value = uris
     }
 
     private fun setContentView() {

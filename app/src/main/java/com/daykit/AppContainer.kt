@@ -1,6 +1,8 @@
 package com.daykit
 
 import android.content.Context
+import android.net.Uri
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.daykit.core.backup.BackupCrypto
 import com.daykit.core.backup.DriveBackupScheduler
 import com.daykit.core.backup.DayKitBackupService
@@ -33,6 +35,10 @@ import com.daykit.feature.reminder.data.ReminderRepository
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
+
+    // Media URIs shared into the app ("share to DayKit" from Gallery), waiting
+    // to be imported into the file vault once the user has unlocked.
+    val pendingVaultShares = MutableStateFlow<List<Uri>>(emptyList())
     val keyStoreCrypto = AndroidKeyStoreCrypto()
     val sensitiveValueCipher = SensitiveValueCipher(keyStoreCrypto)
     val credentialRepository = CredentialRepository(appContext, PasswordHasher())

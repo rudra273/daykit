@@ -1,7 +1,11 @@
 package com.daykit.feature.filelocker.data
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import com.daykit.core.security.CipherPayload
 import com.daykit.core.security.SensitiveDataLockedException
@@ -73,8 +77,10 @@ class VaultFileRepository(
                     streamingCrypto.newEncryptingStream(dek, fileOut, fileId.toByteArray()).use { cipherOut ->
                         plaintextSize = rawInput.copyToCounting(cipherOut)
                     }
-                    fileOut.fd.sync()
                 }
+                // The encrypting stream closes fileOut when it flushes the final
+                // segment, so fsync must go through a reopened handle.
+                fsync(blob)
             }
 
             val wrappedDek = cipher.encryptBytes(dek, DEK_AAD)
@@ -186,8 +192,8 @@ class VaultFileRepository(
                     streamingCrypto.newEncryptingStream(dek, fileOut, record.fileId.toByteArray()).use { cipherOut ->
                         cipherOut.write(record.plaintext)
                     }
-                    fileOut.fd.sync()
                 }
+                fsync(blob)
                 val wrappedDek = cipher.encryptBytes(dek, DEK_AAD)
                 val nameCipher = cipher.encryptString(record.name, record.fileId)
                 val mimeCipher = cipher.encryptString(record.mimeType, record.fileId)
@@ -212,6 +218,11 @@ class VaultFileRepository(
                 dek.fill(0)
             }
         }
+    }
+
+    /** Flushes [file]'s written bytes to disk before the DB row referencing it commits. */
+    private fun fsync(file: File) {
+        java.io.RandomAccessFile(file, "rw").use { it.fd.sync() }
     }
 
     private fun unwrapDek(entity: VaultFileEntity): ByteArray {
@@ -250,9 +261,60 @@ class VaultFileRepository(
     }
 
     private fun deleteOriginal(uri: Uri): Boolean {
+        val resolver = appContext.contentResolver
         return runCatching {
-            appContext.contentResolver.delete(uri, null, null) > 0
+            // Picker results are document URIs; plain ContentResolver.delete()
+            // always throws for those — they require the DocumentsContract API.
+            if (DocumentsContract.isDocumentUri(appContext, uri)) {
+                DocumentsContract.deleteDocument(resolver, uri)
+            } else {
+                resolver.delete(uri, null, null) > 0
+            }
         }.getOrDefault(false)
+    }
+
+    /**
+     * Moves a vault file back out into shared storage (the Gallery for media,
+     * Downloads otherwise) and deletes it from the vault. The vault entry is
+     * removed only after the plaintext is fully written and published.
+     */
+    suspend fun restoreToGallery(fileId: String): Boolean {
+        val entity = dao.getByFileId(fileId) ?: return false
+        val name = cipher.decryptString(CipherPayload(entity.nameCiphertext, entity.nameIv), fileId)
+        val mimeType = cipher.decryptString(CipherPayload(entity.mimeCiphertext, entity.mimeIv), fileId)
+            .ifBlank { GENERIC_MIME_TYPE }
+        val resolver = appContext.contentResolver
+        val (collection, relativePath) = when {
+            mimeType.startsWith("image/") ->
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to
+                    "${Environment.DIRECTORY_PICTURES}/DayKit"
+            mimeType.startsWith("video/") ->
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to
+                    "${Environment.DIRECTORY_MOVIES}/DayKit"
+            else ->
+                MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to
+                    "${Environment.DIRECTORY_DOWNLOADS}/DayKit"
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val target = resolver.insert(collection, values) ?: return false
+        return try {
+            val out = resolver.openOutputStream(target)
+                ?: throw IllegalStateException("Could not open destination for restore")
+            if (!exportTo(fileId, out)) error("Vault file missing")
+            values.clear()
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            resolver.update(target, values, null, null)
+            delete(fileId)
+            true
+        } catch (error: Throwable) {
+            runCatching { resolver.delete(target, null, null) }
+            false
+        }
     }
 
     private fun InputStream.copyToCounting(out: OutputStream): Long {

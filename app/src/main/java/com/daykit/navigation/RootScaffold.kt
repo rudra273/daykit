@@ -11,7 +11,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -38,6 +40,14 @@ fun RootScaffold(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val onTopLevel = currentDestination?.hierarchy?.any { it.route in TOP_LEVEL_ROUTES } == true
+
+    // Media shared into the app goes to the file vault, which consumes the URIs.
+    val pendingShares by container.pendingVaultShares.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingShares) {
+        if (pendingShares.isNotEmpty()) {
+            navController.navigate(Routes.TOOL_FILEVAULT) { launchSingleTop = true }
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
