@@ -57,6 +57,7 @@ import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.security.errorMessageOrNull
 import com.daykit.feature.applock.domain.InstalledApp
 import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
 import com.daykit.feature.lock.ui.ToolUnlockScreen
@@ -185,14 +186,14 @@ fun AppLockScreen(
             onUnlock = {
                 scope.launch {
                     val pin = unlockPin
-                    val valid = withContext(Dispatchers.Default) {
+                    val result = withContext(Dispatchers.Default) {
                         container.credentialRepository.verify(pin.toCharArray())
                     }
-                    if (valid) {
+                    if (result is com.daykit.core.security.PinVerifyResult.Success) {
                         unlocked = true
                         unlockPin = ""
                     } else {
-                        unlockError = "Wrong PIN"
+                        unlockError = result.errorMessageOrNull()
                         unlockPin = ""
                     }
                 }

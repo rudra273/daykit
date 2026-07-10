@@ -31,6 +31,8 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.designsystem.components.FrostedLockBackground
 import com.daykit.core.security.CredentialRepository
+import com.daykit.core.security.PinVerifyResult
+import com.daykit.core.security.errorMessageOrNull
 import com.daykit.core.session.AppLockSessionManager
 import com.daykit.feature.lock.ui.LockChallengeContent
 import kotlinx.coroutines.Dispatchers
@@ -121,14 +123,14 @@ private fun OverlayLockContent(
         if (pin.length < 4) return
         val candidate = pin
         scope.launch {
-            val valid = withContext(Dispatchers.Default) {
+            val result = withContext(Dispatchers.Default) {
                 credentialRepository.verify(candidate.toCharArray())
             }
-            if (valid) {
+            if (result is PinVerifyResult.Success) {
                 onUnlocked()
             } else {
                 pin = ""
-                error = "Wrong PIN"
+                error = result.errorMessageOrNull()
             }
         }
     }

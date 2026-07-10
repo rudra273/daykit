@@ -102,6 +102,7 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.play.services.auth)
     implementation(libs.sqlcipher)
+    implementation(libs.tink.android)
     ksp(libs.androidx.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)

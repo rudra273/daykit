@@ -75,7 +75,10 @@ import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.DayKitDeviceAdmin
+import com.daykit.core.security.PinVerifyResult
+import com.daykit.core.security.errorMessageOrNull
 import com.daykit.feature.applock.domain.SettingsPackageResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -502,10 +505,10 @@ fun SettingsScreen(
             onSave = { oldPin, newPin, onError, onDone ->
                 scope.launch {
                     runCatching {
-                        val valid = withContext(Dispatchers.Default) {
+                        val result = withContext(Dispatchers.Default) {
                             container.credentialRepository.verify(oldPin.toCharArray())
                         }
-                        if (valid) {
+                        if (result is PinVerifyResult.Success) {
                             withContext(Dispatchers.Default) {
                                 container.credentialRepository.saveCredential(newPin.toCharArray())
                             }
@@ -513,7 +516,10 @@ fun SettingsScreen(
                             onDone()
                             showChangePin = false
                         } else {
-                            onError("Old PIN is incorrect")
+                            onError(
+                                (result as? PinVerifyResult.LockedOut)?.let { result.errorMessageOrNull() }
+                                    ?: "Old PIN is incorrect",
+                            )
                         }
                     }.onFailure { error ->
                         onError(error.message ?: "Could not update PIN")
@@ -535,10 +541,10 @@ fun SettingsScreen(
             },
             onConfirm = { pin ->
                 scope.launch {
-                    val valid = withContext(Dispatchers.Default) {
+                    val result = withContext(Dispatchers.Default) {
                         container.credentialRepository.verify(pin.toCharArray())
                     }
-                    if (valid) {
+                    if (result is PinVerifyResult.Success) {
                         container.secureSettingRepository.putBoolean(
                             SecureSettingRepository.KEY_BIOMETRIC_ENABLED,
                             false,
@@ -547,7 +553,7 @@ fun SettingsScreen(
                         showBiometricDisableConfirm = false
                         biometricDisableError = null
                     } else {
-                        biometricDisableError = "Wrong PIN"
+                        biometricDisableError = result.errorMessageOrNull()
                     }
                 }
             },
@@ -566,10 +572,10 @@ fun SettingsScreen(
             },
             onConfirm = { pin ->
                 scope.launch {
-                    val valid = withContext(Dispatchers.Default) {
+                    val result = withContext(Dispatchers.Default) {
                         container.credentialRepository.verify(pin.toCharArray())
                     }
-                    if (valid) {
+                    if (result is PinVerifyResult.Success) {
                         container.secureSettingRepository.putBoolean(
                             SecureSettingRepository.KEY_SCREENSHOT_PROTECTION,
                             false,
@@ -577,7 +583,7 @@ fun SettingsScreen(
                         showScreenshotDisableConfirm = false
                         screenshotDisableError = null
                     } else {
-                        screenshotDisableError = "Wrong PIN"
+                        screenshotDisableError = result.errorMessageOrNull()
                     }
                 }
             },
@@ -596,17 +602,17 @@ fun SettingsScreen(
             },
             onConfirm = { pin ->
                 scope.launch {
-                    val valid = withContext(Dispatchers.Default) {
+                    val result = withContext(Dispatchers.Default) {
                         container.credentialRepository.verify(pin.toCharArray())
                     }
-                    if (valid) {
+                    if (result is PinVerifyResult.Success) {
                         setSettingsLocked(container, settingsPackage, locked = false)
                         removeDeviceAdmin(context)
                         isAdminActive = false
                         showAdminDisableConfirm = false
                         adminDisableError = null
                     } else {
-                        adminDisableError = "Wrong PIN"
+                        adminDisableError = result.errorMessageOrNull()
                     }
                 }
             },
@@ -640,15 +646,15 @@ fun SettingsScreen(
             },
             onConfirm = { pin ->
                 scope.launch {
-                    val valid = withContext(Dispatchers.Default) {
+                    val result = withContext(Dispatchers.Default) {
                         container.credentialRepository.verify(pin.toCharArray())
                     }
-                    if (valid) {
+                    if (result is PinVerifyResult.Success) {
                         container.secureSettingRepository.putBoolean(request.key, false)
                         pendingUtilityDisable = null
                         utilityDisableError = null
                     } else {
-                        utilityDisableError = "Wrong PIN"
+                        utilityDisableError = result.errorMessageOrNull()
                     }
                 }
             },
@@ -718,9 +724,9 @@ private fun ChangePinSheet(
     var saving by remember { mutableStateOf(false) }
 
     val pinsMatch = newPin == confirmNewPin
-    val canChangePin = oldPin.length >= 4 &&
-        newPin.length >= 4 &&
-        confirmNewPin.length >= 4 &&
+    val canChangePin = oldPin.length >= CredentialRepository.MIN_PIN_LENGTH &&
+        newPin.length >= CredentialRepository.MIN_PIN_LENGTH &&
+        confirmNewPin.length >= CredentialRepository.MIN_PIN_LENGTH &&
         pinsMatch &&
         !saving
 
@@ -755,6 +761,12 @@ private fun ChangePinSheet(
                     error = null
                 },
                 label = "New PIN",
+                isError = newPin.isNotEmpty() && newPin.length < CredentialRepository.MIN_PIN_LENGTH,
+                supportingText = if (newPin.isNotEmpty() && newPin.length < CredentialRepository.MIN_PIN_LENGTH) {
+                    "Use at least ${CredentialRepository.MIN_PIN_LENGTH} digits"
+                } else {
+                    null
+                },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             )

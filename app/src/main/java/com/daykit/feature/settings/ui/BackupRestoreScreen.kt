@@ -99,6 +99,7 @@ private const val BACKUP_TOOL_KEY_STORE = "key_store"
 private const val BACKUP_TOOL_NOTES = "secure_notes"
 private const val BACKUP_TOOL_EXPENSES = "expenses"
 private const val BACKUP_TOOL_HABITS = "habits"
+private const val BACKUP_TOOL_VAULT = "vault_files"
 
 private enum class BackupSheet {
     Password,
@@ -149,11 +150,16 @@ fun BackupRestoreScreen(
     val includeHabits by container.secureSettingRepository
         .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS)
         .collectAsStateWithLifecycle(initialValue = true)
+    // Vault files default OFF — never backed up unless the user turns this on.
+    val includeVault by container.secureSettingRepository
+        .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT)
+        .collectAsStateWithLifecycle(initialValue = false)
 
     val driveSchedule = DriveBackupSchedule.fromValue(driveScheduleValue)
     val backupToolKeys = includedBackupToolKeys(
         includeExpenses = includeExpenses != false,
         includeHabits = includeHabits != false,
+        includeVault = includeVault == true,
     )
     var activeSheet by remember { mutableStateOf<BackupSheet?>(null) }
     var driveBackups by remember { mutableStateOf<List<DriveBackupFile>>(emptyList()) }
@@ -647,6 +653,7 @@ fun BackupRestoreScreen(
                 BackupContentOptions(
                     includeExpenses = includeExpenses != false,
                     includeHabits = includeHabits != false,
+                    includeVault = includeVault == true,
                     onExpensesChange = { enabled ->
                         scope.launch {
                             container.secureSettingRepository.putBoolean(
@@ -659,6 +666,14 @@ fun BackupRestoreScreen(
                         scope.launch {
                             container.secureSettingRepository.putBoolean(
                                 SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS,
+                                enabled,
+                            )
+                        }
+                    },
+                    onVaultChange = { enabled ->
+                        scope.launch {
+                            container.secureSettingRepository.putBoolean(
+                                SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT,
                                 enabled,
                             )
                         }
@@ -805,12 +820,14 @@ private val PaddingValuesZero = androidx.compose.foundation.layout.PaddingValues
 private fun includedBackupToolKeys(
     includeExpenses: Boolean,
     includeHabits: Boolean,
+    includeVault: Boolean,
 ): Set<String> {
     return buildSet {
         add(BACKUP_TOOL_KEY_STORE)
         add(BACKUP_TOOL_NOTES)
         if (includeExpenses) add(BACKUP_TOOL_EXPENSES)
         if (includeHabits) add(BACKUP_TOOL_HABITS)
+        if (includeVault) add(BACKUP_TOOL_VAULT)
     }
 }
 
@@ -818,8 +835,10 @@ private fun includedBackupToolKeys(
 private fun BackupContentOptions(
     includeExpenses: Boolean,
     includeHabits: Boolean,
+    includeVault: Boolean,
     onExpensesChange: (Boolean) -> Unit,
     onHabitsChange: (Boolean) -> Unit,
+    onVaultChange: (Boolean) -> Unit,
 ) {
     AppCard(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -830,6 +849,15 @@ private fun BackupContentOptions(
         Spacer(Modifier.height(Spacing.sm))
         BackupContentSwitchRow("Expenses", includeExpenses, onExpensesChange)
         BackupContentSwitchRow("Habits", includeHabits, onHabitsChange)
+        BackupContentSwitchRow("Vault files (photos & videos)", includeVault, onVaultChange)
+        if (includeVault) {
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                "Vault files will be encrypted and uploaded with your backup. This can make backups large and slow. Off by default.",
+                color = MaterialTheme.extendedColors.warning,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 

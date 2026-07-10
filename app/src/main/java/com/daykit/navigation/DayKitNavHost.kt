@@ -83,7 +83,7 @@ fun DayKitNavHost(
         }
         composable(Routes.TOOL_KEYSTORE) { KeyStoreScreen(container = container, onBack = back) }
         composable(Routes.TOOL_NOTES) { SecureNotesScreen(container = container, onBack = back) }
-        composable(Routes.TOOL_FILEVAULT) { FileLockerScreen(onBack = back) }
+        composable(Routes.TOOL_FILEVAULT) { FileLockerScreen(container = container, onBack = back) }
         composable(Routes.TOOL_HABITS) { HabitScreen(container = container, onBack = back) }
         composable(Routes.TOOL_REMINDERS) { ReminderScreen(container = container, onBack = back) }
         composable(Routes.TOOL_EXPENSES) { ExpenseScreen(container = container, onBack = back) }

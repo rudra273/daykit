@@ -53,6 +53,7 @@ import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.permissions.AppLockPermissionState
+import com.daykit.core.security.CredentialRepository
 import com.daykit.core.permissions.PermissionIntents
 
 /** Shared onboarding scaffold: step dots, icon, headline + copy, and a body slot. */
@@ -132,7 +133,7 @@ fun SetupCredentialScreen(
     val subtitle = when {
         error != null -> error!!
         confirming -> "Re-enter your PIN to confirm"
-        else -> "Choose a 4–12 digit PIN to secure DayKit"
+        else -> "Choose a ${CredentialRepository.MIN_PIN_LENGTH}–12 digit PIN to secure DayKit"
     }
 
     FrostedLockBackground {
@@ -144,7 +145,11 @@ fun SetupCredentialScreen(
             subtitle = subtitle,
         ) {
             Spacer(Modifier.height(Spacing.sm))
-            PinDots(length = 4, filledCount = pin.length.coerceAtMost(4), error = error != null)
+            PinDots(
+                length = CredentialRepository.MIN_PIN_LENGTH,
+                filledCount = pin.length.coerceAtMost(CredentialRepository.MIN_PIN_LENGTH),
+                error = error != null,
+            )
             Spacer(Modifier.height(Spacing.xxl))
             PinPad(
                 onDigit = { d ->
@@ -158,7 +163,7 @@ fun SetupCredentialScreen(
             Spacer(Modifier.height(Spacing.xl))
             PrimaryButton(
                 text = if (confirming) "Confirm" else "Continue",
-                enabled = pin.length >= 4,
+                enabled = pin.length >= CredentialRepository.MIN_PIN_LENGTH,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     if (!confirming) {

@@ -9,6 +9,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.daykit.feature.applock.data.LockedAppDao
 import com.daykit.feature.applock.data.LockedAppEntity
 import com.daykit.feature.expense.data.ExpenseDao
+import com.daykit.feature.filelocker.data.VaultFileDao
+import com.daykit.feature.filelocker.data.VaultFileEntity
 import com.daykit.feature.expense.data.ExpenseEntryEntity
 import com.daykit.feature.expense.data.ExpenseMonthEntity
 import com.daykit.feature.expense.data.MonthlyBillAmountEntity
@@ -39,8 +41,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         HabitEntity::class,
         HabitLogEntity::class,
         ReminderEntity::class,
+        VaultFileEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -51,6 +54,7 @@ abstract class DayKitDatabase : RoomDatabase() {
     abstract fun secureNoteDao(): SecureNoteDao
     abstract fun habitDao(): HabitDao
     abstract fun reminderDao(): ReminderDao
+    abstract fun vaultFileDao(): VaultFileDao
 
     companion object {
         fun create(
@@ -75,6 +79,7 @@ abstract class DayKitDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
                     MIGRATION_7_6,
                 )
                 .build()
@@ -397,6 +402,29 @@ abstract class DayKitDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_secure_note_images_imageId` ON `secure_note_images` (`imageId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_secure_note_images_noteId` ON `secure_note_images` (`noteId`)")
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `vault_files` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `fileId` TEXT NOT NULL,
+                        `storedFileName` TEXT NOT NULL,
+                        `nameCiphertext` BLOB NOT NULL,
+                        `nameIv` BLOB NOT NULL,
+                        `mimeCiphertext` BLOB NOT NULL,
+                        `mimeIv` BLOB NOT NULL,
+                        `wrappedDekCiphertext` BLOB NOT NULL,
+                        `wrappedDekIv` BLOB NOT NULL,
+                        `sizeBytes` INTEGER NOT NULL,
+                        `createdAtMillis` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_vault_files_fileId` ON `vault_files` (`fileId`)")
             }
         }
     }

@@ -29,6 +29,7 @@ import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.designsystem.components.FrostedLockBackground
 import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.security.errorMessageOrNull
 import com.daykit.core.session.AppLockSessionManager
 import com.daykit.feature.lock.ui.LockChallengeContent
 import kotlinx.coroutines.Dispatchers
@@ -130,13 +131,13 @@ private fun LockChallengeScreen(
         if (pin.length < 4) return
         scope.launch {
             val candidate = pin
-            val valid = withContext(Dispatchers.Default) {
+            val result = withContext(Dispatchers.Default) {
                 credentialRepository.verify(candidate.toCharArray())
             }
-            if (valid) {
+            if (result is com.daykit.core.security.PinVerifyResult.Success) {
                 onUnlocked()
             } else {
-                error = "Wrong PIN"
+                error = result.errorMessageOrNull()
                 pin = ""
             }
         }

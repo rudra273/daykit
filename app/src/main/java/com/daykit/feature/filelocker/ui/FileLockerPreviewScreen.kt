@@ -1,7 +1,6 @@
 package com.daykit.feature.filelocker.ui
 
 import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.foundation.Image
@@ -14,13 +13,11 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,26 +31,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import com.daykit.core.designsystem.components.AppBackButton
 import com.daykit.core.designsystem.components.LoadingIndicator
-import com.daykit.core.designsystem.extendedColors
+import com.daykit.feature.filelocker.data.VaultFileRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Identifies a vault file to preview. Bytes are fetched via the repository. */
 data class FileLockerPreviewItem(
-    val uri: Uri,
+    val fileId: String,
     val name: String,
     val mimeType: String,
 )
@@ -61,6 +63,7 @@ data class FileLockerPreviewItem(
 @Composable
 fun FileLockerPreviewScreen(
     item: FileLockerPreviewItem,
+    repository: VaultFileRepository,
     onBack: () -> Unit,
 ) {
     BackHandler { onBack() }
@@ -87,7 +90,7 @@ fun FileLockerPreviewScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "Locked preview",
+                        text = "Encrypted preview",
                         color = Color.White.copy(alpha = 0.6f),
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -102,40 +105,36 @@ fun FileLockerPreviewScreen(
                 .padding(16.dp),
             contentAlignment = Alignment.Center,
         ) {
-            if (item.mimeType.startsWith("image/")) {
-                LockedImagePreview(item = item)
-            } else if (item.mimeType.startsWith("video/")) {
-                LockedVideoPreview(item = item)
-            } else {
-                Text(
-                    text = "Preview is not available for this file type.",
-                    color = Color.White.copy(alpha = 0.6f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+            when {
+                item.mimeType.startsWith("image/") -> EncryptedImagePreview(item = item, repository = repository)
+                item.mimeType.startsWith("video/") -> EncryptedVideoPreview(item = item, repository = repository)
+                else -> PreviewMessage("Preview is not available for this file type. Export it to open elsewhere.")
             }
         }
     }
 }
 
 @Composable
-private fun LockedImagePreview(
+private fun EncryptedImagePreview(
     item: FileLockerPreviewItem,
+    repository: VaultFileRepository,
 ) {
-    val context = LocalContext.current
-    var imageBitmap by remember(item.uri) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-    var failed by remember(item.uri) { mutableStateOf(false) }
+    var imageBitmap by remember(item.fileId) { mutableStateOf<ImageBitmap?>(null) }
+    var failed by remember(item.fileId) { mutableStateOf(false) }
 
-    LaunchedEffect(item.uri) {
+    LaunchedEffect(item.fileId) {
         imageBitmap = null
         failed = false
-        imageBitmap = withContext(Dispatchers.IO) {
+        // Decrypt to RAM only — no plaintext is written to disk to view.
+        val decoded = withContext(Dispatchers.IO) {
             runCatching {
-                context.contentResolver.openInputStream(item.uri)?.use { input ->
+                repository.openDecryptedStream(item.fileId)?.use { input ->
                     BitmapFactory.decodeStream(input)?.asImageBitmap()
                 }
             }.getOrNull()
         }
-        failed = imageBitmap == null
+        imageBitmap = decoded
+        failed = decoded == null
     }
 
     when {
@@ -146,11 +145,7 @@ private fun LockedImagePreview(
             contentScale = ContentScale.Fit,
         )
 
-        failed -> Text(
-            text = "Could not preview this image.",
-            color = Color.White.copy(alpha = 0.6f),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        failed -> PreviewMessage("Could not decrypt this image.")
 
         else -> LoadingIndicator(delayMillis = 0)
     }
@@ -158,27 +153,32 @@ private fun LockedImagePreview(
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun LockedVideoPreview(
+private fun EncryptedVideoPreview(
     item: FileLockerPreviewItem,
+    repository: VaultFileRepository,
 ) {
     val context = LocalContext.current
-    val player = remember(item.uri) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(
+
+    // Plays straight from the encrypted blob via a custom decrypting DataSource —
+    // only the byte ranges the player seeks to are decrypted, in memory.
+    val player = remember(item.fileId) {
+        val factory: DataSource.Factory = VaultMediaDataSource.Factory(repository)
+        val mediaSource = ProgressiveMediaSource.Factory(factory)
+            .createMediaSource(
                 MediaItem.Builder()
-                    .setUri(item.uri)
+                    .setUri(VaultMediaDataSource.uriFor(item.fileId))
                     .setMimeType(item.mimeType.ifBlank { MimeTypes.APPLICATION_MP4 })
                     .build(),
             )
+        ExoPlayer.Builder(context).build().apply {
+            setMediaSource(mediaSource)
             prepare()
             playWhenReady = false
         }
     }
 
     DisposableEffect(player) {
-        onDispose {
-            player.release()
-        }
+        onDispose { player.release() }
     }
 
     AndroidView(
@@ -189,8 +189,16 @@ private fun LockedVideoPreview(
                 useController = true
             }
         },
-        update = { view ->
-            view.player = player
-        },
+        update = { view -> view.player = player },
+    )
+}
+
+@Composable
+private fun PreviewMessage(text: String) {
+    Text(
+        text = text,
+        color = Color.White.copy(alpha = 0.6f),
+        style = MaterialTheme.typography.bodyMedium,
+        textAlign = TextAlign.Center,
     )
 }

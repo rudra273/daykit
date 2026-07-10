@@ -16,6 +16,7 @@ private const val BACKUP_TOOL_KEY_STORE = "key_store"
 private const val BACKUP_TOOL_NOTES = "secure_notes"
 private const val BACKUP_TOOL_EXPENSES = "expenses"
 private const val BACKUP_TOOL_HABITS = "habits"
+private const val BACKUP_TOOL_VAULT = "vault_files"
 
 class DriveBackupWorker(
     appContext: Context,
@@ -61,6 +62,8 @@ class DriveBackupWorker(
             val includedToolKeys = includedBackupToolKeys(
                 includeExpenses = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_EXPENSES) != false,
                 includeHabits = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS) != false,
+                // Vault defaults to OFF: only true when the user explicitly enabled it.
+                includeVault = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT) == true,
             )
             val encryptedBackup = container.backupService.exportEncrypted(passwordChars, includedToolKeys)
             val upload = GoogleDriveBackupClient().uploadBackup(
@@ -103,11 +106,13 @@ class DriveBackupWorker(
 private fun includedBackupToolKeys(
     includeExpenses: Boolean,
     includeHabits: Boolean,
+    includeVault: Boolean,
 ): Set<String> {
     return buildSet {
         add(BACKUP_TOOL_KEY_STORE)
         add(BACKUP_TOOL_NOTES)
         if (includeExpenses) add(BACKUP_TOOL_EXPENSES)
         if (includeHabits) add(BACKUP_TOOL_HABITS)
+        if (includeVault) add(BACKUP_TOOL_VAULT)
     }
 }

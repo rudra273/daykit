@@ -85,6 +85,7 @@ import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.security.errorMessageOrNull
 import com.daykit.feature.lock.ui.ToolUnlockScreen
 import com.daykit.feature.notes.data.SecureNote
 import kotlinx.coroutines.Dispatchers
@@ -204,14 +205,14 @@ fun SecureNotesScreen(
             },
             onUnlock = {
                 scope.launch {
-                    val valid = withContext(Dispatchers.Default) {
+                    val result = withContext(Dispatchers.Default) {
                         container.credentialRepository.verify(unlockPin.toCharArray())
                     }
-                    if (valid) {
+                    if (result is com.daykit.core.security.PinVerifyResult.Success) {
                         unlocked = true
                         unlockPin = ""
                     } else {
-                        unlockError = "Wrong PIN"
+                        unlockError = result.errorMessageOrNull()
                         unlockPin = ""
                     }
                 }

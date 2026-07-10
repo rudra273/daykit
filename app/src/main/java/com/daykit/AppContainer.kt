@@ -17,7 +17,10 @@ import com.daykit.feature.applock.data.AppLockRepository
 import com.daykit.feature.applock.data.LockedPackageCache
 import com.daykit.feature.applock.domain.InstalledAppProvider
 import com.daykit.feature.expense.data.ExpenseBackupContributor
+import com.daykit.feature.filelocker.data.VaultBackupContributor
 import com.daykit.feature.expense.data.ExpenseRepository
+import com.daykit.feature.filelocker.data.VaultFileRepository
+import com.daykit.feature.filelocker.data.VaultStreamingCrypto
 import com.daykit.feature.habit.data.HabitBackupContributor
 import com.daykit.feature.habit.data.HabitRepository
 import com.daykit.feature.keystore.data.KeyStoreBackupContributor
@@ -67,6 +70,16 @@ class AppContainer(context: Context) {
         ReminderRepository(database.reminderDao())
     }
 
+    val vaultFileRepository: VaultFileRepository by lazy {
+        VaultFileRepository(
+            context = appContext,
+            dao = database.vaultFileDao(),
+            streamingCrypto = VaultStreamingCrypto(),
+            keyStoreCrypto = keyStoreCrypto,
+            metadataCipher = sensitiveValueCipher,
+        )
+    }
+
     val backupService: DayKitBackupService by lazy {
         DayKitBackupService(
             crypto = BackupCrypto(PasswordHasher()),
@@ -75,6 +88,7 @@ class AppContainer(context: Context) {
                 ExpenseBackupContributor(expenseRepository),
                 SecureNoteBackupContributor(secureNoteRepository),
                 HabitBackupContributor(habitRepository),
+                VaultBackupContributor(vaultFileRepository),
             ),
         )
     }
