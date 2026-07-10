@@ -116,11 +116,12 @@ private fun OverlayLockContent(
     onBiometric: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val pinLength = remember { credentialRepository.pinLength() }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
     fun submit() {
-        if (pin.length < 4) return
+        if (pin.length < pinLength) return
         val candidate = pin
         scope.launch {
             val result = withContext(Dispatchers.Default) {
@@ -142,6 +143,7 @@ private fun OverlayLockContent(
                 subtitle = appLabel,
                 pin = pin,
                 error = error,
+                pinLength = pinLength,
                 appIcon = Icons.Rounded.Lock,
                 onDigit = { d ->
                     if (pin.length < 12) {

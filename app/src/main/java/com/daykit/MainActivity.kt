@@ -252,6 +252,7 @@ private fun DayKitApp(
             subtitle = "Enter your master PIN",
             pin = unlockPin,
             error = unlockError,
+            pinLength = container.credentialRepository.pinLength(),
             biometricEnabled = false,
             icon = Icons.Rounded.Lock,
             onBack = { activity.finish() },

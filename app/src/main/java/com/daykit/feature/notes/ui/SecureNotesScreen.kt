@@ -196,6 +196,7 @@ fun SecureNotesScreen(
             subtitle = "Unlock private notes",
             pin = unlockPin,
             error = unlockError,
+            pinLength = container.credentialRepository.pinLength(),
             biometricEnabled = biometricEnabled,
             icon = Icons.Rounded.Notes,
             onBack = onBack,

@@ -46,7 +46,8 @@ fun AppCard(
     )
     val elevation = if (dark) CardDefaults.cardElevation()
     else CardDefaults.cardElevation(defaultElevation = 1.dp)
-    val border: BorderStroke? = if (dark) null
+    // Dark cards get a faint hairline so edges stay crisp against the background.
+    val border = if (dark) BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
     else BorderStroke(1.dp, MaterialTheme.extendedColors.divider)
 
     if (onClick != null) {

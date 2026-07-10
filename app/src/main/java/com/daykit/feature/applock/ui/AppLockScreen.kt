@@ -176,6 +176,7 @@ fun AppLockScreen(
             subtitle = "Enter master PIN to manage locked apps",
             pin = unlockPin,
             error = unlockError,
+            pinLength = container.credentialRepository.pinLength(),
             biometricEnabled = biometricEnabled,
             icon = Icons.Rounded.Lock,
             onBack = onBack,

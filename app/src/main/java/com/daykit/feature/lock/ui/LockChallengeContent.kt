@@ -43,8 +43,9 @@ import kotlin.math.roundToInt
  * overlay window, and in-app tool gates). The caller owns the PIN string and
  * verification; this only renders identity + dots + pad and animates the shake.
  *
- * Auto-submit: whenever [pin] length reaches [minLength] the caller's [onSubmit]
- * fires (preserving the old auto-submit-at-4-digits behavior).
+ * Auto-submit: whenever [pin] length reaches [pinLength] the caller's [onSubmit]
+ * fires. [pinLength] must be the stored PIN's actual digit count
+ * (CredentialRepository.pinLength()) so the dots match what the user has to type.
  */
 @Composable
 fun LockChallengeContent(
@@ -52,11 +53,11 @@ fun LockChallengeContent(
     subtitle: String,
     pin: String,
     error: String?,
+    pinLength: Int,
     onDigit: (Char) -> Unit,
     onBackspace: () -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
-    minLength: Int = 4,
     appIcon: ImageVector? = null,
     appIconPainter: Painter? = null,
     onBiometric: (() -> Unit)? = null,
@@ -65,11 +66,10 @@ fun LockChallengeContent(
     val scope = rememberCoroutineScope()
     val shake = remember { Animatable(0f) }
 
-    // Auto-submit when the PIN first reaches minLength (matches LockActivity's
-    // existing >=4 auto-submit). Fires on the exact keystroke that crosses the
-    // threshold; on a wrong PIN the caller clears [pin], re-arming this.
+    // Auto-submit on the exact keystroke that completes the PIN; on a wrong
+    // PIN the caller clears [pin], re-arming this.
     LaunchedEffect(pin) {
-        if (pin.length == minLength) onSubmit()
+        if (pin.length == pinLength) onSubmit()
     }
 
     // Error -> shake + haptic.
@@ -140,8 +140,8 @@ fun LockChallengeContent(
         )
         Spacer(Modifier.height(Spacing.xl))
         PinDots(
-            length = minLength.coerceAtLeast(4),
-            filledCount = pin.length.coerceAtMost(minLength.coerceAtLeast(4)),
+            length = pinLength,
+            filledCount = pin.length.coerceAtMost(pinLength),
             error = error != null,
             modifier = Modifier.offset { IntOffset(shake.value.roundToInt(), 0) },
         )

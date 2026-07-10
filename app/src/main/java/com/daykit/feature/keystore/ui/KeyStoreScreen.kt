@@ -197,6 +197,7 @@ fun KeyStoreScreen(
             subtitle = "Unlock secure storage",
             pin = unlockPin,
             error = unlockError,
+            pinLength = container.credentialRepository.pinLength(),
             biometricEnabled = biometricEnabled,
             icon = Icons.Rounded.VpnKey,
             onBack = onBack,

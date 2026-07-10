@@ -101,6 +101,7 @@ private fun LockChallengeScreen(
 
     val scope = rememberCoroutineScope()
     val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
+    val pinLength = remember { credentialRepository.pinLength() }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var biometricEnabled by remember { mutableStateOf(false) }
@@ -128,7 +129,7 @@ private fun LockChallengeScreen(
     }
 
     fun submit() {
-        if (pin.length < 4) return
+        if (pin.length < pinLength) return
         scope.launch {
             val candidate = pin
             val result = withContext(Dispatchers.Default) {
@@ -150,6 +151,7 @@ private fun LockChallengeScreen(
                 subtitle = appLabel,
                 pin = pin,
                 error = error,
+                pinLength = pinLength,
                 appIconPainter = iconPainter,
                 onDigit = { d ->
                     if (pin.length < 12) {

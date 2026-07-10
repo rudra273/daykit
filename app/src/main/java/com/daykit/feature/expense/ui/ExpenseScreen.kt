@@ -37,7 +37,7 @@ import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.Subscriptions
-import androidx.compose.material3.Checkbox
+import com.daykit.core.designsystem.components.AppCheckbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
@@ -1112,7 +1112,7 @@ private fun BillScheduleSheet(
             )
             MonthPickerField(label = "Start month", month = startMonth, onMonthChange = { startMonth = it })
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = noEndMonth, onCheckedChange = { noEndMonth = it })
+                AppCheckbox(checked = noEndMonth, onCheckedChange = { noEndMonth = it })
                 Text("No end month", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
             }
             if (!noEndMonth) {

@@ -189,6 +189,7 @@ private fun ToolCard(tile: ToolTile, status: String, onClick: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        Spacer(Modifier.height(2.dp))
         Text(
             text = status,
             style = MaterialTheme.typography.bodySmall,

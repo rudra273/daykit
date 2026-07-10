@@ -32,19 +32,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +81,8 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppListRow
+import com.daykit.core.designsystem.components.AppRadioButton
+import com.daykit.core.designsystem.components.AppSwitch
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.AppTopBar
@@ -913,44 +915,51 @@ private fun BackupContentOptions(
     onHabitsChange: (Boolean) -> Unit,
     onVaultChange: (Boolean) -> Unit,
 ) {
-    AppCard(modifier = Modifier.fillMaxWidth()) {
+    val accents = MaterialTheme.extendedColors.accents
+    AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValuesZero) {
+        AppListRow(
+            headline = "Expenses",
+            leadingIcon = Icons.Rounded.Payments,
+            leadingAccent = accents.pink,
+            trailing = { AppSwitch(checked = includeExpenses, onCheckedChange = onExpensesChange) },
+        )
+        RowDivider(startIndent = Spacing.lg)
+        AppListRow(
+            headline = "Habits",
+            leadingIcon = Icons.Rounded.TrackChanges,
+            leadingAccent = accents.green,
+            trailing = { AppSwitch(checked = includeHabits, onCheckedChange = onHabitsChange) },
+        )
+        RowDivider(startIndent = Spacing.lg)
+        AppListRow(
+            headline = "Vault files",
+            supporting = "Photos & videos",
+            leadingIcon = Icons.Rounded.Folder,
+            leadingAccent = accents.purple,
+            trailing = { AppSwitch(checked = includeVault, onCheckedChange = onVaultChange) },
+        )
         Text(
             "Key Store and Secure Notes are always included. App Lock is never included.",
             color = MaterialTheme.extendedColors.textMuted,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(
+                start = Spacing.lg,
+                end = Spacing.lg,
+                bottom = Spacing.md,
+            ),
         )
-        Spacer(Modifier.height(Spacing.sm))
-        BackupContentSwitchRow("Expenses", includeExpenses, onExpensesChange)
-        BackupContentSwitchRow("Habits", includeHabits, onHabitsChange)
-        BackupContentSwitchRow("Vault files (photos & videos)", includeVault, onVaultChange)
         if (includeVault) {
-            Spacer(Modifier.height(Spacing.xs))
             Text(
                 "Vault files will be encrypted and uploaded with your backup. This can make backups large and slow. Off by default.",
                 color = MaterialTheme.extendedColors.warning,
                 style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(
+                    start = Spacing.lg,
+                    end = Spacing.lg,
+                    bottom = Spacing.md,
+                ),
             )
         }
-    }
-}
-
-@Composable
-private fun BackupContentSwitchRow(
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            title,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -1372,7 +1381,7 @@ private fun RadioRow(
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = onClick)
+        AppRadioButton(selected = selected, onClick = onClick)
         Spacer(Modifier.width(Spacing.sm))
         Text(text, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
     }

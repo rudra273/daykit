@@ -50,7 +50,7 @@ import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Checkbox
+import com.daykit.core.designsystem.components.AppCheckbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -1514,7 +1514,7 @@ private fun HabitEditorPage(
                         EditorSection(title = "Status") {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("Active", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                                Checkbox(checked = active, onCheckedChange = { active = it })
+                                AppCheckbox(checked = active, onCheckedChange = { active = it })
                             }
                         }
                     }
@@ -1627,7 +1627,7 @@ private fun ProgressSheet(
             if (habit.goalType == HabitGoalType.Check) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Mark complete", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                    Checkbox(checked = checked, onCheckedChange = { checked = it })
+                    AppCheckbox(checked = checked, onCheckedChange = { checked = it })
                 }
             } else {
                 Text(
