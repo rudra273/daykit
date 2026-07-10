@@ -19,4 +19,18 @@ class SensitiveValueCipher(
         )
         return plaintext.toString(StandardCharsets.UTF_8)
     }
+
+    fun encryptBytes(value: ByteArray, aad: String): CipherPayload {
+        return keyStoreCrypto.encrypt(
+            plaintext = value,
+            aad = aad.toByteArray(StandardCharsets.UTF_8),
+        )
+    }
+
+    fun decryptBytes(payload: CipherPayload, aad: String): ByteArray {
+        return keyStoreCrypto.decrypt(
+            payload = payload,
+            aad = aad.toByteArray(StandardCharsets.UTF_8),
+        )
+    }
 }

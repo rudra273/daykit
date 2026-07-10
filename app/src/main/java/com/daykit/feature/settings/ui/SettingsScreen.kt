@@ -268,7 +268,7 @@ fun SettingsScreen(
             // ---- Data ----
             item { SectionHeader("Data") }
             item {
-                AppCard(contentPadding = PaddingValues(vertical = Spacing.xs)) {
+                AppCard(contentPadding = PaddingValues(0.dp)) {
                     AppListRow(
                         headline = "Backup & Restore",
                         leadingIcon = Icons.Rounded.CloudUpload,
@@ -449,7 +449,7 @@ fun SettingsScreen(
             // ---- Appearance ----
             item { SectionHeader("Appearance") }
             item {
-                AppCard(contentPadding = PaddingValues(vertical = Spacing.xs)) {
+                AppCard(contentPadding = PaddingValues(0.dp)) {
                     AppListRow(
                         headline = "Appearance",
                         leadingIcon = Icons.Rounded.Palette,
@@ -463,7 +463,7 @@ fun SettingsScreen(
             // ---- About ----
             item { SectionHeader("About") }
             item {
-                AppCard(contentPadding = PaddingValues(vertical = Spacing.xs)) {
+                AppCard(contentPadding = PaddingValues(0.dp)) {
                     AppListRow(
                         headline = "About DayKit",
                         leadingIcon = Icons.Rounded.Info,

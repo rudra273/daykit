@@ -50,11 +50,10 @@ import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AppListRow
-import com.daykit.core.designsystem.components.AppSearchBar
-import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.BiometricAuthenticator
@@ -87,6 +86,7 @@ fun AppLockScreen(
     var unlockError by remember { mutableStateOf<String?>(null) }
     var biometricEnabled by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    var searchActive by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(AppLockTab.All) }
     var installedApps by remember { mutableStateOf<List<InstalledApp>?>(null) }
     var toolLocked by remember { mutableStateOf<Boolean?>(null) }
@@ -98,7 +98,10 @@ fun AppLockScreen(
     val secureFolderAvailable = remember(context) { SamsungSecureFolderSupport.isAvailable(context) }
 
     BackHandler {
-        if (query.isNotBlank()) {
+        if (searchActive) {
+            searchActive = false
+            query = ""
+        } else if (query.isNotBlank()) {
             query = ""
         } else {
             onBack()
@@ -230,9 +233,14 @@ fun AppLockScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AppTopBar(
+            SearchAppTopBar(
                 title = "App Lock",
+                query = query,
+                onQueryChange = { query = it },
+                searchActive = searchActive,
+                onSearchActiveChange = { searchActive = it; if (!it) query = "" },
                 onBack = onBack,
+                searchPlaceholder = "Search apps",
             )
         },
     ) { innerPadding ->
@@ -266,15 +274,8 @@ fun AppLockScreen(
                         top = innerPadding.calculateTopPadding() + Spacing.sm,
                         bottom = Spacing.xxl,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
-                    item(key = "search") {
-                        AppSearchBar(
-                            query = query,
-                            onQueryChange = { query = it },
-                            placeholder = "Search apps",
-                        )
-                    }
                     item(key = "tabs") {
                         Row(
                             modifier = Modifier

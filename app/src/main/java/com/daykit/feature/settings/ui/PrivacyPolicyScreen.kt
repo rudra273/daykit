@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextDecoration
 import com.daykit.core.designsystem.Spacing
-import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
@@ -150,7 +149,7 @@ fun PrivacyPolicyScreen(
 @Composable
 private fun PolicyHeader() {
     val context = LocalContext.current
-    AppCard(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             "DayKit Privacy Policy",
             color = MaterialTheme.colorScheme.onSurface,
@@ -189,7 +188,7 @@ private fun PolicySection(
     body: List<String>,
 ) {
     SectionHeader(text = title)
-    AppCard(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         body.forEachIndexed { index, paragraph ->
             if (index > 0) Spacer(Modifier.height(Spacing.sm))
             Text(

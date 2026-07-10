@@ -8,6 +8,10 @@ package com.daykit.feature.notes.ui
 
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -36,7 +40,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Label
 import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.SearchOff
@@ -54,7 +60,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,12 +77,12 @@ import com.daykit.core.designsystem.components.AppAlertDialog
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
-import com.daykit.core.designsystem.components.AppSearchBar
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.BiometricAuthenticator
 import com.daykit.feature.lock.ui.ToolUnlockScreen
@@ -107,10 +115,14 @@ fun SecureNotesScreen(
     var actionNote by remember { mutableStateOf<SecureNote?>(null) }
     var confirmDeleteNote by remember { mutableStateOf<SecureNote?>(null) }
     var query by remember { mutableStateOf("") }
+    var searchActive by remember { mutableStateOf(false) }
     var selectedLabel by remember { mutableStateOf<String?>(null) }
     val notes by container.secureNoteRepository
         .observeNotes()
         .collectAsStateWithLifecycle(initialValue = null)
+    val imagesByNote by container.secureNoteRepository
+        .observeImagesByNote()
+        .collectAsStateWithLifecycle(initialValue = emptyMap())
 
     fun tryBiometricUnlock(enabled: Boolean = biometricEnabled) {
         if (!enabled || !biometricAuthenticator.canAuthenticate()) return
@@ -152,6 +164,11 @@ fun SecureNotesScreen(
 
     BackHandler {
         when {
+            searchActive -> {
+                searchActive = false
+                query = ""
+                selectedLabel = null
+            }
             query.isNotBlank() || selectedLabel != null -> {
                 query = ""
                 selectedLabel = null
@@ -223,32 +240,8 @@ fun SecureNotesScreen(
         NoteEditorPage(
             state = currentEditor,
             existingLabels = uniqueLabels,
-            onBack = { title, content, labels ->
-                scope.launch {
-                    when (currentEditor) {
-                        NoteEditorState.Add -> {
-                            if (title.isNotBlank() || content.isNotBlank()) {
-                                container.secureNoteRepository.addNote(
-                                    title = title.ifBlank { "Untitled" },
-                                    content = content.ifBlank { " " },
-                                    labels = labels,
-                                )
-                            }
-                        }
-                        is NoteEditorState.Edit -> {
-                            if (title.isNotBlank() || content.isNotBlank()) {
-                                container.secureNoteRepository.updateNote(
-                                    noteId = currentEditor.note.noteId,
-                                    title = title.ifBlank { "Untitled" },
-                                    content = content.ifBlank { " " },
-                                    labels = labels,
-                                )
-                            }
-                        }
-                    }
-                    editorState = null
-                }
-            },
+            repository = container.secureNoteRepository,
+            onClose = { editorState = null },
         )
         return
     }
@@ -258,9 +251,14 @@ fun SecureNotesScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AppTopBar(
+            SearchAppTopBar(
                 title = "Notes",
+                query = query,
+                onQueryChange = { query = it },
+                searchActive = searchActive,
+                onSearchActiveChange = { searchActive = it; if (!it) query = "" },
                 onBack = onBack,
+                searchPlaceholder = "Search notes",
             )
         },
         floatingActionButton = {
@@ -291,21 +289,6 @@ fun SecureNotesScreen(
                     ),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    item(span = StaggeredGridItemSpan.FullLine) {
-                        Text(
-                            text = "${filteredNotes.size} of ${currentNotes.size} notes",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.extendedColors.textMuted,
-                            modifier = Modifier.padding(bottom = Spacing.sm),
-                        )
-                    }
-                    item(span = StaggeredGridItemSpan.FullLine) {
-                        AppSearchBar(
-                            query = query,
-                            onQueryChange = { query = it },
-                            placeholder = "Search notes",
-                        )
-                    }
                     if (uniqueLabels.isNotEmpty()) {
                         item(span = StaggeredGridItemSpan.FullLine) {
                             androidx.compose.foundation.layout.FlowRow(
@@ -350,6 +333,7 @@ fun SecureNotesScreen(
                     itemsIndexed(filteredNotes, key = { _, it -> it.noteId }) { _, note ->
                         NoteCard(
                             note = note,
+                            previewImage = imagesByNote[note.noteId]?.firstOrNull(),
                             onClick = { editorState = NoteEditorState.Edit(note) },
                             onLongPress = { actionNote = note },
                         )
@@ -403,6 +387,7 @@ fun SecureNotesScreen(
 @Composable
 private fun NoteCard(
     note: SecureNote,
+    previewImage: com.daykit.feature.notes.data.SecureNoteImage?,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
 ) {
@@ -418,6 +403,25 @@ private fun NoteCard(
             ),
         contentPadding = PaddingValues(Spacing.md),
     ) {
+        if (previewImage != null) {
+            val bitmap = remember(previewImage.imageId) {
+                android.graphics.BitmapFactory
+                    .decodeByteArray(previewImage.bytes, 0, previewImage.bytes.size)
+                    ?.asImageBitmap()
+            }
+            if (bitmap != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = bitmap,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+                Spacer(Modifier.height(Spacing.sm))
+            }
+        }
         Text(
             text = note.title.ifBlank { "Untitled" },
             style = MaterialTheme.typography.titleMedium,
@@ -504,8 +508,11 @@ private fun NoteActionRow(
 private fun NoteEditorPage(
     state: NoteEditorState,
     existingLabels: List<String>,
-    onBack: (String, String, String) -> Unit,
+    repository: com.daykit.feature.notes.data.SecureNoteRepository,
+    onClose: () -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     val editingNote = (state as? NoteEditorState.Edit)?.note
     var title by remember(editingNote?.noteId) { mutableStateOf(editingNote?.title.orEmpty()) }
     var content by remember(editingNote?.noteId) { mutableStateOf(editingNote?.content.orEmpty()) }
@@ -513,9 +520,61 @@ private fun NoteEditorPage(
         mutableStateOf(editingNote?.labelList()?.toSet().orEmpty())
     }
     var labelSheetOpen by remember { mutableStateOf(false) }
+    // Persisted id: non-null once the note exists in the DB (immediately for edits,
+    // or after the first image is attached to a new note).
+    var persistedNoteId by remember(editingNote?.noteId) { mutableStateOf(editingNote?.noteId) }
+    var images by remember(editingNote?.noteId) {
+        mutableStateOf<List<com.daykit.feature.notes.data.SecureNoteImage>>(emptyList())
+    }
+
+    LaunchedEffect(editingNote?.noteId) {
+        val id = editingNote?.noteId
+        if (id != null) images = repository.getImages(id)
+    }
+
+    val cleanTitleFor = { title.ifBlank { "Untitled" } }
+    val cleanContentFor = { content.ifBlank { " " } }
+    val labelsString = { selectedLabels.sorted().joinToString(", ") }
+
+    // Ensures the note is saved and returns its id (creates it if new).
+    suspend fun ensureNoteId(): String {
+        persistedNoteId?.let { existing ->
+            repository.updateNote(existing, cleanTitleFor(), cleanContentFor(), labelsString())
+            return existing
+        }
+        val newId = repository.addNote(cleanTitleFor(), cleanContentFor(), labelsString())
+        persistedNoteId = newId
+        return newId
+    }
+
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val bytes = withContext(Dispatchers.IO) { decodeImageBytes(context, uri) }
+                if (bytes != null) {
+                    val noteId = ensureNoteId()
+                    repository.addImage(noteId, bytes)
+                    images = repository.getImages(noteId)
+                }
+            }
+        }
+    }
 
     fun finish() {
-        onBack(title, content, selectedLabels.sorted().joinToString(", "))
+        scope.launch {
+            val existing = persistedNoteId
+            if (existing != null) {
+                // Note already persisted (e.g. images attached) — update text/labels.
+                if (title.isNotBlank() || content.isNotBlank() || images.isNotEmpty()) {
+                    repository.updateNote(existing, cleanTitleFor(), cleanContentFor(), labelsString())
+                }
+            } else if (title.isNotBlank() || content.isNotBlank()) {
+                repository.addNote(cleanTitleFor(), cleanContentFor(), labelsString())
+            }
+            onClose()
+        }
     }
 
     BackHandler { finish() }
@@ -527,6 +586,19 @@ private fun NoteEditorPage(
                 title = "",
                 onBack = { finish() },
                 actions = {
+                    androidx.compose.material3.IconButton(
+                        onClick = {
+                            imagePicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                    ) {
+                        Icon(
+                            Icons.Rounded.Image,
+                            contentDescription = "Add image",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     androidx.compose.material3.IconButton(onClick = { labelSheetOpen = true }) {
                         Icon(
                             Icons.Rounded.Label,
@@ -547,7 +619,7 @@ private fun NoteEditorPage(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.lg)
+                    .padding(horizontal = Spacing.xl)
                     .imePadding(),
             ) {
                 NotePlainField(
@@ -560,7 +632,7 @@ private fun NoteEditorPage(
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = Spacing.sm),
+                        .padding(top = Spacing.lg),
                 )
                 val selectedList = selectedLabels.sorted()
                 if (selectedList.isNotEmpty()) {
@@ -575,6 +647,26 @@ private fun NoteEditorPage(
                                 text = label,
                                 selected = true,
                                 onClick = { selectedLabels = selectedLabels - label },
+                            )
+                        }
+                    }
+                }
+                if (images.isNotEmpty()) {
+                    Spacer(Modifier.height(Spacing.md))
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        images.forEach { image ->
+                            EditorImageThumbnail(
+                                image = image,
+                                onDelete = {
+                                    scope.launch {
+                                        repository.deleteImage(image.imageId)
+                                        persistedNoteId?.let { images = repository.getImages(it) }
+                                    }
+                                },
                             )
                         }
                     }
@@ -611,6 +703,71 @@ private fun NoteEditorPage(
             onDismiss = { labelSheetOpen = false },
         )
     }
+}
+
+@Composable
+private fun EditorImageThumbnail(
+    image: com.daykit.feature.notes.data.SecureNoteImage,
+    onDelete: () -> Unit,
+) {
+    val bitmap = remember(image.imageId) {
+        android.graphics.BitmapFactory.decodeByteArray(image.bytes, 0, image.bytes.size)?.asImageBitmap()
+    }
+    Box(
+        modifier = Modifier
+            .size(96.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.extendedColors.inputField),
+    ) {
+        if (bitmap != null) {
+            androidx.compose.foundation.Image(
+                bitmap = bitmap,
+                contentDescription = "Note image",
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        androidx.compose.material3.Surface(
+            onClick = onDelete,
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(24.dp),
+        ) {
+            Icon(
+                Icons.Rounded.Close,
+                contentDescription = "Remove image",
+                modifier = Modifier.padding(4.dp),
+            )
+        }
+    }
+}
+
+/** Decodes and downscales the picked image to a reasonable-size JPEG byte array. */
+private fun decodeImageBytes(
+    context: android.content.Context,
+    uri: android.net.Uri,
+): ByteArray? {
+    return runCatching {
+        val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+        val bitmap = android.graphics.ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            decoder.isMutableRequired = false
+            val maxDimension = 1600
+            val (w, h) = info.size.width to info.size.height
+            val largest = maxOf(w, h)
+            if (largest > maxDimension) {
+                val scale = maxDimension.toFloat() / largest
+                decoder.setTargetSize((w * scale).toInt(), (h * scale).toInt())
+            }
+        }
+        val stream = java.io.ByteArrayOutputStream()
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, stream)
+        bitmap.recycle()
+        stream.toByteArray()
+    }.getOrNull()
 }
 
 @Composable

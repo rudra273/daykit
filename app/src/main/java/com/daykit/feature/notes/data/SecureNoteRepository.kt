@@ -16,15 +16,16 @@ class SecureNoteRepository(
         }
     }
 
-    suspend fun addNote(title: String, content: String, labels: String) {
+    suspend fun addNote(title: String, content: String, labels: String): String {
         val cleanTitle = title.trim()
         val cleanContent = content.trim()
         require(cleanTitle.isNotBlank() || cleanContent.isNotBlank()) { "Note cannot be empty" }
         val now = System.currentTimeMillis()
+        val noteId = UUID.randomUUID().toString()
         dao.upsert(
             encryptedEntity(
                 id = 0,
-                noteId = UUID.randomUUID().toString(),
+                noteId = noteId,
                 title = cleanTitle,
                 content = cleanContent,
                 labels = cleanLabels(labels),
@@ -33,6 +34,7 @@ class SecureNoteRepository(
                 updatedAtMillis = now,
             ),
         )
+        return noteId
     }
 
     suspend fun updateNote(noteId: String, title: String, content: String, labels: String) {
@@ -55,7 +57,53 @@ class SecureNoteRepository(
     }
 
     suspend fun deleteNote(noteId: String) {
+        dao.deleteImagesForNote(noteId)
         dao.deleteByNoteId(noteId)
+    }
+
+    /** Emits the decrypted images for every note, keyed by noteId. */
+    fun observeImagesByNote(): Flow<Map<String, List<SecureNoteImage>>> {
+        return dao.observeAllImages().map { entities ->
+            entities.mapNotNull { it.toImageOrNull() }
+                .groupBy { it.noteId }
+        }
+    }
+
+    suspend fun getImages(noteId: String): List<SecureNoteImage> {
+        return dao.getImagesForNote(noteId).mapNotNull { it.toImageOrNull() }
+    }
+
+    suspend fun addImage(noteId: String, bytes: ByteArray) {
+        require(bytes.isNotEmpty()) { "Image is empty" }
+        val payload = cipher.encryptBytes(bytes, aad = AAD_IMAGE)
+        val nextPosition = dao.maxImagePosition(noteId) + 1
+        dao.upsertImage(
+            SecureNoteImageEntity(
+                id = 0,
+                imageId = UUID.randomUUID().toString(),
+                noteId = noteId,
+                imageCiphertext = payload.ciphertext,
+                imageIv = payload.iv,
+                position = nextPosition,
+                createdAtMillis = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun deleteImage(imageId: String) {
+        dao.deleteImageById(imageId)
+    }
+
+    private fun SecureNoteImageEntity.toImageOrNull(): SecureNoteImage? {
+        return runCatching {
+            SecureNoteImage(
+                imageId = imageId,
+                noteId = noteId,
+                bytes = cipher.decryptBytes(CipherPayload(imageCiphertext, imageIv), aad = AAD_IMAGE),
+                position = position,
+                createdAtMillis = createdAtMillis,
+            )
+        }.getOrNull()
     }
 
     suspend fun exportRecords(): List<SecureNoteBackupRecord> {
@@ -149,6 +197,7 @@ class SecureNoteRepository(
         const val AAD_TITLE = "secure_notes.note.title"
         const val AAD_CONTENT = "secure_notes.note.content"
         const val AAD_LABELS = "secure_notes.note.labels"
+        const val AAD_IMAGE = "secure_notes.note.image"
     }
 }
 

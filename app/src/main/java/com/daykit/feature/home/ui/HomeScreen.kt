@@ -1,5 +1,6 @@
 package com.daykit.feature.home.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,9 +43,8 @@ import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppCard
-import com.daykit.core.designsystem.components.AppSearchBar
-import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.EmptyState
+import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.navigation.Routes
@@ -65,6 +65,7 @@ fun HomeScreen(
     onOpenTool: (String) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
     val habitDashboard by container.habitRepository
         .observeDashboard()
         .collectAsStateWithLifecycle(initialValue = null)
@@ -124,8 +125,17 @@ fun HomeScreen(
     val fOther = other.filter(::match)
     val nothing = fSecurity.isEmpty() && fProductivity.isEmpty() && fOther.isEmpty()
 
+    BackHandler(enabled = searchActive) { searchActive = false; query = "" }
+
     Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "DayKit")
+        SearchAppTopBar(
+            title = "DayKit",
+            query = query,
+            onQueryChange = { query = it },
+            searchActive = searchActive,
+            onSearchActiveChange = { searchActive = it; if (!it) query = "" },
+            searchPlaceholder = "Search tools",
+        )
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
@@ -137,9 +147,6 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                AppSearchBar(query = query, onQueryChange = { query = it }, placeholder = "Search tools")
-            }
             if (nothing) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(

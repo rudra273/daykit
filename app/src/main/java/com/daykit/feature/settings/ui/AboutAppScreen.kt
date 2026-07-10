@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
-import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
@@ -116,7 +115,7 @@ fun AboutAppScreen(
 
 @Composable
 private fun AboutHero() {
-    AppCard(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             "DayKit",
             color = MaterialTheme.colorScheme.onSurface,
@@ -143,7 +142,7 @@ private fun AboutSection(
     body: List<String>,
 ) {
     SectionHeader(text = title)
-    AppCard(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         body.forEachIndexed { index, paragraph ->
             if (index > 0) Spacer(Modifier.height(Spacing.sm))
             Text(

@@ -20,6 +20,7 @@ import com.daykit.feature.keystore.data.KeyStoreEntryDao
 import com.daykit.feature.keystore.data.KeyStoreEntryEntity
 import com.daykit.feature.notes.data.SecureNoteDao
 import com.daykit.feature.notes.data.SecureNoteEntity
+import com.daykit.feature.notes.data.SecureNoteImageEntity
 import com.daykit.feature.reminder.data.ReminderDao
 import com.daykit.feature.reminder.data.ReminderEntity
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
@@ -34,11 +35,12 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         MonthlyBillAmountEntity::class,
         ExpenseMonthEntity::class,
         SecureNoteEntity::class,
+        SecureNoteImageEntity::class,
         HabitEntity::class,
         HabitLogEntity::class,
         ReminderEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -72,6 +74,7 @@ abstract class DayKitDatabase : RoomDatabase() {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
                     MIGRATION_7_6,
                 )
                 .build()
@@ -374,6 +377,26 @@ abstract class DayKitDatabase : RoomDatabase() {
                     """.trimIndent(),
                 )
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_reminders_reminderId` ON `reminders` (`reminderId`)")
+            }
+        }
+
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `secure_note_images` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `imageId` TEXT NOT NULL,
+                        `noteId` TEXT NOT NULL,
+                        `imageCiphertext` BLOB NOT NULL,
+                        `imageIv` BLOB NOT NULL,
+                        `position` INTEGER NOT NULL,
+                        `createdAtMillis` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_secure_note_images_imageId` ON `secure_note_images` (`imageId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_secure_note_images_noteId` ON `secure_note_images` (`noteId`)")
             }
         }
     }

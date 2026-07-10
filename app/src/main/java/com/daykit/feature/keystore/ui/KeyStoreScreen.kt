@@ -68,14 +68,13 @@ import com.daykit.core.designsystem.components.AppAlertDialog
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
-import com.daykit.core.designsystem.components.AppSearchBar
 import com.daykit.core.designsystem.components.AppTextField
-import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.DestructiveButton
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
@@ -114,12 +113,16 @@ fun KeyStoreScreen(
     var actionEntry by remember { mutableStateOf<KeyStoreEntry?>(null) }
     var confirmDeleteEntry by remember { mutableStateOf<KeyStoreEntry?>(null) }
     var query by remember { mutableStateOf("") }
+    var searchActive by remember { mutableStateOf(false) }
     var selectedLabel by remember { mutableStateOf<String?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
     BackHandler {
-        if (query.isNotEmpty() || selectedLabel != null) {
+        if (searchActive) {
+            searchActive = false
+            query = ""
+        } else if (query.isNotEmpty() || selectedLabel != null) {
             query = ""
             selectedLabel = null
         } else {
@@ -234,9 +237,14 @@ fun KeyStoreScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AppTopBar(
+            SearchAppTopBar(
                 title = "Key Store",
+                query = query,
+                onQueryChange = { query = it },
+                searchActive = searchActive,
+                onSearchActiveChange = { searchActive = it; if (!it) query = "" },
                 onBack = onBack,
+                searchPlaceholder = "Search name or label",
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -265,13 +273,6 @@ fun KeyStoreScreen(
                         text = "${filteredEntries.size} of ${entries?.size ?: 0} saved",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.extendedColors.textMuted,
-                    )
-                }
-                item(key = "search") {
-                    AppSearchBar(
-                        query = query,
-                        onQueryChange = { query = it },
-                        placeholder = "Search name or label",
                     )
                 }
                 if (uniqueLabels.isNotEmpty()) {

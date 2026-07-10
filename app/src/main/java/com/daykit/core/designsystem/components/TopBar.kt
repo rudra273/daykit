@@ -1,6 +1,7 @@
 package com.daykit.core.designsystem.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,14 +16,22 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
@@ -95,6 +104,92 @@ fun AppTopBar(
             actions()
         }
         RowDivider(modifier = Modifier.align(Alignment.BottomCenter), startIndent = 0.dp)
+    }
+}
+
+/**
+ * Top bar with a built-in search affordance. At rest it shows [title] and a search
+ * icon; tapping the icon morphs the title area into an autofocused inline text field
+ * with a clear/close button. Filtering is driven by [query]/[onQueryChange]; the
+ * caller decides what to do with the query.
+ */
+@Composable
+fun SearchAppTopBar(
+    title: String,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    searchActive: Boolean,
+    onSearchActiveChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
+    searchPlaceholder: String = "Search",
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(searchActive) {
+        if (searchActive) focusRequester.requestFocus()
+    }
+    if (searchActive) {
+        AppTopBar(
+            modifier = modifier,
+            title = title,
+            onBack = onBack,
+            titleContent = {
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.titleMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    decorationBox = { inner ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (query.isEmpty()) {
+                                Text(
+                                    text = searchPlaceholder,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.extendedColors.textMuted,
+                                )
+                            }
+                            inner()
+                        }
+                    },
+                )
+            },
+            actions = {
+                IconButton(
+                    onClick = {
+                        if (query.isEmpty()) onSearchActiveChange(false) else onQueryChange("")
+                    },
+                ) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = "Close search",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            },
+        )
+    } else {
+        AppTopBar(
+            modifier = modifier,
+            title = title,
+            onBack = onBack,
+            actions = {
+                IconButton(onClick = { onSearchActiveChange(true) }) {
+                    Icon(
+                        Icons.Rounded.Search,
+                        contentDescription = "Search",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                actions()
+            },
+        )
     }
 }
 
