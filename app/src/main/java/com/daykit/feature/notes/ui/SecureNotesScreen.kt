@@ -591,6 +591,24 @@ private fun NoteEditorPage(
             AppTopBar(
                 title = "",
                 onBack = { finish() },
+                titleContent = {
+                    val headerLabels = selectedLabels.sorted()
+                    if (headerLabels.isNotEmpty()) {
+                        androidx.compose.foundation.layout.FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            headerLabels.forEach { label ->
+                                FilterChipButton(
+                                    text = label,
+                                    selected = true,
+                                    onClick = { selectedLabels = selectedLabels - label },
+                                )
+                            }
+                        }
+                    }
+                },
                 actions = {
                     androidx.compose.material3.IconButton(
                         onClick = {
@@ -641,23 +659,6 @@ private fun NoteEditorPage(
                         .fillMaxWidth()
                         .padding(top = Spacing.lg),
                 )
-                val selectedList = selectedLabels.sorted()
-                if (selectedList.isNotEmpty()) {
-                    Spacer(Modifier.height(Spacing.sm))
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        selectedList.forEach { label ->
-                            FilterChipButton(
-                                text = label,
-                                selected = true,
-                                onClick = { selectedLabels = selectedLabels - label },
-                            )
-                        }
-                    }
-                }
                 if (images.isNotEmpty()) {
                     Spacer(Modifier.height(Spacing.md))
                     androidx.compose.foundation.layout.FlowRow(

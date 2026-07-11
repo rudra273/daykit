@@ -27,6 +27,17 @@ class ReminderRepository(
         return reminder
     }
 
+    suspend fun updateReminder(reminderId: String, title: String, scheduledAtMillis: Long): Reminder? {
+        require(title.trim().isNotBlank()) { "Reminder title cannot be empty" }
+        dao.updateReminder(
+            reminderId = reminderId,
+            title = title.trim(),
+            scheduledAtMillis = scheduledAtMillis,
+            updatedAtMillis = System.currentTimeMillis(),
+        )
+        return getReminder(reminderId)
+    }
+
     suspend fun markComplete(reminderId: String) {
         dao.markComplete(reminderId, System.currentTimeMillis())
     }

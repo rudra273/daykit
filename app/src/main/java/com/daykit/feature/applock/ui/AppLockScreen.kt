@@ -125,6 +125,7 @@ fun AppLockScreen(
 
     LaunchedEffect(Unit) {
         installedApps = container.installedAppProvider.loadLaunchableApps()
+            .filterNot { it.packageName == context.packageName }
     }
 
     LaunchedEffect(secureFolderAvailable) {
@@ -523,7 +524,7 @@ private fun InstalledApp.recommendationPriority(ownPackageName: String): Int {
     val combined = "$labelText $packageText"
 
     return when {
-        packageName == ownPackageName || labelText == "daykit" -> 0
+        packageName == ownPackageName -> 0
         listOf(
             "whatsapp",
             "telegram",

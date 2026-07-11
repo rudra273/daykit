@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.PlayCircle
@@ -196,7 +198,6 @@ fun FileLockerScreen(
         topBar = {
             if (selectionMode) {
                 SelectionTopBar(
-                    count = selectedIds.size,
                     onCancel = { selectedIds.clear() },
                     onExport = {
                         snack("Choose where to export the selected files.")
@@ -272,6 +273,14 @@ fun FileLockerScreen(
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column {
+                        if (selectionMode) {
+                            Text(
+                                text = "${selectedIds.size} selected",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(Modifier.height(Spacing.md))
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                             StatTile(
                                 label = "Protected files",
@@ -288,8 +297,8 @@ fun FileLockerScreen(
                                 modifier = Modifier.weight(1f),
                             )
                         }
-                        Spacer(Modifier.height(Spacing.md))
-                        SecurityCallout()
+                        Spacer(Modifier.height(Spacing.sm))
+                        SecurityInfo()
                         Spacer(Modifier.height(Spacing.md))
                     }
                 }
@@ -343,29 +352,54 @@ fun FileLockerScreen(
 }
 
 @Composable
-private fun SecurityCallout() {
-    AppCard(contentPadding = PaddingValues(Spacing.md)) {
-        Row(verticalAlignment = Alignment.Top) {
+private fun SecurityInfo() {
+    var expanded by remember { mutableStateOf(false) }
+    Column {
+        Row(
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable { expanded = !expanded }
+                .padding(vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(
-                Icons.Rounded.Shield,
-                contentDescription = null,
+                Icons.Rounded.Info,
+                contentDescription = "How your files are protected",
                 tint = MaterialTheme.extendedColors.textMuted,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(Spacing.sm))
             Text(
-                text = "Files are encrypted (AES-256) and stored only inside this app. " +
-                    "Other apps, file managers, and USB cannot read them. Export a file to use it elsewhere.",
+                text = "How your files are protected",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.extendedColors.textMuted,
             )
+        }
+        if (expanded) {
+            Spacer(Modifier.height(Spacing.sm))
+            AppCard(contentPadding = PaddingValues(Spacing.md)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        Icons.Rounded.Shield,
+                        contentDescription = null,
+                        tint = MaterialTheme.extendedColors.textMuted,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text(
+                        text = "Files are encrypted (AES-256) and stored only inside this app. " +
+                            "Other apps, file managers, and USB cannot read them. Export a file to use it elsewhere.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.extendedColors.textMuted,
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun SelectionTopBar(
-    count: Int,
     onCancel: () -> Unit,
     onExport: () -> Unit,
     onRestore: () -> Unit,
@@ -384,13 +418,7 @@ private fun SelectionTopBar(
         IconButton(onClick = onCancel) {
             Icon(Icons.Rounded.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.onSurface)
         }
-        Spacer(Modifier.width(Spacing.sm))
-        Text(
-            text = "$count selected",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
+        Spacer(Modifier.weight(1f))
         IconButton(onClick = onDelete, enabled = actionsEnabled) {
             Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
         }

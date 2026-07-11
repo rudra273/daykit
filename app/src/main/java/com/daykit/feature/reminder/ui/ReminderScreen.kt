@@ -22,12 +22,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Schedule
@@ -36,7 +37,6 @@ import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -72,6 +72,7 @@ import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.DestructiveButton
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
@@ -101,6 +102,8 @@ fun ReminderScreen(
         .observeReminders()
         .collectAsStateWithLifecycle(initialValue = null)
     var addOpen by remember { mutableStateOf(false) }
+    var editReminder by remember { mutableStateOf<Reminder?>(null) }
+    var actionReminder by remember { mutableStateOf<Reminder?>(null) }
     var deleteReminder by remember { mutableStateOf<Reminder?>(null) }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -127,14 +130,17 @@ fun ReminderScreen(
                     reminders = current,
                     listState = listState,
                     onComplete = ::complete,
-                    onDelete = { deleteReminder = it },
+                    onLongPress = { actionReminder = it },
                 )
             }
         }
     }
 
     if (addOpen) {
-        ReminderAddSheet(
+        ReminderFormSheet(
+            heading = "New reminder",
+            confirmText = "Add reminder",
+            initial = null,
             onDismiss = { addOpen = false },
             onSave = { title, scheduledAtMillis ->
                 scope.launch {
@@ -143,6 +149,44 @@ fun ReminderScreen(
                     requestNotificationPermissionIfNeeded(context as? Activity)
                     addOpen = false
                 }
+            },
+        )
+    }
+
+    editReminder?.let { editing ->
+        ReminderFormSheet(
+            heading = "Edit reminder",
+            confirmText = "Save changes",
+            initial = editing,
+            onDismiss = { editReminder = null },
+            onSave = { title, scheduledAtMillis ->
+                scope.launch {
+                    val updated = container.reminderRepository
+                        .updateReminder(editing.reminderId, title, scheduledAtMillis)
+                    if (updated != null) {
+                        scheduler.cancel(updated.reminderId)
+                        NotificationManagerCompat.from(context)
+                            .cancel(ReminderNotifier.notificationId(updated.reminderId))
+                        scheduler.schedule(updated)
+                        requestNotificationPermissionIfNeeded(context as? Activity)
+                    }
+                    editReminder = null
+                }
+            },
+        )
+    }
+
+    actionReminder?.let { reminder ->
+        ReminderActionSheet(
+            reminder = reminder,
+            onDismiss = { actionReminder = null },
+            onEdit = {
+                actionReminder = null
+                editReminder = reminder
+            },
+            onDelete = {
+                actionReminder = null
+                deleteReminder = reminder
             },
         )
     }
@@ -171,7 +215,7 @@ private fun ReminderContent(
     reminders: List<Reminder>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onComplete: (Reminder) -> Unit,
-    onDelete: (Reminder) -> Unit,
+    onLongPress: (Reminder) -> Unit,
 ) {
     if (reminders.isEmpty()) {
         Column(Modifier.fillMaxSize()) {
@@ -208,9 +252,9 @@ private fun ReminderContent(
         if (next != null) {
             item { UpNextCard(reminder = next, onComplete = { onComplete(next) }) }
         }
-        section("Overdue", overdue, accentDanger = true, onComplete, onDelete)
-        section("Today", today, accentDanger = false, onComplete, onDelete)
-        section("Upcoming", upcoming, accentDanger = false, onComplete, onDelete)
+        section("Overdue", overdue, accentDanger = true, onComplete, onLongPress)
+        section("Today", today, accentDanger = false, onComplete, onLongPress)
+        section("Upcoming", upcoming, accentDanger = false, onComplete, onLongPress)
         if (completed.isNotEmpty()) {
             item {
                 Text(
@@ -221,7 +265,7 @@ private fun ReminderContent(
                 )
             }
             items(completed, key = { it.reminderId }) { r ->
-                ReminderRow(reminder = r, accentDanger = false, onComplete = { onComplete(r) }, onDelete = { onDelete(r) })
+                ReminderRow(reminder = r, accentDanger = false, onComplete = { onComplete(r) }, onLongPress = { onLongPress(r) })
             }
         }
     }
@@ -232,14 +276,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
     reminders: List<Reminder>,
     accentDanger: Boolean,
     onComplete: (Reminder) -> Unit,
-    onDelete: (Reminder) -> Unit,
+    onLongPress: (Reminder) -> Unit,
 ) {
     if (reminders.isEmpty()) return
     item(key = "header-$title") {
         SectionHeaderRow(title = title, count = reminders.size, danger = accentDanger)
     }
     items(reminders, key = { it.reminderId }) { r ->
-        ReminderRow(reminder = r, accentDanger = accentDanger, onComplete = { onComplete(r) }, onDelete = { onDelete(r) })
+        ReminderRow(reminder = r, accentDanger = accentDanger, onComplete = { onComplete(r) }, onLongPress = { onLongPress(r) })
     }
 }
 
@@ -305,14 +349,18 @@ private fun UpNextCard(reminder: Reminder, onComplete: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReminderRow(
     reminder: Reminder,
     accentDanger: Boolean,
     onComplete: () -> Unit,
-    onDelete: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
-    AppCard(contentPadding = PaddingValues(Spacing.md)) {
+    AppCard(
+        modifier = Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress),
+        contentPadding = PaddingValues(Spacing.md),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Tap-to-complete circle
             if (reminder.completed) {
@@ -358,25 +406,56 @@ private fun ReminderRow(
                     color = if (accentDanger) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.textMuted,
                 )
             }
-            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    Icons.Rounded.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.extendedColors.textMuted,
-                    modifier = Modifier.size(20.dp),
-                )
+        }
+    }
+}
+
+@Composable
+private fun ReminderActionSheet(
+    reminder: Reminder,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    AppBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                reminder.title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                reminder.scheduledAtMillis.toAbsoluteText(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.extendedColors.textMuted,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                SecondaryButton(text = "Edit", modifier = Modifier.weight(1f), onClick = onEdit)
+                DestructiveButton(text = "Delete", modifier = Modifier.weight(1f), onClick = onDelete)
             }
         }
     }
 }
 
 @Composable
-private fun ReminderAddSheet(
+private fun ReminderFormSheet(
+    heading: String,
+    confirmText: String,
+    initial: Reminder?,
     onDismiss: () -> Unit,
     onSave: (String, Long) -> Unit,
 ) {
-    var title by remember { mutableStateOf("") }
-    val default = LocalDateTime.now().plusMinutes(5)
+    val default = remember(initial) {
+        initial?.let {
+            Instant.ofEpochMilli(it.scheduledAtMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
+        } ?: LocalDateTime.now().plusMinutes(5)
+    }
+    var title by remember { mutableStateOf(initial?.title ?: "") }
     var date by remember { mutableStateOf(default.toLocalDate()) }
     var time by remember { mutableStateOf(default.toLocalTime()) }
 
@@ -391,7 +470,7 @@ private fun ReminderAddSheet(
     AppBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg)) {
             Text(
-                text = "New reminder",
+                text = heading,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -426,7 +505,7 @@ private fun ReminderAddSheet(
             )
             Spacer(Modifier.height(Spacing.lg))
             PrimaryButton(
-                text = "Add reminder",
+                text = confirmText,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = canSave,
                 onClick = { onSave(title, scheduledAtMillis) },

@@ -42,7 +42,9 @@ fun AppListRow(
             .fillMaxWidth()
             // Uniform floor so single-line and two-line rows share the same
             // height rhythm within a card (matches the "Tool locks" template).
-            .defaultMinSize(minHeight = 56.dp)
+            // 60dp so chevron/icon-only rows match the taller switch rows, whose
+            // AppSwitch pushes them just past a 56dp floor.
+            .defaultMinSize(minHeight = 60.dp)
             .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier)
             .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,

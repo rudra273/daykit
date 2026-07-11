@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <queries>
         <intent>
@@ -43,6 +44,16 @@
             android:showWhenLocked="true"
             android:taskAffinity=""
             android:theme="@style/Theme.DayKit.Lock" />
+
+        <activity
+            android:name=".feature.reminder.ui.ReminderAlarmActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.DayKit.Lock"
+            android:turnScreenOn="true" />
 
         <activity
             android:name=".feature.widget.QuickExpenseWidgetActivity"

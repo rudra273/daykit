@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.daykit.MainActivity
 import com.daykit.R
+import com.daykit.feature.reminder.ui.ReminderAlarmActivity
 
 object ReminderNotifier {
     private const val CHANNEL_ID = "reminders"
@@ -31,6 +32,15 @@ object ReminderNotifier {
             appContext,
             reminderId.hashCode(),
             Intent(appContext, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        // Full-screen intent launches the alarm-style page over the lock screen when the
+        // device is idle; otherwise it surfaces as a heads-up notification the user taps.
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            appContext,
+            reminderId.hashCode() * 17,
+            ReminderAlarmActivity.intent(appContext, reminderId, title)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val completePendingIntent = PendingIntent.getBroadcast(
@@ -55,7 +65,9 @@ object ReminderNotifier {
             .setContentTitle(title)
             .setContentText("Tap Complete after you acknowledge this reminder.")
             .setContentIntent(openPendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setDeleteIntent(dismissedPendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setOngoing(true)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
