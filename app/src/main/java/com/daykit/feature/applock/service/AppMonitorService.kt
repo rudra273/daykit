@@ -46,6 +46,11 @@ class AppMonitorService : Service() {
     private var biometricEnabled = false
     private var lastForegroundPackage: String? = null
     private var activeActivityLockPackage: String? = null
+    // Adaptive polling: we only need the fast 250ms cadence for a short burst
+    // right after a foreground change (to cover a locked app before the user
+    // sees it). Once the foreground app is stable we back off to a ~1s cadence,
+    // which cuts steady-state UsageStats queries ~4x with no switch latency.
+    private var fastPollUntilMillis = 0L
     // True when the current activity lock is a focus-block countdown (vs a PIN
     // challenge). Lets us re-arm a PIN gate once a block expires on the same app.
     private var activeActivityLockIsFocus = false
@@ -192,12 +197,20 @@ class AppMonitorService : Service() {
                 // app on its next in-app navigation. Skip the tick and keep the last
                 // known foreground package and its unlock grant intact instead.
                 if (foregroundPackage == null) {
-                    delay(POLL_INTERVAL_MILLIS)
+                    // A null can also occur in the brief window right after a switch
+                    // before the resume event lands, so honor an active burst here
+                    // too rather than always idling (which could delay a lock).
+                    val fastPoll = System.currentTimeMillis() < fastPollUntilMillis
+                    delay(if (fastPoll) FAST_POLL_INTERVAL_MILLIS else IDLE_POLL_INTERVAL_MILLIS)
                     continue
                 }
 
                 if (foregroundPackage != lastForegroundPackage) {
                     lastForegroundPackage = foregroundPackage
+                    // A switch just happened — poll fast for a short burst so the
+                    // lock covers the app immediately, then let the loop settle
+                    // back to the idle cadence below.
+                    fastPollUntilMillis = System.currentTimeMillis() + FAST_POLL_DURATION_MILLIS
                     if (foregroundPackage == packageName && activeActivityLockPackage != null) {
                         // Keep the active challenge in front without clearing the target session.
                     } else {
@@ -258,7 +271,11 @@ class AppMonitorService : Service() {
                     mainHandler.post { overlayController.dismiss() }
                 }
 
-                delay(POLL_INTERVAL_MILLIS)
+                // Stay on the fast cadence during the post-switch burst, and while
+                // a lock is still pending so the challenge lands promptly; otherwise
+                // idle-poll to save battery.
+                val fastPoll = shouldLock || System.currentTimeMillis() < fastPollUntilMillis
+                delay(if (fastPoll) FAST_POLL_INTERVAL_MILLIS else IDLE_POLL_INTERVAL_MILLIS)
             }
         }
     }
@@ -329,7 +346,13 @@ class AppMonitorService : Service() {
     }
 
     companion object {
-        private const val POLL_INTERVAL_MILLIS = 250L
+        // Fast cadence used only in a burst right after a foreground change (and
+        // while a lock is pending); idle cadence used once the foreground app is
+        // stable. Backing off from a flat 250ms to 1s at rest is the main battery
+        // win, since each tick is a UsageStats query (binder IPC).
+        private const val FAST_POLL_INTERVAL_MILLIS = 250L
+        private const val IDLE_POLL_INTERVAL_MILLIS = 1_000L
+        private const val FAST_POLL_DURATION_MILLIS = 2_000L
         private const val SCREEN_OFF_POLL_INTERVAL_MILLIS = 1_500L
         private const val NOTIFICATION_CHANNEL_ID = "app_lock_monitor"
         private const val NOTIFICATION_ID = 1001
