@@ -154,26 +154,35 @@ class AppMonitorService : Service() {
                     continue
                 }
 
-                val foregroundApp = runCatching { detector.currentForegroundApp() }.getOrNull()
+                val foregroundApp = runCatching { detector.currentResumedApp() }.getOrNull()
                 val foregroundPackage = foregroundApp?.packageName
+
+                // A null reading means usage-stats has no recent foreground event to
+                // report — NOT that the current app went to the background. Apps that
+                // sit idle (e.g. watching a reel) stop emitting events, so treating
+                // null as "backgrounded" and clearing the session would re-lock the
+                // app on its next in-app navigation. Skip the tick and keep the last
+                // known foreground package and its unlock grant intact instead.
+                if (foregroundPackage == null) {
+                    delay(POLL_INTERVAL_MILLIS)
+                    continue
+                }
+
                 if (foregroundPackage != lastForegroundPackage) {
                     lastForegroundPackage = foregroundPackage
                     if (foregroundPackage == packageName && activeActivityLockPackage != null) {
                         // Keep the active challenge in front without clearing the target session.
-                    } else if (foregroundPackage != null) {
+                    } else {
                         if (foregroundPackage != packageName) {
                             activeActivityLockPackage = null
                         }
+                        // Evicting every other package's grant is safe here: a real app
+                        // switch always surfaces the new package as a resume event.
                         AppLockSessionManager.keepOnly(foregroundPackage)
-                    } else {
-                        // App went to background and no new app came to foreground
-                        activeActivityLockPackage = null
-                        AppLockSessionManager.clearAll()
                     }
                 }
 
-                val shouldLock = foregroundPackage != null &&
-                    foregroundPackage != packageName &&
+                val shouldLock = foregroundPackage != packageName &&
                     !SamsungSecureFolderSupport.shouldBypassLock(
                         packageName = foregroundPackage,
                         className = foregroundApp.className,
@@ -182,12 +191,10 @@ class AppMonitorService : Service() {
                     foregroundPackage in lockedPackages &&
                     !AppLockSessionManager.isAllowed(foregroundPackage)
 
-                foregroundPackage?.let { currentPackage ->
-                    if (shouldLock) {
-                        launchLockScreen(currentPackage)
-                    } else if (currentPackage !in lockedPackages) {
-                        mainHandler.post { overlayController.dismiss() }
-                    }
+                if (shouldLock) {
+                    launchLockScreen(foregroundPackage)
+                } else if (foregroundPackage !in lockedPackages) {
+                    mainHandler.post { overlayController.dismiss() }
                 }
 
                 delay(POLL_INTERVAL_MILLIS)
