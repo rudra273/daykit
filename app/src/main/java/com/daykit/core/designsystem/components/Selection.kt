@@ -5,6 +5,8 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -47,5 +49,28 @@ fun AppCheckbox(
             uncheckedColor = MaterialTheme.extendedColors.textMuted,
         ),
         modifier = modifier.scale(0.9f),
+    )
+}
+
+/** DayKit-themed slider — primary-tinted track/thumb, otherwise a plain M3 [Slider]. */
+@Composable
+fun AppSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+    enabled: Boolean = true,
+) {
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        enabled = enabled,
+        colors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.extendedColors.divider,
+        ),
+        modifier = modifier,
     )
 }

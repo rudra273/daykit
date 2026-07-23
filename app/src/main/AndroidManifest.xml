@@ -112,6 +112,15 @@
             android:exported="true"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 
+        <service
+            android:name=".feature.eventlight.service.EventLightService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Shows a colored border overlay to light the user's face during video calls" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

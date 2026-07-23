@@ -12,6 +12,7 @@ import com.daykit.AppContainer
 import com.daykit.feature.applock.ui.AppLockScreen
 import com.daykit.feature.dns.ui.DnsManagerScreen
 import com.daykit.feature.editor.ui.EditorScreen
+import com.daykit.feature.eventlight.ui.EventLightScreen
 import com.daykit.feature.expense.ui.ExpenseScreen
 import com.daykit.feature.filelocker.ui.FileLockerScreen
 import com.daykit.feature.habit.ui.HabitScreen
@@ -89,6 +90,7 @@ fun DayKitNavHost(
         composable(Routes.TOOL_EXPENSES) { ExpenseScreen(container = container, onBack = back) }
         composable(Routes.TOOL_EDITOR) { EditorScreen(onBack = back) }
         composable(Routes.TOOL_DNS) { DnsManagerScreen(onBack = back) }
+        composable(Routes.TOOL_EVENTLIGHT) { EventLightScreen(onBack = back) }
 
         // ── Settings sub-screens ──
         composable(Routes.SETTINGS_BACKUP) { BackupRestoreScreen(container = container, onBack = back) }

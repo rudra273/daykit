@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.NotificationsActive
@@ -93,6 +94,8 @@ fun HomeScreen(
             listOf("editor", "document", "text")),
         ToolTile(Routes.TOOL_DNS, "DNS Manager", Icons.Rounded.Dns, { accents.red },
             listOf("dns", "ad block", "private dns")),
+        ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", Icons.Rounded.FlashOn, { accents.yellow },
+            listOf("event light", "ring light", "video call light", "night light", "border light")),
     )
 
     val q = query.trim()

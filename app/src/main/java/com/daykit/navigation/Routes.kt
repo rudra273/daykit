@@ -21,6 +21,7 @@ object Routes {
     const val TOOL_EXPENSES = "tool/expenses"
     const val TOOL_EDITOR = "tool/editor"
     const val TOOL_DNS = "tool/dns"
+    const val TOOL_EVENTLIGHT = "tool/eventlight"
 
     const val SETTINGS_BACKUP = "settings/backup"
     const val SETTINGS_APPEARANCE = "settings/appearance"
