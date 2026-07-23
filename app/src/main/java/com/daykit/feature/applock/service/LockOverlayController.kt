@@ -43,6 +43,7 @@ class LockOverlayController(
     private val context: Context,
     private val credentialRepository: CredentialRepository,
     private val onBiometricRequested: (String) -> Unit,
+    private val isFocusBlocked: (String) -> Boolean = { false },
 ) {
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private var composeView: ComposeView? = null
@@ -66,7 +67,11 @@ class LockOverlayController(
                         appLabel = appLabel,
                         credentialRepository = credentialRepository,
                         onUnlocked = {
-                            AppLockSessionManager.allow(packageName)
+                            // A focus-blocked app never routes to the overlay, but
+                            // guard anyway so a PIN grant can't open it if it did.
+                            if (!isFocusBlocked(packageName)) {
+                                AppLockSessionManager.allow(packageName)
+                            }
                             dismiss()
                         },
                         onBiometric = {

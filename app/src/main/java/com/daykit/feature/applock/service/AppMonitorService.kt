@@ -39,9 +39,16 @@ class AppMonitorService : Service() {
     private lateinit var overlayController: LockOverlayController
     private lateinit var settingsPackage: String
     private var lockedPackages = emptySet<String>()
+    // Package -> epoch-millis at which its strict timed lock ("focus block")
+    // expires. While now < expiry the app is blocked regardless of PIN grants.
+    @Volatile
+    private var focusBlockedPackages = emptyMap<String, Long>()
     private var biometricEnabled = false
     private var lastForegroundPackage: String? = null
     private var activeActivityLockPackage: String? = null
+    // True when the current activity lock is a focus-block countdown (vs a PIN
+    // challenge). Lets us re-arm a PIN gate once a block expires on the same app.
+    private var activeActivityLockIsFocus = false
 
     @Volatile
     private var screenInteractive = true
@@ -73,15 +80,24 @@ class AppMonitorService : Service() {
             context = this,
             credentialRepository = container.credentialRepository,
             onBiometricRequested = { packageName -> launchActivityLockScreen(packageName) },
+            isFocusBlocked = { packageName ->
+                focusBlockedPackages[packageName]?.let { it > System.currentTimeMillis() } == true
+            },
         )
         // Seed synchronously from the prefs caches so there is no window where the
         // monitor loop runs with an empty locked set or stale biometric flag.
         lockedPackages = container.appLockRepository.getLockedPackages()
+        focusBlockedPackages = container.appLockRepository.activeFocusPackages()
+            .mapNotNull { pkg ->
+                container.appLockRepository.focusBlockUntil(pkg)?.let { pkg to it }
+            }
+            .toMap()
         biometricEnabled = container.settingFlagCache
             .get(SecureSettingRepository.KEY_BIOMETRIC_ENABLED) == true
         screenInteractive = getSystemService(PowerManager::class.java)?.isInteractive != false
         registerSessionResetReceiver()
         observeLockedApps()
+        observeFocusBlocks()
         observeBiometricSetting()
         monitorForegroundApps()
     }
@@ -116,6 +132,7 @@ class AppMonitorService : Service() {
     private fun resetLockSession() {
         AppLockSessionManager.clearAll()
         activeActivityLockPackage = null
+        activeActivityLockIsFocus = false
         lastForegroundPackage = null
     }
 
@@ -128,6 +145,17 @@ class AppMonitorService : Service() {
                     lockedPackages = apps.map { it.packageName }.toSet()
                     (application as DayKitApplication).container.lockedPackageCache
                         .putPackages(lockedPackages)
+                }
+        }
+    }
+
+    private fun observeFocusBlocks() {
+        val repository = (application as DayKitApplication).container.appLockRepository
+        scope.launch {
+            repository.observeFocusBlocks()
+                .catch { focusBlockedPackages = emptyMap() }
+                .collect { blocks ->
+                    focusBlockedPackages = blocks.associate { it.packageName to it.lockUntilMillis }
                 }
         }
     }
@@ -175,6 +203,7 @@ class AppMonitorService : Service() {
                     } else {
                         if (foregroundPackage != packageName) {
                             activeActivityLockPackage = null
+                            activeActivityLockIsFocus = false
                         }
                         // Evicting every other package's grant is safe here: a real app
                         // switch always surfaces the new package as a resume event.
@@ -182,18 +211,50 @@ class AppMonitorService : Service() {
                     }
                 }
 
-                val shouldLock = foregroundPackage != packageName &&
+                // Strict timed lock: while now < expiry the app is blocked no
+                // matter what — a PIN grant must NOT satisfy it. This is OR'd in
+                // ahead of the normal grant check and applies even to apps that
+                // are not in the PIN-locked set.
+                val focusBlockUntil = focusBlockedPackages[foregroundPackage]
+                    ?.takeIf { it > System.currentTimeMillis() }
+                val focusBlocked = focusBlockUntil != null
+
+                // When a focus block expires, its countdown LockActivity finishes
+                // itself. Clear the activity dedup so that if the app is ALSO
+                // PIN-locked, the PIN challenge can be re-shown for it (otherwise
+                // launchActivityLockScreen would early-return on the stale package).
+                // Guarded by activeActivityLockIsFocus so we never reset a live PIN
+                // challenge's dedup and relaunch it in a loop.
+                if (!focusBlocked &&
+                    activeActivityLockIsFocus &&
+                    activeActivityLockPackage == foregroundPackage
+                ) {
+                    activeActivityLockPackage = null
+                    activeActivityLockIsFocus = false
+                    // Prune the now-expired block from the store/flow so the manage
+                    // screen and this service's map drop it instead of holding a
+                    // stale entry indefinitely (the flow only re-emits on demand).
+                    (application as DayKitApplication).container.appLockRepository.refreshFocusBlocks()
+                }
+
+                val notBypassed = foregroundPackage != packageName &&
                     !SamsungSecureFolderSupport.shouldBypassLock(
                         packageName = foregroundPackage,
                         className = foregroundApp.className,
                         settingsPackage = settingsPackage,
-                    ) &&
-                    foregroundPackage in lockedPackages &&
-                    !AppLockSessionManager.isAllowed(foregroundPackage)
+                    )
+
+                val shouldLock = notBypassed && (
+                    focusBlocked ||
+                        (
+                            foregroundPackage in lockedPackages &&
+                                !AppLockSessionManager.isAllowed(foregroundPackage)
+                            )
+                    )
 
                 if (shouldLock) {
-                    launchLockScreen(foregroundPackage)
-                } else if (foregroundPackage !in lockedPackages) {
+                    launchLockScreen(foregroundPackage, focusBlockUntil)
+                } else if (foregroundPackage !in lockedPackages && !focusBlocked) {
                     mainHandler.post { overlayController.dismiss() }
                 }
 
@@ -202,7 +263,14 @@ class AppMonitorService : Service() {
         }
     }
 
-    private fun launchLockScreen(packageName: String) {
+    private fun launchLockScreen(packageName: String, focusBlockUntil: Long? = null) {
+        // A focus block shows a countdown, not a PIN/biometric challenge, so it
+        // must go through the full-screen activity — the overlay is a PIN pad and
+        // biometric cannot end a timer early.
+        if (focusBlockUntil != null) {
+            mainHandler.post { launchActivityLockScreen(packageName, focusBlockUntil) }
+            return
+        }
         if (biometricEnabled) {
             mainHandler.post { launchActivityLockScreen(packageName) }
             return
@@ -219,10 +287,11 @@ class AppMonitorService : Service() {
         mainHandler.post { launchActivityLockScreen(packageName) }
     }
 
-    private fun launchActivityLockScreen(packageName: String) {
+    private fun launchActivityLockScreen(packageName: String, focusBlockUntil: Long? = null) {
         if (activeActivityLockPackage == packageName) return
         activeActivityLockPackage = packageName
-        val intent = LockActivity.intent(this, packageName)
+        activeActivityLockIsFocus = focusBlockUntil != null
+        val intent = LockActivity.intent(this, packageName, focusBlockUntil)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         startActivity(intent)
     }

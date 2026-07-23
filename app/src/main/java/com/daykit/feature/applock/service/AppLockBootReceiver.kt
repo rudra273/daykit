@@ -23,9 +23,11 @@ class AppLockBootReceiver : BroadcastReceiver() {
             return
         }
         val container = (context.applicationContext as DayKitApplication).container
+        val hasProtectedApps = container.appLockRepository.getLockedPackages().isNotEmpty() ||
+            container.appLockRepository.activeFocusPackages().isNotEmpty()
         val shouldMonitor = container.credentialRepository.hasCredential() &&
             AppLockPermissionChecker.hasUsageAccess(context) &&
-            container.appLockRepository.getLockedPackages().isNotEmpty()
+            hasProtectedApps
         if (shouldMonitor) {
             AppMonitorService.start(context)
         }

@@ -21,6 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import com.daykit.core.designsystem.components.AppSwitch
@@ -97,6 +100,32 @@ fun AppLockScreen(
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val lockedPackages = remember(lockedApps) { lockedApps.map { it.packageName }.toSet() }
     val secureFolderAvailable = remember(context) { SamsungSecureFolderSupport.isAvailable(context) }
+
+    val focusBlocks by container.appLockRepository
+        .observeFocusBlocks()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    // Ticks every second so the per-row remaining-time chip counts down and
+    // expired blocks disappear without leaving the screen. Only runs while at
+    // least one block is active — otherwise a per-second tick would recompose
+    // the whole app list for nothing (the common, no-block case).
+    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    val hasActiveBlocks = focusBlocks.any { it.lockUntilMillis > nowMillis }
+    LaunchedEffect(hasActiveBlocks) {
+        if (!hasActiveBlocks) return@LaunchedEffect
+        // Re-check against the live list each tick so the loop stops once the
+        // last block expires (rather than spinning until the screen closes).
+        while (focusBlocks.any { it.lockUntilMillis > System.currentTimeMillis() }) {
+            nowMillis = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000L)
+        }
+        nowMillis = System.currentTimeMillis()
+    }
+    val focusBlockByPackage = remember(focusBlocks, nowMillis) {
+        focusBlocks.filter { it.lockUntilMillis > nowMillis }
+            .associate { it.packageName to it.lockUntilMillis }
+    }
+    // The app targeted by the duration-picker sheet, or null when it's closed.
+    var focusSheetApp by remember { mutableStateOf<InstalledApp?>(null) }
 
     BackHandler {
         if (searchActive) {
@@ -268,6 +297,8 @@ fun AppLockScreen(
                     }
                 }
 
+                val onStartFocus: (InstalledApp) -> Unit = { app -> focusSheetApp = app }
+
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -320,7 +351,10 @@ fun AppLockScreen(
                                     apps = lockedVisibleApps,
                                     lockedPackages = lockedPackages,
                                     secureFolderAvailable = secureFolderAvailable,
+                                    focusBlockByPackage = focusBlockByPackage,
+                                    nowMillis = nowMillis,
                                     onCheckedChange = onCheckedChange,
+                                    onStartFocus = onStartFocus,
                                 )
                             }
                         }
@@ -333,7 +367,10 @@ fun AppLockScreen(
                                     apps = recommendedApps,
                                     lockedPackages = lockedPackages,
                                     secureFolderAvailable = secureFolderAvailable,
+                                    focusBlockByPackage = focusBlockByPackage,
+                                    nowMillis = nowMillis,
                                     onCheckedChange = onCheckedChange,
+                                    onStartFocus = onStartFocus,
                                 )
                             }
                             if (otherUnlockedApps.isNotEmpty()) {
@@ -343,7 +380,10 @@ fun AppLockScreen(
                                     apps = otherUnlockedApps,
                                     lockedPackages = lockedPackages,
                                     secureFolderAvailable = secureFolderAvailable,
+                                    focusBlockByPackage = focusBlockByPackage,
+                                    nowMillis = nowMillis,
                                     onCheckedChange = onCheckedChange,
+                                    onStartFocus = onStartFocus,
                                 )
                             }
                             if (unlockedApps.isEmpty()) {
@@ -365,7 +405,10 @@ fun AppLockScreen(
                                     apps = lockedVisibleApps,
                                     lockedPackages = lockedPackages,
                                     secureFolderAvailable = secureFolderAvailable,
+                                    focusBlockByPackage = focusBlockByPackage,
+                                    nowMillis = nowMillis,
                                     onCheckedChange = onCheckedChange,
+                                    onStartFocus = onStartFocus,
                                 )
                             }
                             if (recommendedApps.isNotEmpty()) {
@@ -375,7 +418,10 @@ fun AppLockScreen(
                                     apps = recommendedApps,
                                     lockedPackages = lockedPackages,
                                     secureFolderAvailable = secureFolderAvailable,
+                                    focusBlockByPackage = focusBlockByPackage,
+                                    nowMillis = nowMillis,
                                     onCheckedChange = onCheckedChange,
+                                    onStartFocus = onStartFocus,
                                 )
                             }
                             if (otherUnlockedApps.isNotEmpty()) {
@@ -385,7 +431,10 @@ fun AppLockScreen(
                                     apps = otherUnlockedApps,
                                     lockedPackages = lockedPackages,
                                     secureFolderAvailable = secureFolderAvailable,
+                                    focusBlockByPackage = focusBlockByPackage,
+                                    nowMillis = nowMillis,
                                     onCheckedChange = onCheckedChange,
+                                    onStartFocus = onStartFocus,
                                 )
                             }
                             if (filteredApps.isEmpty()) {
@@ -403,6 +452,27 @@ fun AppLockScreen(
             }
         }
     }
+
+    focusSheetApp?.let { app ->
+        FocusBlockSheet(
+            appLabel = app.label,
+            onConfirm = { durationMillis ->
+                focusSheetApp = null
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                scope.launch {
+                    container.appLockRepository.startFocusBlock(
+                        packageName = app.packageName,
+                        label = app.label,
+                        durationMillis = durationMillis,
+                    )
+                    // Ensure the monitor is running even if this app was never
+                    // PIN-locked, so the block is actually enforced.
+                    onSelectionChanged()
+                }
+            },
+            onDismiss = { focusSheetApp = null },
+        )
+    }
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.appRows(
@@ -410,7 +480,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.appRows(
     apps: List<InstalledApp>,
     lockedPackages: Set<String>,
     secureFolderAvailable: Boolean,
+    focusBlockByPackage: Map<String, Long>,
+    nowMillis: Long,
     onCheckedChange: (InstalledApp, Boolean) -> Unit,
+    onStartFocus: (InstalledApp) -> Unit,
 ) {
     items(apps, key = { "$prefix-${it.packageName}" }) { app ->
         val isLocked = app.packageName in lockedPackages
@@ -420,7 +493,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.appRows(
             app = app,
             isLocked = isLocked,
             lockDisabled = lockDisabled,
+            focusRemainingMillis = focusBlockByPackage[app.packageName]?.let { it - nowMillis }?.takeIf { it > 0 },
             onCheckedChange = { checked -> onCheckedChange(app, checked) },
+            onStartFocus = { onStartFocus(app) },
         )
     }
 }
@@ -430,7 +505,9 @@ private fun AppLockAppRow(
     app: InstalledApp,
     isLocked: Boolean,
     lockDisabled: Boolean,
+    focusRemainingMillis: Long?,
     onCheckedChange: (Boolean) -> Unit,
+    onStartFocus: () -> Unit,
 ) {
     val accents = MaterialTheme.extendedColors.accents
     val palette = listOf(
@@ -445,8 +522,10 @@ private fun AppLockAppRow(
         accents.indigo,
     )
     val accent = palette[(Math.floorMod(app.packageName.hashCode(), palette.size))]
+    val focusActive = focusRemainingMillis != null
     val supporting = when {
         lockDisabled -> "Protected by Samsung"
+        focusActive -> "Focus block · ${formatFocusRemaining(focusRemainingMillis!!)} left"
         else -> app.packageName
     }
     AppListRow(
@@ -460,11 +539,30 @@ private fun AppLockAppRow(
             }
         },
         trailing = {
-            AppSwitch(
-                checked = isLocked,
-                onCheckedChange = { onCheckedChange(it) },
-                enabled = !lockDisabled,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (focusActive) {
+                    // While a block is active it can't be changed or started again.
+                    Text(
+                        text = formatFocusRemaining(focusRemainingMillis!!),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else if (!lockDisabled) {
+                    IconButton(onClick = onStartFocus) {
+                        Icon(
+                            imageVector = Icons.Rounded.Timer,
+                            contentDescription = "Set focus block timer",
+                            tint = MaterialTheme.extendedColors.textMuted,
+                        )
+                    }
+                }
+                Spacer(Modifier.width(Spacing.xs))
+                AppSwitch(
+                    checked = isLocked,
+                    onCheckedChange = { onCheckedChange(it) },
+                    enabled = !lockDisabled && !focusActive,
+                )
+            }
         },
     )
 }

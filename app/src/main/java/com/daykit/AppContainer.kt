@@ -18,6 +18,7 @@ import com.daykit.core.security.SensitiveKeyManager
 import com.daykit.core.security.SensitiveValueCipher
 import com.daykit.core.security.SessionValueCipher
 import com.daykit.feature.applock.data.AppLockRepository
+import com.daykit.feature.applock.data.FocusBlockStore
 import com.daykit.feature.applock.data.LockedPackageCache
 import com.daykit.feature.applock.domain.InstalledAppProvider
 import com.daykit.feature.expense.data.ExpenseBackupContributor
@@ -48,6 +49,7 @@ class AppContainer(context: Context) {
     val sensitiveKeyManager = SensitiveKeyManager(appContext, PasswordHasher())
     val sessionValueCipher = SessionValueCipher(sensitiveKeyManager)
     val lockedPackageCache = LockedPackageCache(appContext)
+    val focusBlockStore = FocusBlockStore(appContext)
     val settingFlagCache = SettingFlagCache(appContext)
 
     val database: DayKitDatabase by lazy {
@@ -60,7 +62,7 @@ class AppContainer(context: Context) {
     }
 
     val appLockRepository: AppLockRepository by lazy {
-        AppLockRepository(lockedPackageCache)
+        AppLockRepository(lockedPackageCache, focusBlockStore)
     }
 
     val keyStoreRepository: KeyStoreRepository by lazy {
