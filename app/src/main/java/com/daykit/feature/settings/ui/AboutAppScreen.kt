@@ -70,8 +70,8 @@ fun AboutAppScreen(
                 title = "Backup And Restore",
                 body = listOf(
                     "Backups are encrypted before they leave the device. The backup password is used to derive an encryption key, and the backup payload is encrypted with AES-GCM.",
-                    "Key Store and Secure Notes are always included in app backups. Expenses and Habits are optional and can be switched on or off in Backup & Restore settings.",
-                    "App Lock selections, theme preferences, dashboard widget settings, DNS choices, reminder schedules, editor cache, and File Vault media are not included in app backups.",
+                    "Key Store and Secure Notes are always included in app backups. Expenses, Habits, and File Vault files are optional and can be switched on or off in Backup & Restore settings. File Vault backup is off by default.",
+                    "App Lock selections, theme preferences, dashboard widget settings, DNS choices, reminder schedules, and editor cache are not included in app backups.",
                     "Google Drive backup uses the user's Google account permission to create and manage DayKit backup files. Google Drive stores the encrypted backup file, not plain app data.",
                 ),
             )
@@ -94,9 +94,9 @@ fun AboutAppScreen(
             AboutSection(
                 title = "File Vault",
                 body = listOf(
-                    "File Vault copies selected images or videos into a Documents/DayKitFileLocker folder and uses a locked file extension.",
-                    "File Vault media is not encrypted, not saved in the app database, and not included in backup or restore.",
-                    "Users should treat File Vault as a local hiding tool, not as a cryptographic vault.",
+                    "File Vault encrypts selected images and videos with AES-256 and stores the ciphertext in the app's private storage, where other apps and file managers cannot read it.",
+                    "Each file is encrypted with its own key, and that key is protected by the Android Keystore. Files are streamed through encryption, so even large videos can be added and played back without leaving a decrypted copy on disk.",
+                    "File Vault files can optionally be included in encrypted backups. This is off by default and only takes effect when the user turns it on in Backup & Restore settings.",
                 ),
             )
             AboutSection(

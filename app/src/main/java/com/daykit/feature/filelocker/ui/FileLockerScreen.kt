@@ -605,7 +605,7 @@ private fun Long.toReadableSize(): String {
     val kb = this / 1024.0
     if (kb < 1024) return "${kb.toInt()} KB"
     val mb = kb / 1024.0
-    if (mb < 1024) return "${String.format("%.1f", mb)} MB"
+    if (mb < 1024) return "${String.format(java.util.Locale.US, "%.1f", mb)} MB"
     val gb = mb / 1024.0
-    return "${String.format("%.1f", gb)} GB"
+    return "${String.format(java.util.Locale.US, "%.1f", gb)} GB"
 }

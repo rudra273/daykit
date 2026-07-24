@@ -40,6 +40,7 @@ fun ToolUnlockScreen(
 ) {
     BackHandler(onBack = onBack)
 
+    @Suppress("UnusedMaterial3ScaffoldPaddingParameter") // full-screen lock UI handles its own insets
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { _ ->
         FrostedLockBackground {
             Box(Modifier.fillMaxSize()) {

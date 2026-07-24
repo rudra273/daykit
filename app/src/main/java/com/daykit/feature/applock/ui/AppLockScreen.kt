@@ -192,6 +192,7 @@ fun AppLockScreen(
     }
 
     if (isToolLocked == null) {
+        @Suppress("UnusedMaterial3ScaffoldPaddingParameter") // full-screen loader handles its own insets
         Scaffold(containerColor = MaterialTheme.colorScheme.background) { _ ->
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 LoadingIndicator()

@@ -28,7 +28,7 @@ import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 
-private const val PRIVACY_POLICY_URL = "https://www.rosmox.com/projects/daykit/privacy-policy"
+private const val PRIVACY_POLICY_URL = "https://roxmos-eight.vercel.app/products/daykit/privacy-policy"
 
 @Composable
 fun PrivacyPolicyScreen(
