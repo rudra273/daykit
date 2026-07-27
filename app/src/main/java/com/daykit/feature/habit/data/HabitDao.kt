@@ -25,6 +25,9 @@ interface HabitDao {
     @Query("SELECT * FROM habit_logs WHERE habitId = :habitId AND date = :date AND relapse = 0 ORDER BY createdAtMillis DESC LIMIT 1")
     suspend fun getDailyLog(habitId: String, date: String): HabitLogEntity?
 
+    @Query("SELECT * FROM habit_logs WHERE logId = :logId LIMIT 1")
+    suspend fun getLog(logId: String): HabitLogEntity?
+
     @Upsert
     suspend fun upsertHabit(entity: HabitEntity)
 

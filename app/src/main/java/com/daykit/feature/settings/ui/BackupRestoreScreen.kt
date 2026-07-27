@@ -469,13 +469,17 @@ fun BackupRestoreScreen(
                 withContext(Dispatchers.Default) {
                     container.backupService.importEncrypted(encryptedBackup, passwordChars)
                 }
-            }.onSuccess {
+            }.onSuccess { report ->
                 restorePassword = ""
                 activeSheet = null
+                if (!report.isCompleteRestore) {
+                    // Never report a clean restore when a section was dropped.
+                    showSnackbar(skippedSectionMessage(report))
+                }
                 restartApp()
-            }.onFailure {
+            }.onFailure { error ->
                 passwordChars.fill(' ')
-                restoreError = "Incorrect password"
+                restoreError = restoreErrorMessage(error)
             }
             driveBusy = false
         }
@@ -500,13 +504,16 @@ fun BackupRestoreScreen(
                 withContext(Dispatchers.Default) {
                     container.backupService.importEncrypted(encryptedBackup, passwordChars)
                 }
-            }.onSuccess {
+            }.onSuccess { report ->
                 restorePassword = ""
                 pendingLocalRestoreUri = null
                 activeSheet = null
+                if (!report.isCompleteRestore) {
+                    showSnackbar(skippedSectionMessage(report))
+                }
                 restartApp()
-            }.onFailure {
-                restoreError = "Incorrect password"
+            }.onFailure { error ->
+                restoreError = restoreErrorMessage(error)
             }
             passwordChars.fill(' ')
             localBusy = false
@@ -899,6 +906,34 @@ fun BackupRestoreScreen(
 }
 
 private val PaddingValuesZero = androidx.compose.foundation.layout.PaddingValues(0.dp)
+
+/** Human label for a contributor's toolKey, for restore messages. */
+private fun toolDisplayName(toolKey: String): String = when (toolKey) {
+    BACKUP_TOOL_KEY_STORE -> "Key Store"
+    BACKUP_TOOL_NOTES -> "Secure Notes"
+    BACKUP_TOOL_EXPENSES -> "Expenses"
+    BACKUP_TOOL_HABITS -> "Habits"
+    BACKUP_TOOL_VAULT -> "File Vault"
+    else -> toolKey
+}
+
+/**
+ * Tells the user exactly which tools did not come back. A restore that silently
+ * drops a section is indistinguishable from data loss, so this is never omitted.
+ */
+private fun skippedSectionMessage(report: DayKitBackupService.ImportReport): String {
+    val names = report.skipped.joinToString(", ") { toolDisplayName(it.toolKey) }
+    return "Restored, but could not read: $names"
+}
+
+/**
+ * A failed restore is usually a wrong password, but not always — a backup from a
+ * newer app version carries its own explanation and must not be mislabeled.
+ */
+private fun restoreErrorMessage(error: Throwable): String = when (error) {
+    is DayKitBackupService.NewerBackupException -> error.message ?: "Update the app to restore this backup."
+    else -> "Incorrect password"
+}
 
 private fun includedBackupToolKeys(
     includeExpenses: Boolean,

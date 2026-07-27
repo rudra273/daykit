@@ -144,9 +144,23 @@ class HabitRepository(
         )
     }
 
+    /**
+     * Merges a backup into the existing data rather than duplicating it.
+     *
+     * The row `id` is the primary key but backups only carry the stable business
+     * key (`habitId` / `logId`), so an entity built from a backup has `id = 0`.
+     * Upserting that would insert a second row and then trip the unique index, so
+     * the existing row's `id` is looked up and carried over first.
+     */
     suspend fun importRecords(record: HabitBackupRecord) {
-        record.habits.forEach { dao.upsertHabit(it.toEntity()) }
-        record.logs.forEach { dao.upsertLog(it.toEntity()) }
+        record.habits.forEach { habit ->
+            val existing = dao.getHabit(habit.habitId)
+            dao.upsertHabit(habit.toEntity().copy(id = existing?.id ?: 0))
+        }
+        record.logs.forEach { log ->
+            val existing = dao.getLog(log.logId)
+            dao.upsertLog(log.toEntity().copy(id = existing?.id ?: 0))
+        }
     }
 }
 
