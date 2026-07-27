@@ -77,6 +77,7 @@ import com.daykit.core.designsystem.components.AppAlertDialog
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
+import com.daykit.core.designsystem.components.BetaTopBarTitle
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.EmptyState
@@ -264,6 +265,7 @@ fun SecureNotesScreen(
                 onSearchActiveChange = { searchActive = it; if (!it) query = "" },
                 onBack = onBack,
                 searchPlaceholder = "Search notes",
+                titleContent = { BetaTopBarTitle("Notes") },
             )
         },
         floatingActionButton = {

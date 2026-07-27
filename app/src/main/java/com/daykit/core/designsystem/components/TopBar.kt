@@ -118,6 +118,9 @@ fun AppTopBar(
  * icon; tapping the icon morphs the title area into an autofocused inline text field
  * with a clear/close button. Filtering is driven by [query]/[onQueryChange]; the
  * caller decides what to do with the query.
+ *
+ * [titleContent] replaces the plain [title] text while search is inactive — used to
+ * hang a [BetaBadge] off the title. [title] is still required as the accessible name.
  */
 @Composable
 fun SearchAppTopBar(
@@ -130,6 +133,7 @@ fun SearchAppTopBar(
     onBack: (() -> Unit)? = null,
     searchPlaceholder: String = "Search",
     showDivider: Boolean = true,
+    titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -188,6 +192,7 @@ fun SearchAppTopBar(
             title = title,
             onBack = onBack,
             showDivider = showDivider,
+            titleContent = titleContent,
             actions = {
                 IconButton(onClick = { onSearchActiveChange(true) }) {
                     Icon(
@@ -199,6 +204,26 @@ fun SearchAppTopBar(
                 actions()
             },
         )
+    }
+}
+
+/**
+ * Top-bar title with a trailing [BetaBadge]. Pass as the `titleContent` of
+ * [AppTopBar] / [SearchAppTopBar] for tools still marked beta.
+ */
+@Composable
+fun BetaTopBarTitle(title: String, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        BetaBadge()
     }
 }
 

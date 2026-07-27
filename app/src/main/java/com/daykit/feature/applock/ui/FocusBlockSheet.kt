@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
@@ -33,6 +34,9 @@ import com.daykit.core.designsystem.extendedColors
 
 private data class DurationPreset(val label: String, val millis: Long)
 
+/** Steps of the sheet: pick a duration, read the warning, then type to confirm. */
+private enum class FocusStep { Duration, Warn, Confirm }
+
 private val PRESETS = listOf(
     DurationPreset("30m", 30 * 60_000L),
     DurationPreset("1h", 60 * 60_000L),
@@ -41,11 +45,15 @@ private val PRESETS = listOf(
     DurationPreset("12h", 12 * 60 * 60_000L),
 )
 
+/** Word the user must type on the final step. Guards an irreversible action. */
+private const val CONFIRM_WORD = "LOCK"
+
 /**
  * Bottom sheet to start a strict timed lock ("focus block") on [appLabel].
- * Presents preset durations plus a custom hours+minutes entry, then a confirm
- * step (the block is irreversible — no early cancel). On confirm invokes
- * [onConfirm] with the chosen duration in millis.
+ * Presents preset durations plus a custom hours+minutes entry, then two confirm
+ * steps — a warning, then a typed [CONFIRM_WORD] acknowledgement — because the
+ * block is irreversible (no early cancel, not even with the PIN). On confirm
+ * invokes [onConfirm] with the chosen duration in millis.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +65,8 @@ fun FocusBlockSheet(
     var selectedPreset by remember { mutableStateOf<Long?>(PRESETS[2].millis) }
     var customHours by remember { mutableStateOf("") }
     var customMinutes by remember { mutableStateOf("") }
-    var confirming by remember { mutableStateOf(false) }
+    var step by remember { mutableStateOf(FocusStep.Duration) }
+    var typedConfirm by remember { mutableStateOf("") }
 
     val customMillis = run {
         val h = customHours.toLongOrNull() ?: 0L
@@ -74,7 +83,7 @@ fun FocusBlockSheet(
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         ) {
-            if (!confirming) {
+            if (step == FocusStep.Duration) {
                 Text(
                     text = "Lock $appLabel for…",
                     style = MaterialTheme.typography.titleLarge,
@@ -134,10 +143,10 @@ fun FocusBlockSheet(
                     PrimaryButton(
                         text = "Continue",
                         enabled = valid,
-                        onClick = { confirming = true },
+                        onClick = { step = FocusStep.Warn },
                     )
                 }
-            } else {
+            } else if (step == FocusStep.Warn) {
                 Text(
                     text = "Start focus block?",
                     style = MaterialTheme.typography.titleLarge,
@@ -156,10 +165,54 @@ fun FocusBlockSheet(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppTextButton(text = "Back", onClick = { confirming = false })
+                    AppTextButton(text = "Back", onClick = { step = FocusStep.Duration })
+                    Spacer(Modifier.width(Spacing.sm))
+                    PrimaryButton(
+                        text = "Continue",
+                        onClick = { step = FocusStep.Confirm },
+                    )
+                }
+            } else {
+                Text(
+                    text = "Type $CONFIRM_WORD to confirm",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    text = "Last check: $appLabel will be blocked for " +
+                        "${formatFocusDuration(durationMillis)} with no way out. " +
+                        "Type $CONFIRM_WORD below to start.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.extendedColors.textMuted,
+                )
+                Spacer(Modifier.height(Spacing.md))
+                OutlinedTextField(
+                    value = typedConfirm,
+                    onValueChange = { typedConfirm = it.take(CONFIRM_WORD.length) },
+                    label = { Text(CONFIRM_WORD) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        capitalization = KeyboardCapitalization.Characters,
+                        autoCorrectEnabled = false,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(Spacing.lg))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppTextButton(
+                        text = "Back",
+                        onClick = { typedConfirm = ""; step = FocusStep.Warn },
+                    )
                     Spacer(Modifier.width(Spacing.sm))
                     PrimaryButton(
                         text = "Start focus block",
+                        enabled = typedConfirm.trim().equals(CONFIRM_WORD, ignoreCase = true),
                         onClick = { onConfirm(durationMillis) },
                     )
                 }

@@ -4,11 +4,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -34,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -43,6 +46,7 @@ import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppCard
+import com.daykit.core.designsystem.components.BetaBadge
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
@@ -55,6 +59,7 @@ private data class ToolTile(
     val icon: ImageVector,
     val accent: @Composable () -> Color,
     val keywords: List<String>,
+    val beta: Boolean = false,
 )
 
 @Composable
@@ -75,11 +80,11 @@ fun HomeScreen(
         ToolTile(Routes.TOOL_APPLOCK, "App Lock", Icons.Rounded.Lock, { accents.blue },
             listOf("app lock", "lock")),
         ToolTile(Routes.TOOL_KEYSTORE, "Key Store", Icons.Rounded.VpnKey, { accents.indigo },
-            listOf("key store", "password", "vault")),
+            listOf("key store", "password", "vault"), beta = true),
         ToolTile(Routes.TOOL_NOTES, "Notes", Icons.Rounded.Notes, { accents.teal },
-            listOf("notes", "secure notes")),
+            listOf("notes", "secure notes"), beta = true),
         ToolTile(Routes.TOOL_FILEVAULT, "File Vault", Icons.Rounded.Folder, { accents.purple },
-            listOf("file vault", "file locker", "hide files", "images", "videos")),
+            listOf("file vault", "file locker", "hide files", "images", "videos"), beta = true),
     )
     val productivity = listOf(
         ToolTile(Routes.TOOL_HABITS, "Habits", Icons.Rounded.TrackChanges, { accents.green },
@@ -168,12 +173,19 @@ private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
         AccentIconTile(icon = tile.icon, accent = tile.accent(), size = 42.dp, iconSize = 23.dp)
         // Taller cards: fixed gap between icon and title gives the card its height.
         Spacer(Modifier.height(Spacing.xl))
-        Text(
-            text = tile.name,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = tile.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (tile.beta) {
+                Spacer(Modifier.width(Spacing.xs))
+                BetaBadge()
+            }
+        }
     }
 }
