@@ -17,6 +17,10 @@ class DatabasePassphraseProvider(
         val encrypted = prefs.getString(KEY_CIPHERTEXT, null)
         val iv = prefs.getString(KEY_IV, null)
         if (encrypted != null && iv != null) {
+            // A KeyUnavailableException here means the wrapped passphrase can never
+            // be recovered, so the encrypted DB is permanently unreadable. Propagate
+            // it as-is — the caller turns it into a user-visible recovery screen
+            // rather than an uncaught crash on every launch.
             return keyStoreCrypto.decrypt(
                 payload = CipherPayload(
                     ciphertext = encrypted.decodeBase64(),
@@ -33,6 +37,19 @@ class DatabasePassphraseProvider(
             putString(KEY_IV, payload.iv.encodeBase64())
         }
         return passphrase
+    }
+
+    /**
+     * Forgets the stored (wrapped) passphrase so the next call mints a fresh one.
+     *
+     * Only meaningful as part of a full data reset: the existing database file is
+     * encrypted under the old passphrase and becomes garbage once this is called.
+     */
+    fun clear() {
+        prefs.edit {
+            remove(KEY_CIPHERTEXT)
+            remove(KEY_IV)
+        }
     }
 
     private fun ByteArray.encodeBase64(): String = Base64.encodeToString(this, Base64.NO_WRAP)

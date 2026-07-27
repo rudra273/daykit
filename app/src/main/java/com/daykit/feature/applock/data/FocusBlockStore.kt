@@ -84,6 +84,14 @@ class FocusBlockStore(context: Context) {
         }
     }
 
+    /**
+     * Drops every focus block. Committed synchronously for the same reason as
+     * [LockedPackageCache.clear] — the monitor service reads this directly.
+     */
+    fun clear() {
+        prefs.edit(commit = true) { clear() }
+    }
+
     private companion object {
         const val PREFS_NAME = "app_lock_focus_blocks"
         const val KEY_BLOCKS = "blocks"

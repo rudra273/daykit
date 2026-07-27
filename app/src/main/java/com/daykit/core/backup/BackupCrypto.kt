@@ -33,7 +33,14 @@ class BackupCrypto(
     }
 
     fun decrypt(envelope: JSONObject, password: CharArray): JSONObject {
-        require(envelope.getInt("formatVersion") == FORMAT_VERSION) { "Unsupported backup format" }
+        // Older envelopes stay readable; only a newer format than this build knows
+        // is refused. The cipher/KDF checks stay exact — those name the algorithm
+        // we are about to run, not a version we can degrade across.
+        val envelopeVersion = envelope.getInt("formatVersion")
+        require(envelopeVersion <= FORMAT_VERSION) {
+            "This backup was made by a newer version of DayKit (format v$envelopeVersion, " +
+                "this version reads v$FORMAT_VERSION). Update the app to restore it."
+        }
         require(envelope.getString("cipher") == CIPHER_NAME) { "Unsupported backup cipher" }
         require(envelope.getString("kdf") == KDF_NAME) { "Unsupported backup KDF" }
 

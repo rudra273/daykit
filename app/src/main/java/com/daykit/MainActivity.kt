@@ -7,8 +7,17 @@ import android.view.WindowManager
 import androidx.core.content.IntentCompat
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -20,9 +29,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.permissions.AppLockPermissionChecker
@@ -31,7 +42,9 @@ import com.daykit.core.security.BiometricAuthenticator
 import com.daykit.core.security.PinVerifyResult
 import com.daykit.core.security.errorMessageOrNull
 import com.daykit.core.designsystem.DayKitTheme
+import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.feature.applock.data.LockedApp
 import com.daykit.feature.applock.service.AppMonitorService
 import com.daykit.feature.lock.ui.ToolUnlockScreen
@@ -85,10 +98,84 @@ class MainActivity : FragmentActivity() {
     private fun setContentView() {
         setContent {
             DayKitTheme {
-                DayKitApp(
-                    activity = this,
-                    container = container,
+                val storageFailure by container.storageFailure.collectAsStateWithLifecycle()
+                val failure = storageFailure
+                if (failure != null) {
+                    // The DB can't be opened at all, so no normal screen can render.
+                    StorageRecoveryScreen(
+                        message = failure.message.orEmpty(),
+                        onReset = {
+                            container.resetAllLocalData()
+                            // Restart into a clean first-run state.
+                            finishAffinity()
+                            startActivity(
+                                packageManager.getLaunchIntentForPackage(packageName)
+                                    ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                            Runtime.getRuntime().exit(0)
+                        },
+                    )
+                } else {
+                    DayKitApp(
+                        activity = this,
+                        container = container,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Shown when the Android Keystore key protecting the database is gone, which makes
+ * every stored byte permanently unreadable. There is no way back to the old data,
+ * so the only meaningful action is a full reset — but the user gets an explanation
+ * and an explicit choice instead of an app that crashes on every launch.
+ */
+@Composable
+private fun StorageRecoveryScreen(
+    message: String,
+    onReset: () -> Unit,
+) {
+    var confirming by remember { mutableStateOf(false) }
+
+    Surface(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(Spacing.lg),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "Secure storage unavailable",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = "$message\n\nDayKit's encryption key is no longer available on this " +
+                    "device, so your saved data can't be decrypted. This can happen after a " +
+                    "system update or a device security change.\n\nResetting clears all local " +
+                    "DayKit data and lets you start again. If you have a backup, you can " +
+                    "restore it afterwards.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(Spacing.xl))
+            if (confirming) {
+                Text(
+                    text = "This permanently deletes all local DayKit data. Continue?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
                 )
+                Spacer(Modifier.height(Spacing.md))
+                PrimaryButton(text = "Reset all data", onClick = onReset)
+                Spacer(Modifier.height(Spacing.sm))
+                TextButton(onClick = { confirming = false }) { Text("Cancel") }
+            } else {
+                PrimaryButton(text = "Reset DayKit", onClick = { confirming = true })
             }
         }
     }

@@ -157,6 +157,16 @@ class SensitiveKeyManager(
         cachedKey = null
     }
 
+    /**
+     * Destroys the wrapped MSK on disk as well as the in-memory copy. Everything
+     * encrypted with it (vault, key store, secure notes) becomes unrecoverable, so
+     * this is only for an explicit full reset.
+     */
+    fun clearAll() {
+        lock()
+        prefs.edit { clear() }
+    }
+
     private data class Wrapped(val ciphertext: ByteArray, val iv: ByteArray)
 
     private fun aesGcmEncrypt(key: ByteArray, plaintext: ByteArray): Wrapped {

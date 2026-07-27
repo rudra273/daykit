@@ -24,6 +24,11 @@ class SettingFlagCache(context: Context) {
         }
     }
 
+    /** Drops every mirrored flag. Part of a full data reset. */
+    fun clear() {
+        prefs.edit { clear() }
+    }
+
     private companion object {
         const val PREFS_NAME = "daykit_setting_flags"
     }

@@ -87,6 +87,15 @@ class LockedPackageCache(context: Context) {
         return getRecords().orEmpty()
     }
 
+    /**
+     * Drops every locked-package record. Committed synchronously because the
+     * monitor service reads this cache and must not see stale entries after a
+     * reset.
+     */
+    fun clear() {
+        prefs.edit(commit = true) { clear() }
+    }
+
     private companion object {
         const val PREFS_NAME = "app_lock_package_cache"
         const val KEY_INITIALIZED = "initialized"

@@ -13,6 +13,7 @@ import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.data.SettingFlagCache
 import com.daykit.core.security.AndroidKeyStoreCrypto
 import com.daykit.core.security.CredentialRepository
+import com.daykit.core.security.KeyUnavailableException
 import com.daykit.core.security.PasswordHasher
 import com.daykit.core.security.SensitiveKeyManager
 import com.daykit.core.security.SensitiveValueCipher
@@ -33,6 +34,7 @@ import com.daykit.feature.keystore.data.KeyStoreRepository
 import com.daykit.feature.notes.data.SecureNoteBackupContributor
 import com.daykit.feature.notes.data.SecureNoteRepository
 import com.daykit.feature.reminder.data.ReminderRepository
+import java.io.File
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -52,9 +54,41 @@ class AppContainer(context: Context) {
     val focusBlockStore = FocusBlockStore(appContext)
     val settingFlagCache = SettingFlagCache(appContext)
 
+    /**
+     * Set when the encrypted database could not be opened at all — the Keystore key
+     * that wraps the SQLCipher passphrase is gone, so no stored data is readable.
+     *
+     * The UI observes this to show a recovery screen instead of crash-looping: a
+     * bare throw out of the [database] lazy re-throws on every access, which turns
+     * one Keystore failure into an app that can never launch again.
+     */
+    val storageFailure = MutableStateFlow<KeyUnavailableException?>(null)
+
     val database: DayKitDatabase by lazy {
         val passphraseProvider = DatabasePassphraseProvider(appContext, keyStoreCrypto)
-        DayKitDatabase.create(appContext, passphraseProvider)
+        try {
+            DayKitDatabase.create(appContext, passphraseProvider)
+        } catch (e: KeyUnavailableException) {
+            storageFailure.value = e
+            throw e
+        }
+    }
+
+    /**
+     * Destroys all local data and the keys protecting it, so a device whose Keystore
+     * entry was lost can be used again. Irreversible — only call from an explicit,
+     * user-confirmed reset.
+     */
+    fun resetAllLocalData() {
+        runCatching { if (database.isOpen) database.close() }
+        appContext.deleteDatabase("daykit_secure.db")
+        runCatching { DatabasePassphraseProvider(appContext, keyStoreCrypto).clear() }
+        runCatching { sensitiveKeyManager.clearAll() }
+        runCatching { credentialRepository.clear() }
+        runCatching { lockedPackageCache.clear() }
+        runCatching { focusBlockStore.clear() }
+        runCatching { settingFlagCache.clear() }
+        runCatching { File(appContext.filesDir, "vault").deleteRecursively() }
     }
 
     val secureSettingRepository: SecureSettingRepository by lazy {

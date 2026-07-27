@@ -1,12 +1,25 @@
 package com.daykit.core.security
 
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
+import java.security.InvalidKeyException
 import java.security.KeyStore
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+
+/**
+ * Raised when Keystore-encrypted data can no longer be decrypted because the
+ * underlying hardware key is gone or invalid. This is unrecoverable for the
+ * affected ciphertext — the only remedy is to reset the data it protected.
+ */
+class KeyUnavailableException(
+    message: String,
+    cause: Throwable?,
+) : Exception(message, cause)
 
 class AndroidKeyStoreCrypto {
     private val keyStore: KeyStore by lazy {
@@ -23,18 +36,46 @@ class AndroidKeyStoreCrypto {
         )
     }
 
+    /**
+     * Decrypts data written by [encrypt].
+     *
+     * Throws [KeyUnavailableException] when the Keystore entry that produced the
+     * ciphertext is gone or no longer usable — a real field failure on some OEM
+     * ROMs and across certain OS upgrades. Callers must handle it: decrypting with
+     * a freshly generated key would silently fail the GCM tag check, so we surface
+     * the cause instead of letting an opaque AEADBadTagException escape.
+     */
     fun decrypt(payload: CipherPayload, aad: ByteArray? = null): ByteArray {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        val spec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, payload.iv)
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), spec)
-        aad?.let(cipher::updateAAD)
-        return cipher.doFinal(payload.ciphertext)
+        val key = existingKey() ?: throw KeyUnavailableException(
+            "The device keystore entry for DayKit is missing.",
+            null,
+        )
+        return try {
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            val spec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, payload.iv)
+            cipher.init(Cipher.DECRYPT_MODE, key, spec)
+            aad?.let(cipher::updateAAD)
+            cipher.doFinal(payload.ciphertext)
+        } catch (e: KeyPermanentlyInvalidatedException) {
+            throw KeyUnavailableException("The device keystore key was invalidated.", e)
+        } catch (e: InvalidKeyException) {
+            throw KeyUnavailableException("The device keystore key is unusable.", e)
+        } catch (e: AEADBadTagException) {
+            throw KeyUnavailableException("Stored data could not be authenticated.", e)
+        }
+    }
+
+    /** True when a usable Keystore entry already exists (no side effects). */
+    fun hasKey(): Boolean = runCatching { existingKey() != null }.getOrDefault(false)
+
+    private fun existingKey(): SecretKey? {
+        return runCatching {
+            (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+        }.getOrNull()
     }
 
     private fun getOrCreateKey(): SecretKey {
-        (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let {
-            return it.secretKey
-        }
+        existingKey()?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         val spec = KeyGenParameterSpec.Builder(
