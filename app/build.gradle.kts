@@ -43,6 +43,12 @@ android {
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            // Bundle native debug symbols into the AAB so Play can symbolicate
+            // crashes/ANRs from native libs (e.g. SQLCipher).
+            debugSymbolLevel = "FULL"
+        }
     }
 
     signingConfigs {
