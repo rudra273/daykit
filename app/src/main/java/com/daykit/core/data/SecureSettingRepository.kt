@@ -85,9 +85,6 @@ class SecureSettingRepository(
         // Vault files are NOT backed up unless the user explicitly opts in (default off).
         const val KEY_BACKUP_INCLUDE_VAULT = "backup.include.vault"
         const val KEY_SCREENSHOT_PROTECTION = "privacy.screenshot_protection"
-        const val KEY_TOOL_LOCK_APP_LOCK = "utility_lock.app_lock"
-        const val KEY_TOOL_LOCK_KEY_STORE = "utility_lock.key_store"
-        const val KEY_TOOL_LOCK_NOTES = "utility_lock.notes"
         const val KEY_WIDGET_EXPENSES = "dashboard_widget.expenses"
         const val KEY_WIDGET_HABITS = "dashboard_widget.habits"
     }

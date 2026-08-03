@@ -46,10 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
-import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AppListRow
@@ -59,14 +57,9 @@ import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
-import com.daykit.core.security.BiometricAuthenticator
-import com.daykit.core.security.errorMessageOrNull
 import com.daykit.feature.applock.domain.InstalledApp
 import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
-import com.daykit.feature.lock.ui.ToolUnlockScreen
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private enum class AppLockTab {
     All,
@@ -81,20 +74,12 @@ fun AppLockScreen(
     onSelectionChanged: () -> Unit,
 ) {
     val context = LocalContext.current
-    val activity = context as FragmentActivity
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
-    val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
-    var unlocked by remember { mutableStateOf(false) }
-    var unlockPin by remember { mutableStateOf("") }
-    var unlockError by remember { mutableStateOf<String?>(null) }
-    var biometricEnabled by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(AppLockTab.All) }
     var installedApps by remember { mutableStateOf<List<InstalledApp>?>(null) }
-    var toolLocked by remember { mutableStateOf<Boolean?>(null) }
-    val isToolLocked = toolLocked
     val lockedApps by container.appLockRepository
         .observeLockedApps()
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -138,20 +123,6 @@ fun AppLockScreen(
         }
     }
 
-    fun tryBiometricUnlock(enabled: Boolean = biometricEnabled) {
-        if (!enabled || !biometricAuthenticator.canAuthenticate()) return
-        biometricAuthenticator.authenticate(
-            title = "Unlock App Lock",
-            subtitle = "Manage protected apps",
-            onSuccess = {
-                unlocked = true
-                unlockPin = ""
-                unlockError = null
-            },
-            onError = { unlockError = it },
-        )
-    }
-
     LaunchedEffect(Unit) {
         installedApps = container.installedAppProvider.loadLaunchableApps()
             .filterNot { it.packageName == context.packageName }
@@ -165,74 +136,6 @@ fun AppLockScreen(
                 locked = false,
             )
         }
-    }
-
-    LaunchedEffect(Unit) {
-        val storedToolLocked = container.secureSettingRepository
-            .getBoolean(SecureSettingRepository.KEY_TOOL_LOCK_APP_LOCK) != false
-        val storedBiometricEnabled = container.secureSettingRepository
-            .getBoolean(SecureSettingRepository.KEY_BIOMETRIC_ENABLED) == true
-        biometricEnabled = storedBiometricEnabled
-        if (storedToolLocked && storedBiometricEnabled) {
-            tryBiometricUnlock(storedBiometricEnabled)
-        }
-        container.secureSettingRepository
-            .observeBoolean(SecureSettingRepository.KEY_TOOL_LOCK_APP_LOCK)
-            .collect { locked ->
-                toolLocked = locked ?: true
-            }
-    }
-
-    LaunchedEffect(isToolLocked) {
-        if (isToolLocked == false) {
-            unlocked = true
-            unlockPin = ""
-            unlockError = null
-        }
-    }
-
-    if (isToolLocked == null) {
-        @Suppress("UnusedMaterial3ScaffoldPaddingParameter") // full-screen loader handles its own insets
-        Scaffold(containerColor = MaterialTheme.colorScheme.background) { _ ->
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
-            }
-        }
-        return
-    }
-
-    if (isToolLocked == true && !unlocked) {
-        ToolUnlockScreen(
-            title = "App Lock",
-            subtitle = "Enter master PIN to manage locked apps",
-            pin = unlockPin,
-            error = unlockError,
-            pinLength = container.credentialRepository.pinLength(),
-            biometricEnabled = biometricEnabled,
-            icon = Icons.Rounded.Lock,
-            onBack = onBack,
-            onPinChange = {
-                unlockPin = it.filter(Char::isDigit).take(12)
-                unlockError = null
-            },
-            onUnlock = {
-                scope.launch {
-                    val pin = unlockPin
-                    val result = withContext(Dispatchers.Default) {
-                        container.credentialRepository.verify(pin.toCharArray())
-                    }
-                    if (result is com.daykit.core.security.PinVerifyResult.Success) {
-                        unlocked = true
-                        unlockPin = ""
-                    } else {
-                        unlockError = result.errorMessageOrNull()
-                        unlockPin = ""
-                    }
-                }
-            },
-            onBiometric = { tryBiometricUnlock() },
-        )
-        return
     }
 
     val filteredApps = remember(installedApps, query, lockedPackages) {

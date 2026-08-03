@@ -38,7 +38,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,11 +56,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.text.KeyboardOptions
 import com.daykit.AppContainer
-import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AppAlertDialog
@@ -73,19 +70,13 @@ import com.daykit.core.designsystem.components.BetaTopBarTitle
 import com.daykit.core.designsystem.components.DestructiveButton
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
-import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
-import com.daykit.core.security.BiometricAuthenticator
-import com.daykit.core.security.errorMessageOrNull
 import com.daykit.feature.keystore.data.KeyStoreEntry
-import com.daykit.feature.lock.ui.ToolUnlockScreen
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private sealed interface KeyEditorState {
     data object Add : KeyEditorState
@@ -98,16 +89,8 @@ fun KeyStoreScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val activity = context as FragmentActivity
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
-    val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
-    var unlocked by remember { mutableStateOf(false) }
-    var unlockPin by remember { mutableStateOf("") }
-    var unlockError by remember { mutableStateOf<String?>(null) }
-    var biometricEnabled by remember { mutableStateOf(false) }
-    var toolLocked by remember { mutableStateOf<Boolean?>(null) }
-    val isToolLocked = toolLocked
     val entries by container.keyStoreRepository
         .observeEntries()
         .collectAsStateWithLifecycle(initialValue = null)
@@ -140,90 +123,6 @@ fun KeyStoreScreen(
             val matchesLabel = selectedLabel == null || entry.label == selectedLabel
             matchesQuery && matchesLabel
         }
-    }
-
-    fun tryBiometricUnlock(enabled: Boolean = biometricEnabled) {
-        if (!enabled || !biometricAuthenticator.canAuthenticate()) return
-        biometricAuthenticator.authenticate(
-            title = "Unlock Key Store",
-            subtitle = "DayKit secure storage",
-            onSuccess = {
-                unlocked = true
-                unlockPin = ""
-                unlockError = null
-            },
-            onError = { unlockError = it },
-        )
-    }
-
-    LaunchedEffect(Unit) {
-        val storedToolLocked = container.secureSettingRepository
-            .getBoolean(SecureSettingRepository.KEY_TOOL_LOCK_KEY_STORE) != false
-        val storedBiometricEnabled = container.secureSettingRepository
-            .getBoolean(SecureSettingRepository.KEY_BIOMETRIC_ENABLED) == true
-        biometricEnabled = storedBiometricEnabled
-        if (storedToolLocked && storedBiometricEnabled) {
-            tryBiometricUnlock(storedBiometricEnabled)
-        }
-        container.secureSettingRepository
-            .observeBoolean(SecureSettingRepository.KEY_TOOL_LOCK_KEY_STORE)
-            .collect { locked ->
-                toolLocked = locked ?: true
-            }
-    }
-
-    LaunchedEffect(isToolLocked) {
-        if (isToolLocked == false) {
-            unlocked = true
-            unlockPin = ""
-            unlockError = null
-        }
-    }
-
-    if (isToolLocked == null) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            contentAlignment = Alignment.Center,
-        ) {
-            LoadingIndicator()
-        }
-        return
-    }
-
-    if (isToolLocked == true && !unlocked) {
-        ToolUnlockScreen(
-            title = "Key Store",
-            subtitle = "Unlock secure storage",
-            pin = unlockPin,
-            error = unlockError,
-            pinLength = container.credentialRepository.pinLength(),
-            biometricEnabled = biometricEnabled,
-            icon = Icons.Rounded.VpnKey,
-            onBack = onBack,
-            onPinChange = {
-                unlockPin = it.filter(Char::isDigit).take(12)
-                unlockError = null
-            },
-            onUnlock = {
-                scope.launch {
-                    val pin = unlockPin
-                    val result = withContext(Dispatchers.Default) {
-                        container.credentialRepository.verify(pin.toCharArray())
-                    }
-                    if (result is com.daykit.core.security.PinVerifyResult.Success) {
-                        unlocked = true
-                        unlockPin = ""
-                    } else {
-                        unlockError = result.errorMessageOrNull()
-                        unlockPin = ""
-                    }
-                }
-            },
-            onBiometric = { tryBiometricUnlock() },
-        )
-        return
     }
 
     val listState = rememberLazyListState()

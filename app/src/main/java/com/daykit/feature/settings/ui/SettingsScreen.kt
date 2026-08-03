@@ -24,13 +24,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.NoteAlt
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.Shield
@@ -85,11 +82,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val SETTINGS_LABEL = "Settings"
-
-private data class UtilityLockDisableRequest(
-    val key: String,
-    val title: String,
-)
 
 private fun deviceAdminComponent(context: Context) =
     ComponentName(context, DayKitDeviceAdmin::class.java)
@@ -157,15 +149,8 @@ fun SettingsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
     var biometricEnabled by remember { mutableStateOf<Boolean?>(null) }
-    var appLockToolLocked by remember { mutableStateOf<Boolean?>(null) }
-    var keyStoreToolLocked by remember { mutableStateOf<Boolean?>(null) }
-    var notesToolLocked by remember { mutableStateOf<Boolean?>(null) }
     var screenshotProtection by remember { mutableStateOf<Boolean?>(null) }
-    val settingsLoaded = biometricEnabled != null &&
-        appLockToolLocked != null &&
-        keyStoreToolLocked != null &&
-        notesToolLocked != null &&
-        screenshotProtection != null
+    val settingsLoaded = biometricEnabled != null && screenshotProtection != null
 
     val settingsPackage = remember(context) { SettingsPackageResolver.resolve(context) }
     var isAdminActive by remember { mutableStateOf(isDeviceAdminActive(context)) }
@@ -181,8 +166,6 @@ fun SettingsScreen(
     var screenshotDisableError by remember { mutableStateOf<String?>(null) }
     var showAdminDisableConfirm by remember { mutableStateOf(false) }
     var adminDisableError by remember { mutableStateOf<String?>(null) }
-    var pendingUtilityDisable by remember { mutableStateOf<UtilityLockDisableRequest?>(null) }
-    var utilityDisableError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         container.secureSettingRepository
@@ -192,37 +175,8 @@ fun SettingsScreen(
 
     LaunchedEffect(Unit) {
         container.secureSettingRepository
-            .observeBoolean(SecureSettingRepository.KEY_TOOL_LOCK_APP_LOCK)
-            .collect { locked -> appLockToolLocked = locked ?: true }
-    }
-
-    LaunchedEffect(Unit) {
-        container.secureSettingRepository
-            .observeBoolean(SecureSettingRepository.KEY_TOOL_LOCK_KEY_STORE)
-            .collect { locked -> keyStoreToolLocked = locked ?: true }
-    }
-
-    LaunchedEffect(Unit) {
-        container.secureSettingRepository
-            .observeBoolean(SecureSettingRepository.KEY_TOOL_LOCK_NOTES)
-            .collect { locked -> notesToolLocked = locked ?: true }
-    }
-
-    LaunchedEffect(Unit) {
-        container.secureSettingRepository
             .observeBoolean(SecureSettingRepository.KEY_SCREENSHOT_PROTECTION)
             .collect { enabled -> screenshotProtection = enabled != false }
-    }
-
-    fun requestUtilityLockChange(key: String, title: String, locked: Boolean) {
-        if (locked) {
-            scope.launch {
-                container.secureSettingRepository.putBoolean(key, true)
-            }
-        } else {
-            pendingUtilityDisable = UtilityLockDisableRequest(key = key, title = title)
-            utilityDisableError = null
-        }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -398,54 +352,6 @@ fun SettingsScreen(
                             ),
                         )
                     }
-                }
-            }
-
-            // ---- Tool locks ----
-            item { SectionHeader("Tool locks") }
-            item {
-                AppCard(contentPadding = PaddingValues(0.dp)) {
-                    UtilityToolLockRow(
-                        icon = Icons.Rounded.Apps,
-                        accent = accents.blue,
-                        title = "App Lock",
-                        locked = appLockToolLocked == true,
-                        onLockedChange = { locked ->
-                            requestUtilityLockChange(
-                                key = SecureSettingRepository.KEY_TOOL_LOCK_APP_LOCK,
-                                title = "App Lock",
-                                locked = locked,
-                            )
-                        },
-                    )
-                    RowDivider(startIndent = Spacing.lg)
-                    UtilityToolLockRow(
-                        icon = Icons.Rounded.Key,
-                        accent = accents.indigo,
-                        title = "Key Store",
-                        locked = keyStoreToolLocked == true,
-                        onLockedChange = { locked ->
-                            requestUtilityLockChange(
-                                key = SecureSettingRepository.KEY_TOOL_LOCK_KEY_STORE,
-                                title = "Key Store",
-                                locked = locked,
-                            )
-                        },
-                    )
-                    RowDivider(startIndent = Spacing.lg)
-                    UtilityToolLockRow(
-                        icon = Icons.Rounded.NoteAlt,
-                        accent = accents.teal,
-                        title = "Notes",
-                        locked = notesToolLocked == true,
-                        onLockedChange = { locked ->
-                            requestUtilityLockChange(
-                                key = SecureSettingRepository.KEY_TOOL_LOCK_NOTES,
-                                title = "Notes",
-                                locked = locked,
-                            )
-                        },
-                    )
                 }
             }
 
@@ -637,48 +543,6 @@ fun SettingsScreen(
         )
     }
 
-    // ---- Utility tool lock disable confirm ----
-    pendingUtilityDisable?.let { request ->
-        ConfirmPinSheet(
-            title = "Turn off ${request.title} lock",
-            message = "Confirm with fingerprint or master PIN.",
-            error = utilityDisableError,
-            showFingerprint = biometricEnabled == true && biometricAuthenticator.canAuthenticate(),
-            onFingerprint = {
-                biometricAuthenticator.authenticate(
-                    title = "Confirm change",
-                    subtitle = "Turn off ${request.title} lock",
-                    onSuccess = {
-                        scope.launch {
-                            container.secureSettingRepository.putBoolean(request.key, false)
-                            pendingUtilityDisable = null
-                            utilityDisableError = null
-                        }
-                    },
-                    onError = { utilityDisableError = it },
-                )
-            },
-            onDismiss = {
-                pendingUtilityDisable = null
-                utilityDisableError = null
-            },
-            onConfirm = { pin ->
-                scope.launch {
-                    val result = withContext(Dispatchers.Default) {
-                        container.credentialRepository.verify(pin.toCharArray())
-                    }
-                    if (result is PinVerifyResult.Success) {
-                        container.secureSettingRepository.putBoolean(request.key, false)
-                        pendingUtilityDisable = null
-                        utilityDisableError = null
-                    } else {
-                        utilityDisableError = result.errorMessageOrNull()
-                    }
-                }
-            },
-        )
-    }
-
 }
 
 @Composable
@@ -705,24 +569,6 @@ private fun ActiveBadge() {
             color = MaterialTheme.extendedColors.success,
         )
     }
-}
-
-@Composable
-private fun UtilityToolLockRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    accent: androidx.compose.ui.graphics.Color,
-    title: String,
-    locked: Boolean,
-    onLockedChange: (Boolean) -> Unit,
-) {
-    AppListRow(
-        headline = title,
-        leadingIcon = icon,
-        leadingAccent = accent,
-        trailing = {
-            AppSwitch(checked = locked, onCheckedChange = onLockedChange)
-        },
-    )
 }
 
 @Composable

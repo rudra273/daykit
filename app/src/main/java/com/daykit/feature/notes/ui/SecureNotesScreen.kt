@@ -67,10 +67,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
-import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBackButton
 import com.daykit.core.designsystem.components.AppAlertDialog
@@ -85,9 +83,6 @@ import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.extendedColors
-import com.daykit.core.security.BiometricAuthenticator
-import com.daykit.core.security.errorMessageOrNull
-import com.daykit.feature.lock.ui.ToolUnlockScreen
 import com.daykit.feature.notes.data.SecureNote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -104,15 +99,7 @@ fun SecureNotesScreen(
     onBack: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val activity = context as FragmentActivity
     val scope = rememberCoroutineScope()
-    val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
-    var unlocked by remember { mutableStateOf(false) }
-    var unlockPin by remember { mutableStateOf("") }
-    var unlockError by remember { mutableStateOf<String?>(null) }
-    var biometricEnabled by remember { mutableStateOf(false) }
-    var toolLocked by remember { mutableStateOf<Boolean?>(null) }
-    val isToolLocked = toolLocked
     var editorState by remember { mutableStateOf<NoteEditorState?>(null) }
     var actionNote by remember { mutableStateOf<SecureNote?>(null) }
     var confirmDeleteNote by remember { mutableStateOf<SecureNote?>(null) }
@@ -125,44 +112,6 @@ fun SecureNotesScreen(
     val imagesByNote by container.secureNoteRepository
         .observeImagesByNote()
         .collectAsStateWithLifecycle(initialValue = emptyMap())
-
-    fun tryBiometricUnlock(enabled: Boolean = biometricEnabled) {
-        if (!enabled || !biometricAuthenticator.canAuthenticate()) return
-        biometricAuthenticator.authenticate(
-            title = "Unlock Notes",
-            subtitle = "DayKit secure notes",
-            onSuccess = {
-                unlocked = true
-                unlockPin = ""
-                unlockError = null
-            },
-            onError = { unlockError = it },
-        )
-    }
-
-    LaunchedEffect(Unit) {
-        val storedToolLocked = container.secureSettingRepository
-            .getBoolean(SecureSettingRepository.KEY_TOOL_LOCK_NOTES) != false
-        val storedBiometricEnabled = container.secureSettingRepository
-            .getBoolean(SecureSettingRepository.KEY_BIOMETRIC_ENABLED) == true
-        biometricEnabled = storedBiometricEnabled
-        if (storedToolLocked && storedBiometricEnabled) {
-            tryBiometricUnlock(storedBiometricEnabled)
-        }
-        container.secureSettingRepository
-            .observeBoolean(SecureSettingRepository.KEY_TOOL_LOCK_NOTES)
-            .collect { locked ->
-                toolLocked = locked ?: true
-            }
-    }
-
-    LaunchedEffect(isToolLocked) {
-        if (isToolLocked == false) {
-            unlocked = true
-            unlockPin = ""
-            unlockError = null
-        }
-    }
 
     BackHandler {
         when {
@@ -177,51 +126,6 @@ fun SecureNotesScreen(
             }
             else -> onBack()
         }
-    }
-
-    if (isToolLocked == null) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
-            }
-        }
-        return
-    }
-
-    if (isToolLocked == true && !unlocked) {
-        ToolUnlockScreen(
-            title = "Notes",
-            subtitle = "Unlock private notes",
-            pin = unlockPin,
-            error = unlockError,
-            pinLength = container.credentialRepository.pinLength(),
-            biometricEnabled = biometricEnabled,
-            icon = Icons.Rounded.Notes,
-            onBack = onBack,
-            onPinChange = {
-                unlockPin = it.filter(Char::isDigit).take(12)
-                unlockError = null
-            },
-            onUnlock = {
-                scope.launch {
-                    val result = withContext(Dispatchers.Default) {
-                        container.credentialRepository.verify(unlockPin.toCharArray())
-                    }
-                    if (result is com.daykit.core.security.PinVerifyResult.Success) {
-                        unlocked = true
-                        unlockPin = ""
-                    } else {
-                        unlockError = result.errorMessageOrNull()
-                        unlockPin = ""
-                    }
-                }
-            },
-            onBiometric = { tryBiometricUnlock() },
-        )
-        return
     }
 
     val filteredNotes = remember(notes, query, selectedLabel) {
