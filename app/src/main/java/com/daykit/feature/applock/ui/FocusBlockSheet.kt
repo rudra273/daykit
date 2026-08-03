@@ -34,8 +34,8 @@ import com.daykit.core.designsystem.extendedColors
 
 private data class DurationPreset(val label: String, val millis: Long)
 
-/** Steps of the sheet: pick a duration, read the warning, then type to confirm. */
-private enum class FocusStep { Duration, Warn, Confirm }
+/** Steps of the sheet: pick a duration, then type to confirm. */
+private enum class FocusStep { Duration, Confirm }
 
 private val PRESETS = listOf(
     DurationPreset("30m", 30 * 60_000L),
@@ -50,10 +50,10 @@ private const val CONFIRM_WORD = "LOCK"
 
 /**
  * Bottom sheet to start a strict timed lock ("focus block") on [appLabel].
- * Presents preset durations plus a custom hours+minutes entry, then two confirm
- * steps — a warning, then a typed [CONFIRM_WORD] acknowledgement — because the
- * block is irreversible (no early cancel, not even with the PIN). On confirm
- * invokes [onConfirm] with the chosen duration in millis.
+ * Presents preset durations plus a custom hours+minutes entry, then a single
+ * confirm step — the warning and a typed [CONFIRM_WORD] acknowledgement together —
+ * because the block is irreversible (no early cancel, not even with the PIN). On
+ * confirm invokes [onConfirm] with the chosen duration in millis.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -143,32 +143,6 @@ fun FocusBlockSheet(
                     PrimaryButton(
                         text = "Continue",
                         enabled = valid,
-                        onClick = { step = FocusStep.Warn },
-                    )
-                }
-            } else if (step == FocusStep.Warn) {
-                Text(
-                    text = "Start focus block?",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(Modifier.height(Spacing.sm))
-                Text(
-                    text = "You won't be able to open $appLabel for ${formatFocusDuration(durationMillis)} — " +
-                        "not even with your PIN. This can't be undone until the timer ends.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
-                )
-                Spacer(Modifier.height(Spacing.lg))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppTextButton(text = "Back", onClick = { step = FocusStep.Duration })
-                    Spacer(Modifier.width(Spacing.sm))
-                    PrimaryButton(
-                        text = "Continue",
                         onClick = { step = FocusStep.Confirm },
                     )
                 }
@@ -180,8 +154,9 @@ fun FocusBlockSheet(
                 )
                 Spacer(Modifier.height(Spacing.sm))
                 Text(
-                    text = "Last check: $appLabel will be blocked for " +
-                        "${formatFocusDuration(durationMillis)} with no way out. " +
+                    text = "You won't be able to open $appLabel for " +
+                        "${formatFocusDuration(durationMillis)} — not even with your PIN. " +
+                        "This can't be undone until the timer ends. " +
                         "Type $CONFIRM_WORD below to start.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.extendedColors.textMuted,
@@ -207,7 +182,7 @@ fun FocusBlockSheet(
                 ) {
                     AppTextButton(
                         text = "Back",
-                        onClick = { typedConfirm = ""; step = FocusStep.Warn },
+                        onClick = { typedConfirm = ""; step = FocusStep.Duration },
                     )
                     Spacer(Modifier.width(Spacing.sm))
                     PrimaryButton(

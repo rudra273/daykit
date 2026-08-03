@@ -26,12 +26,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -69,11 +72,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -112,6 +117,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
 
 private enum class HabitTab {
@@ -154,7 +160,8 @@ fun HabitScreen(
     var deleteHabit by remember { mutableStateOf<Habit?>(null) }
     var logHabit by remember { mutableStateOf<Habit?>(null) }
     var relapseHabit by remember { mutableStateOf<Habit?>(null) }
-    var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
+    var progressPeriod by remember { mutableStateOf(ProgressPeriod.Month) }
+    var progressAnchor by remember { mutableStateOf(LocalDate.now()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     val nestedUiOpen = addOpen || editHabit != null || deleteHabit != null || logHabit != null || relapseHabit != null
 
@@ -239,9 +246,28 @@ fun HabitScreen(
             onPreviousDate = { selectedDate = selectedDate.minusDays(1) },
             onNextDate = { selectedDate = selectedDate.plusDays(1) },
             onSelectDate = { selectedDate = it },
-            selectedMonth = selectedMonth,
-            onPreviousMonth = { selectedMonth = selectedMonth.minusMonths(1) },
-            onNextMonth = { selectedMonth = selectedMonth.plusMonths(1) },
+            progressPeriod = progressPeriod,
+            progressAnchor = progressAnchor,
+            onProgressPeriodChange = { period ->
+                progressPeriod = period
+                // Switching Week <-> Month can land the anchor outside the navigable range.
+                val current = dashboard
+                if (current != null) {
+                    progressAnchor = clampAnchor(progressAnchor, earliestHistoryDate(current), current.today)
+                }
+            },
+            onProgressPrevious = {
+                progressAnchor = when (progressPeriod) {
+                    ProgressPeriod.Week -> progressAnchor.minusWeeks(1)
+                    ProgressPeriod.Month -> progressAnchor.minusMonths(1)
+                }
+            },
+            onProgressNext = {
+                progressAnchor = when (progressPeriod) {
+                    ProgressPeriod.Week -> progressAnchor.plusWeeks(1)
+                    ProgressPeriod.Month -> progressAnchor.plusMonths(1)
+                }
+            },
             onAdd = {
                 addKind = if (selectedTab == HabitTab.Quit) HabitKind.Quit else HabitKind.Build
                 addOpen = true
@@ -343,9 +369,11 @@ private fun HabitHome(
     onPreviousDate: () -> Unit,
     onNextDate: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
-    selectedMonth: YearMonth,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
+    progressPeriod: ProgressPeriod,
+    progressAnchor: LocalDate,
+    onProgressPeriodChange: (ProgressPeriod) -> Unit,
+    onProgressPrevious: () -> Unit,
+    onProgressNext: () -> Unit,
     onAdd: () -> Unit,
     onAddBuild: () -> Unit,
     onAddQuit: () -> Unit,
@@ -408,9 +436,11 @@ private fun HabitHome(
                         )
                         HabitTab.Progress -> progressItems(
                             dashboard = current,
-                            selectedMonth = selectedMonth,
-                            onPrevious = onPreviousMonth,
-                            onNext = onNextMonth,
+                            period = progressPeriod,
+                            anchor = progressAnchor,
+                            onPeriodChange = onProgressPeriodChange,
+                            onPrevious = onProgressPrevious,
+                            onNext = onProgressNext,
                         )
                         HabitTab.Quit -> quitItems(
                             dashboard = current,
@@ -763,43 +793,86 @@ private fun HabitManageCard(
 
 private fun androidx.compose.foundation.lazy.LazyListScope.progressItems(
     dashboard: HabitDashboard,
-    selectedMonth: YearMonth,
+    period: ProgressPeriod,
+    anchor: LocalDate,
+    onPeriodChange: (ProgressPeriod) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
 ) {
-    item(key = "stats") { ProgressStatsRow(dashboard = dashboard, month = selectedMonth) }
-    item(key = "heatmap") {
-        AppCard(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPrevious) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Previous", tint = MaterialTheme.colorScheme.onSurface)
+    // One item, not several: the log index and the aggregates below have to share a
+    // single composable scope or they would be recomputed per item and lost on recycle.
+    item(key = "progressBody") {
+        val window = remember(period, anchor) { progressWindow(period, anchor) }
+        val earliest = remember(dashboard.habits, dashboard.logs) { earliestHistoryDate(dashboard) }
+        val index = remember(dashboard.logs, window) { buildLogIndex(dashboard.logs, window) }
+        val relapses = remember(dashboard.logs, window) { relapseDates(dashboard.logs, window) }
+        val timeHabits = remember(dashboard.habits) { timeGoalHabits(dashboard) }
+        val countHabits = remember(dashboard.habits) { countGoalHabits(dashboard) }
+
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            if (dashboard.buildHabits.isEmpty()) {
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    EmptyState(
+                        icon = Icons.Rounded.Flag,
+                        title = "No progress yet",
+                        description = "Add a habit and check in — your stats, charts, and streaks show up here.",
+                    )
                 }
-                Text(
-                    selectedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
+            } else {
+                ProgressStatsRow(dashboard = dashboard, window = window, index = index)
+                PeriodControlCard(
+                    period = period,
+                    label = window.label,
+                    canGoBack = canNavigateBack(window, earliest),
+                    canGoForward = canNavigateForward(window, dashboard.today),
+                    onPeriodChange = onPeriodChange,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
                 )
-                IconButton(onClick = onNext) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Next", tint = MaterialTheme.colorScheme.primary)
+                if (timeHabits.isNotEmpty()) {
+                    val rows = remember(timeHabits, index, window) {
+                        periodMinutesByHabit(timeHabits, index, window)
+                    }
+                    val bars = remember(timeHabits, index, window) {
+                        dailyMinutesBars(timeHabits, index, window, dashboard.today)
+                    }
+                    TimeSpentCard(rows = rows, bars = bars, period = period)
+                }
+                if (countHabits.isNotEmpty()) {
+                    val completions = remember(countHabits, index, window) {
+                        periodCompletions(countHabits, index, window, dashboard.today)
+                    }
+                    CompletionsCard(rows = completions)
+                }
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    when (period) {
+                        ProgressPeriod.Month -> MonthHeatmap(
+                            dashboard = dashboard,
+                            month = window.month,
+                            index = index,
+                            relapseDates = relapses,
+                        )
+                        ProgressPeriod.Week -> WeeklyConsistencyCard(
+                            dashboard = dashboard,
+                            weekStart = window.start,
+                            index = index,
+                        )
+                    }
                 }
             }
-            Spacer(Modifier.height(Spacing.sm))
-            MonthHeatmap(dashboard = dashboard, month = selectedMonth)
         }
     }
-    item(key = "weekly") { WeeklyConsistencyCard(dashboard = dashboard) }
 }
 
 @Composable
-private fun ProgressStatsRow(dashboard: HabitDashboard, month: YearMonth) {
+private fun ProgressStatsRow(
+    dashboard: HabitDashboard,
+    window: ProgressWindow,
+    index: HabitLogIndex,
+) {
     val activeHabits = dashboard.buildHabits.size
-    val monthDays = (1..month.lengthOfMonth()).map { month.atDay(it) }.filter { !it.isAfter(dashboard.today) }
-    val monthPct = if (monthDays.isEmpty()) 0 else {
-        (monthDays.sumOf { (dayProgress(dashboard, it) * 100).roundToInt() }.toFloat() / (monthDays.size * 100) * 100).roundToInt()
-    }
+    val windowPct = windowCompletionPercent(dashboard, index, window)
+    // Best streak stays all-time — a window-scoped "best streak" would be misleading.
     val bestStreak = dashboard.buildHabits.maxOfOrNull { habit ->
         bestBuildStreak(habit, dashboard.logs, dashboard.today)
     } ?: 0
@@ -812,8 +885,8 @@ private fun ProgressStatsRow(dashboard: HabitDashboard, month: YearMonth) {
             modifier = Modifier.weight(1f),
         )
         StatTile(
-            label = "This month",
-            value = "$monthPct%",
+            label = window.period.statLabel,
+            value = "$windowPct%",
             accent = MaterialTheme.extendedColors.accents.green,
             icon = Icons.Rounded.CheckCircle,
             modifier = Modifier.weight(1f),
@@ -829,15 +902,342 @@ private fun ProgressStatsRow(dashboard: HabitDashboard, month: YearMonth) {
 }
 
 @Composable
-private fun MonthHeatmap(dashboard: HabitDashboard, month: YearMonth) {
+private fun PeriodControlCard(
+    period: ProgressPeriod,
+    label: String,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onPeriodChange: (ProgressPeriod) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        SegmentedRow {
+            ProgressPeriod.values().forEach { option ->
+                SegmentOption(
+                    text = option.title,
+                    selected = period == option,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onPeriodChange(option) },
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        PeriodNavigatorRow(
+            label = label,
+            canGoBack = canGoBack,
+            canGoForward = canGoForward,
+            onPrevious = onPrevious,
+            onNext = onNext,
+        )
+    }
+}
+
+@Composable
+private fun PeriodNavigatorRow(
+    label: String,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    val disabledTint = MaterialTheme.extendedColors.textMuted.copy(alpha = 0.4f)
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        // Disabled rather than hidden, so the row never reflows at the ends of history.
+        IconButton(onClick = onPrevious, enabled = canGoBack) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Previous",
+                tint = if (canGoBack) MaterialTheme.colorScheme.onSurface else disabledTint,
+            )
+        }
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onNext, enabled = canGoForward) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = "Next",
+                tint = if (canGoForward) MaterialTheme.colorScheme.primary else disabledTint,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimeSpentCard(
+    rows: List<HabitMinutesRow>,
+    bars: List<DayMinutesBar>,
+    period: ProgressPeriod,
+) {
+    val totalMinutes = rows.sumOf { it.minutes }
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "Time spent",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                formatMinutes(totalMinutes),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        if (rows.isEmpty()) {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                "No time logged this ${period.title.lowercase()}",
+                color = MaterialTheme.extendedColors.textMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        } else {
+            Spacer(Modifier.height(Spacing.md))
+            HabitMinutesBarList(rows = rows)
+            Spacer(Modifier.height(Spacing.lg))
+            DailyMinutesChart(bars = bars, period = period)
+        }
+    }
+}
+
+@Composable
+private fun HabitMinutesBarList(rows: List<HabitMinutesRow>) {
+    val maxMinutes = rows.firstOrNull()?.minutes?.coerceAtLeast(1) ?: 1
+    val trackColor = MaterialTheme.extendedColors.inputField
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        rows.forEach { row ->
+            val ratio = (row.minutes.toFloat() / maxMinutes).coerceIn(0.04f, 1f)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        row.name,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        formatMinutes(row.minutes),
+                        color = MaterialTheme.extendedColors.textMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(trackColor),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(ratio)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(row.color),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyMinutesChart(bars: List<DayMinutesBar>, period: ProgressPeriod) {
+    // Reset the selection whenever the period changes out from under it.
+    var selectedBar by remember(bars) { mutableStateOf<DayMinutesBar?>(null) }
+    val maxMinutes = bars.maxOfOrNull { it.totalMinutes }?.coerceAtLeast(1) ?: 1
+    val emptyColor = MaterialTheme.extendedColors.inputField
+    val mutedColor = MaterialTheme.extendedColors.textMuted
+    val barGap = if (period == ProgressPeriod.Week) 6.dp else 2.dp
+    val plotHeight = 104.dp
+
+    Text(
+        text = selectedBar?.let { "${it.date.format(dayLabelFormatter)}: ${formatMinutes(it.totalMinutes)}" }
+            ?: "Tap a bar for the day total",
+        color = mutedColor,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Spacer(Modifier.height(Spacing.sm))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(42.dp)
+                .height(126.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.End,
+        ) {
+            Text(formatMinutes(maxMinutes), color = mutedColor, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            Text(formatMinutes(maxMinutes / 2), color = mutedColor, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            Text("0m", color = mutedColor, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(barGap),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            bars.forEach { bar ->
+                val totalRatio = (bar.totalMinutes.toFloat() / maxMinutes).coerceIn(0.04f, 1f)
+                val isSelected = selectedBar?.date == bar.date
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedBar = if (isSelected) null else bar },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom,
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(plotHeight),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        if (bar.totalMinutes <= 0) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(plotHeight * 0.04f)
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                    .background(emptyColor),
+                            )
+                        } else {
+                            // Clip the whole stack, not each slice, so it reads as one rounded bar.
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(plotHeight * totalRatio)
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)),
+                                verticalArrangement = Arrangement.Bottom,
+                            ) {
+                                bar.segments.forEach { segment ->
+                                    val share = segment.minutes.toFloat() / bar.totalMinutes
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .weight(share.coerceAtLeast(0.001f))
+                                            .background(
+                                                if (isSelected) segment.color else segment.color.copy(alpha = 0.85f),
+                                            ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    // With 28-31 bars the day labels collide, so month mode thins them out.
+                    val showLabel = period == ProgressPeriod.Week || bar.date.dayOfMonth % 5 == 1
+                    Text(
+                        text = if (showLabel) bar.label else "",
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else mutedColor,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompletionsCard(rows: List<CompletionRow>) {
+    val totalDone = rows.sumOf { it.completed }
+    val totalPossible = rows.sumOf { it.possible }
+    val trackColor = MaterialTheme.extendedColors.inputField
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Completions",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    if (totalPossible == 0) "Nothing scheduled yet" else "$totalDone of $totalPossible days",
+                    color = MaterialTheme.extendedColors.textMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        if (totalPossible > 0) {
+            Spacer(Modifier.height(Spacing.md))
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                rows.forEach { row ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(row.color),
+                            )
+                            Text(
+                                row.name,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "${row.completed}/${row.possible}",
+                                color = MaterialTheme.extendedColors.textMuted,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(trackColor),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(row.ratio.coerceAtLeast(0.02f))
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(99.dp))
+                                    .background(row.color),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonthHeatmap(
+    dashboard: HabitDashboard,
+    month: YearMonth,
+    index: HabitLogIndex,
+    relapseDates: Set<String>,
+) {
     val firstDay = month.atDay(1)
-    val offset = (firstDay.dayOfWeek.value % 7)
+    // DayOfWeek.value is 1=Mon..7=Sun, so this grid is Monday-first like the rest of the app.
+    val offset = firstDay.dayOfWeek.value - 1
     val days = month.lengthOfMonth()
     val cells = offset + days
     val rows = (cells + 6) / 7
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            listOf("S", "M", "T", "W", "T", "F", "S").forEach {
+            listOf("M", "T", "W", "T", "F", "S", "S").forEach {
                 Text(it, color = MaterialTheme.extendedColors.textMuted, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             }
         }
@@ -846,9 +1246,9 @@ private fun MonthHeatmap(dashboard: HabitDashboard, month: YearMonth) {
                 repeat(7) { column ->
                     val dayNumber = row * 7 + column - offset + 1
                     val date = if (dayNumber in 1..days) month.atDay(dayNumber) else null
-                    val segments = if (date == null) emptyList() else daySegments(dashboard, date)
-                    val progress = if (date == null) 0f else dayProgress(dashboard, date)
-                    val relapse = date != null && dashboard.logs.any { it.date == date.toString() && it.relapse }
+                    val segments = if (date == null) emptyList() else daySegments(dashboard, index, date)
+                    val progress = if (date == null) 0f else dayProgress(dashboard, index, date)
+                    val relapse = date != null && date.toString() in relapseDates
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -895,21 +1295,24 @@ private fun MonthHeatmap(dashboard: HabitDashboard, month: YearMonth) {
 }
 
 @Composable
-private fun WeeklyConsistencyCard(dashboard: HabitDashboard) {
-    val weekDays = remember(dashboard.today) {
-        val start = dashboard.today.with(DayOfWeek.MONDAY)
-        (0..6).map { start.plusDays(it.toLong()) }
+private fun WeeklyConsistencyCard(
+    dashboard: HabitDashboard,
+    weekStart: LocalDate,
+    index: HabitLogIndex,
+) {
+    val weekDays = remember(weekStart) {
+        (0..6).map { weekStart.plusDays(it.toLong()) }
     }
     val keptCount = dashboard.buildHabits.sumOf { habit ->
-        weekDays.count { date -> isLogComplete(habit, dashboard.logFor(habit.habitId, date)) }
+        weekDays.count { date -> isLogComplete(habit, index.logFor(habit.habitId, date)) }
     }
     val pastSlots = dashboard.buildHabits.size * weekDays.count { !it.isAfter(dashboard.today) }
     val missedCount = dashboard.buildHabits.sumOf { habit ->
         weekDays.count { date ->
-            !date.isAfter(dashboard.today) && dashboard.logFor(habit.habitId, date) == null
+            !date.isAfter(dashboard.today) && index.logFor(habit.habitId, date) == null
         }
     }
-    AppCard(modifier = Modifier.fillMaxWidth()) {
+    Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Weekly Consistency", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -920,7 +1323,7 @@ private fun WeeklyConsistencyCard(dashboard: HabitDashboard) {
                 )
             }
             Text(
-                if (pastSlots == 0) "0%" else "${((keptCount.toFloat() / pastSlots) * 100).roundToInt()}%",
+                if (pastSlots == 0) "—" else "${((keptCount.toFloat() / pastSlots) * 100).roundToInt()}%",
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
@@ -969,7 +1372,7 @@ private fun WeeklyConsistencyCard(dashboard: HabitDashboard) {
                 weekDays.forEach { date ->
                     WeeklyStatusCell(
                         habit = habit,
-                        log = dashboard.logFor(habit.habitId, date),
+                        log = index.logFor(habit.habitId, date),
                         date = date,
                         today = dashboard.today,
                         modifier = Modifier.weight(1f),
@@ -1661,6 +2064,12 @@ private fun Stepper(
     onGoal: (() -> Unit)?,
     goalLabel: String?,
 ) {
+    val focusManager = LocalFocusManager.current
+    var editing by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf(value.toString()) }
+    // While not editing the field mirrors the +/- buttons and the Goal shortcut.
+    if (!editing && text != value.toString()) text = value.toString()
+
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1669,11 +2078,31 @@ private fun Stepper(
         ) {
             StepperButton(icon = Icons.Rounded.Remove, onClick = { onValueChange(value - step) })
             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    value.toString(),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                BasicTextField(
+                    value = text,
+                    onValueChange = { input ->
+                        val digits = input.filter(Char::isDigit).take(5)
+                        text = digits
+                        onValueChange(digits.toIntOrNull() ?: 0)
+                    },
+                    textStyle = MaterialTheme.typography.headlineMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    modifier = Modifier
+                        .widthIn(min = 56.dp)
+                        .onFocusChanged { state ->
+                            editing = state.isFocused
+                            if (!state.isFocused) text = value.toString()
+                        },
                 )
                 Text(label, color = MaterialTheme.extendedColors.textMuted, style = MaterialTheme.typography.labelSmall)
             }
@@ -1878,17 +2307,283 @@ private data class HabitDaySegment(
     val progress: Float,
 )
 
+/** One habit's slice of a stacked day bar in [DailyMinutesChart]. */
 private data class HabitBarSegment(
     val habitId: String,
     val color: Color,
     val minutes: Int,
 )
 
-private fun daySegments(dashboard: HabitDashboard, date: LocalDate): List<HabitDaySegment> {
+// ---------------------------------------------------------------------------
+// PROGRESS PERIOD MODEL
+// ---------------------------------------------------------------------------
+
+private enum class ProgressPeriod {
+    Week,
+    Month,
+}
+
+private val ProgressPeriod.title: String
+    get() = when (this) {
+        ProgressPeriod.Week -> "Week"
+        ProgressPeriod.Month -> "Month"
+    }
+
+/** Label for the stat tile, e.g. "This week". */
+private val ProgressPeriod.statLabel: String
+    get() = when (this) {
+        ProgressPeriod.Week -> "This week"
+        ProgressPeriod.Month -> "This month"
+    }
+
+/** A resolved, inclusive date window plus the label shown in the navigator. */
+private data class ProgressWindow(
+    val period: ProgressPeriod,
+    val start: LocalDate,
+    val endInclusive: LocalDate,
+    val label: String,
+) {
+    val days: List<LocalDate>
+        get() = generateSequence(start) { day ->
+            day.plusDays(1).takeIf { !it.isAfter(endInclusive) }
+        }.toList()
+
+    /** Days that have actually happened — the future is never counted as missed. */
+    fun elapsedDays(today: LocalDate): List<LocalDate> = days.filter { !it.isAfter(today) }
+
+    val month: YearMonth get() = YearMonth.from(start)
+}
+
+private val monthLabelFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy")
+private val dayLabelFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d")
+
+private fun weekStartOf(date: LocalDate): LocalDate =
+    date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+
+/** "Mar 3 – 9" within one month, "Dec 29 – Jan 4" when the week straddles two. */
+private fun weekRangeLabel(start: LocalDate, end: LocalDate): String {
+    return if (start.month == end.month) {
+        "${start.format(dayLabelFormatter)} – ${end.dayOfMonth}"
+    } else {
+        "${start.format(dayLabelFormatter)} – ${end.format(dayLabelFormatter)}"
+    }
+}
+
+private fun progressWindow(period: ProgressPeriod, anchor: LocalDate): ProgressWindow {
+    return when (period) {
+        ProgressPeriod.Week -> {
+            val start = weekStartOf(anchor)
+            val end = start.plusDays(6)
+            ProgressWindow(period, start, end, weekRangeLabel(start, end))
+        }
+        ProgressPeriod.Month -> {
+            val month = YearMonth.from(anchor)
+            ProgressWindow(period, month.atDay(1), month.atEndOfMonth(), month.format(monthLabelFormatter))
+        }
+    }
+}
+
+/**
+ * Earliest period the user may navigate back to: the first habit created or the
+ * first day logged, whichever came first. Falls back to today with no history.
+ */
+private fun earliestHistoryDate(dashboard: HabitDashboard): LocalDate {
+    val fromHabits = dashboard.habits.minOfOrNull { dateFromMillis(it.createdAtMillis) }
+    val fromLogs = dashboard.logs
+        .mapNotNull { runCatching { LocalDate.parse(it.date) }.getOrNull() }
+        .minOrNull()
+    return listOfNotNull(fromHabits, fromLogs).minOrNull() ?: dashboard.today
+}
+
+private fun canNavigateBack(window: ProgressWindow, earliest: LocalDate): Boolean {
+    return when (window.period) {
+        ProgressPeriod.Week -> weekStartOf(earliest) < window.start
+        ProgressPeriod.Month -> YearMonth.from(earliest) < window.month
+    }
+}
+
+private fun canNavigateForward(window: ProgressWindow, today: LocalDate): Boolean {
+    return when (window.period) {
+        ProgressPeriod.Week -> window.start < weekStartOf(today)
+        ProgressPeriod.Month -> window.month < YearMonth.from(today)
+    }
+}
+
+/** Keeps the anchor inside [earliest, today] when the user flips Week <-> Month. */
+private fun clampAnchor(anchor: LocalDate, earliest: LocalDate, today: LocalDate): LocalDate {
+    val lower = minOf(earliest, today)
+    return anchor.coerceIn(lower, today)
+}
+
+// ---------------------------------------------------------------------------
+// PROGRESS AGGREGATION
+// ---------------------------------------------------------------------------
+
+/**
+ * `habitId + ISO date` -> the single non-relapse log for that day.
+ *
+ * [HabitDashboard.logFor] scans every log ever recorded, and the month grid needs
+ * one lookup per habit per day (plus more from `dayProgress`/`daySegments`), so the
+ * window's logs are indexed once per period instead.
+ */
+private typealias HabitLogIndex = Map<Pair<String, String>, HabitLog>
+
+private fun buildLogIndex(logs: List<HabitLog>, window: ProgressWindow): HabitLogIndex {
+    val from = window.start.toString()
+    val to = window.endInclusive.toString()
+    val index = HashMap<Pair<String, String>, HabitLog>()
+    logs.forEach { log ->
+        // Relapses are dropped here so no minutes or completion path can ever see one.
+        if (log.relapse) return@forEach
+        // Dates are strict ISO, so range checks sort lexicographically without parsing.
+        if (log.date < from || log.date > to) return@forEach
+        index[log.habitId to log.date] = log
+    }
+    return index
+}
+
+private fun HabitLogIndex.logFor(habitId: String, date: LocalDate): HabitLog? =
+    this[habitId to date.toString()]
+
+private fun relapseDates(logs: List<HabitLog>, window: ProgressWindow): Set<String> {
+    val from = window.start.toString()
+    val to = window.endInclusive.toString()
+    return logs.asSequence()
+        .filter { it.relapse && it.date >= from && it.date <= to }
+        .map { it.date }
+        .toSet()
+}
+
+private fun dayProgress(dashboard: HabitDashboard, index: HabitLogIndex, date: LocalDate): Float {
+    val buildHabits = dashboard.buildHabits
+    if (buildHabits.isEmpty()) return 0f
+    val total = buildHabits.sumOf { habit ->
+        (habitProgress(habit, index.logFor(habit.habitId, date)) * 100).roundToInt()
+    }
+    return (total.toFloat() / (buildHabits.size * 100)).coerceIn(0f, 1f)
+}
+
+private fun daySegments(dashboard: HabitDashboard, index: HabitLogIndex, date: LocalDate): List<HabitDaySegment> {
     return dashboard.buildHabits.mapNotNull { habit ->
-        val progress = habitProgress(habit, dashboard.logFor(habit.habitId, date))
+        val progress = habitProgress(habit, index.logFor(habit.habitId, date))
         if (progress > 0f) HabitDaySegment(habitColor(habit.colorIndex), progress) else null
     }
+}
+
+private fun timeGoalHabits(dashboard: HabitDashboard): List<Habit> =
+    dashboard.buildHabits.filter { it.goalType == HabitGoalType.Time }
+
+private fun countGoalHabits(dashboard: HabitDashboard): List<Habit> =
+    dashboard.buildHabits.filter { it.goalType != HabitGoalType.Time }
+
+private data class HabitMinutesRow(
+    val habitId: String,
+    val name: String,
+    val color: Color,
+    val minutes: Int,
+)
+
+private data class DayMinutesBar(
+    val date: LocalDate,
+    val label: String,
+    val totalMinutes: Int,
+    val segments: List<HabitBarSegment>,
+    val isFuture: Boolean,
+)
+
+private data class CompletionRow(
+    val habitId: String,
+    val name: String,
+    val color: Color,
+    val completed: Int,
+    val possible: Int,
+) {
+    val ratio: Float get() = if (possible <= 0) 0f else (completed.toFloat() / possible).coerceIn(0f, 1f)
+}
+
+/** Total minutes per time-goal habit across the window, ranked, zero-minute habits dropped. */
+private fun periodMinutesByHabit(
+    habits: List<Habit>,
+    index: HabitLogIndex,
+    window: ProgressWindow,
+): List<HabitMinutesRow> {
+    val days = window.days
+    return habits
+        .map { habit ->
+            HabitMinutesRow(
+                habitId = habit.habitId,
+                name = habit.name,
+                color = habitColor(habit.colorIndex),
+                minutes = days.sumOf { date -> index.logFor(habit.habitId, date)?.minutes ?: 0 },
+            )
+        }
+        .filter { it.minutes > 0 }
+        .sortedByDescending { it.minutes }
+}
+
+/** Per-day stacked totals in calendar order; empty days are kept so the axis stays even. */
+private fun dailyMinutesBars(
+    habits: List<Habit>,
+    index: HabitLogIndex,
+    window: ProgressWindow,
+    today: LocalDate,
+): List<DayMinutesBar> {
+    return window.days.map { date ->
+        val segments = habits.mapNotNull { habit ->
+            val minutes = index.logFor(habit.habitId, date)?.minutes ?: 0
+            if (minutes > 0) HabitBarSegment(habit.habitId, habitColor(habit.colorIndex), minutes) else null
+        }
+        DayMinutesBar(
+            date = date,
+            label = when (window.period) {
+                ProgressPeriod.Week -> date.dayOfWeek.name.take(1)
+                ProgressPeriod.Month -> date.dayOfMonth.toString()
+            },
+            totalMinutes = segments.sumOf { it.minutes },
+            segments = segments,
+            isFuture = date.isAfter(today),
+        )
+    }
+}
+
+/** Completions vs. days the habit could actually have been kept. */
+private fun periodCompletions(
+    habits: List<Habit>,
+    index: HabitLogIndex,
+    window: ProgressWindow,
+    today: LocalDate,
+): List<CompletionRow> {
+    val elapsed = window.elapsedDays(today)
+    return habits
+        .map { habit ->
+            val createdOn = dateFromMillis(habit.createdAtMillis)
+            // A habit added mid-period reads "3/4", not "3/7".
+            val eligible = elapsed.filter { !it.isBefore(createdOn) }
+            CompletionRow(
+                habitId = habit.habitId,
+                name = habit.name,
+                color = habitColor(habit.colorIndex),
+                completed = eligible.count { isLogComplete(habit, index.logFor(habit.habitId, it)) },
+                possible = eligible.size,
+            )
+        }
+        .sortedByDescending { it.ratio }
+}
+
+private fun windowCompletionPercent(
+    dashboard: HabitDashboard,
+    index: HabitLogIndex,
+    window: ProgressWindow,
+): Int {
+    val habits = dashboard.buildHabits
+    val elapsed = window.elapsedDays(dashboard.today)
+    if (habits.isEmpty() || elapsed.isEmpty()) return 0
+    val total = elapsed.sumOf { date ->
+        habits.sumOf { habit ->
+            (habitProgress(habit, index.logFor(habit.habitId, date)) * 100).roundToInt()
+        }
+    }
+    return (total.toFloat() / (elapsed.size * habits.size)).roundToInt().coerceIn(0, 100)
 }
 
 private fun formatMinutes(minutes: Int): String {
