@@ -83,7 +83,6 @@ import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppExtendedFab
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.AppTopBarHeight
-import com.daykit.core.designsystem.components.BetaTopBarTitle
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.StatTile
@@ -248,7 +247,6 @@ fun FileLockerScreen(
                 AppTopBar(
                     title = "File Vault",
                     onBack = onBack,
-                    titleContent = { BetaTopBarTitle("File Vault") },
                 )
             }
         },
