@@ -1,4 +1,4 @@
-package com.daykit.feature.applock.ui
+package com.daykit.feature.focus.ui
 
 /**
  * Formats a remaining-time span (in millis) as a compact human string, e.g.

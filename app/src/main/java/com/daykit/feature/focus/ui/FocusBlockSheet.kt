@@ -1,4 +1,4 @@
-package com.daykit.feature.applock.ui
+package com.daykit.feature.focus.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

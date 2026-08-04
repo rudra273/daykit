@@ -92,9 +92,9 @@ class AppMonitorService : Service() {
         // Seed synchronously from the prefs caches so there is no window where the
         // monitor loop runs with an empty locked set or stale biometric flag.
         lockedPackages = container.appLockRepository.getLockedPackages()
-        focusBlockedPackages = container.appLockRepository.activeFocusPackages()
+        focusBlockedPackages = container.focusRepository.activeFocusPackages()
             .mapNotNull { pkg ->
-                container.appLockRepository.focusBlockUntil(pkg)?.let { pkg to it }
+                container.focusRepository.focusBlockUntil(pkg)?.let { pkg to it }
             }
             .toMap()
         biometricEnabled = container.settingFlagCache
@@ -155,7 +155,7 @@ class AppMonitorService : Service() {
     }
 
     private fun observeFocusBlocks() {
-        val repository = (application as DayKitApplication).container.appLockRepository
+        val repository = (application as DayKitApplication).container.focusRepository
         scope.launch {
             repository.observeFocusBlocks()
                 .catch { focusBlockedPackages = emptyMap() }
@@ -244,10 +244,10 @@ class AppMonitorService : Service() {
                 ) {
                     activeActivityLockPackage = null
                     activeActivityLockIsFocus = false
-                    // Prune the now-expired block from the store/flow so the manage
-                    // screen and this service's map drop it instead of holding a
-                    // stale entry indefinitely (the flow only re-emits on demand).
-                    (application as DayKitApplication).container.appLockRepository.refreshFocusBlocks()
+                    // Prune the now-expired block from the store so the manage
+                    // screen and this service's map drop it promptly rather than
+                    // waiting on the flow's own expiry wake-up.
+                    (application as DayKitApplication).container.focusRepository.refreshFocusBlocks()
                 }
 
                 val notBypassed = foregroundPackage != packageName &&

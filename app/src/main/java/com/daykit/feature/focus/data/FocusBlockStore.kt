@@ -1,4 +1,4 @@
-package com.daykit.feature.applock.data
+package com.daykit.feature.focus.data
 
 import android.content.Context
 import androidx.core.content.edit
@@ -11,9 +11,9 @@ import org.json.JSONObject
  * expire first. Stored in SharedPreferences (not the in-memory session manager)
  * so a block survives process death, screen-off session resets, and reboot.
  *
- * Deliberately separate from [LockedPackageCache]: a focus block is independent
- * of whether an app is PIN-locked, so a timer can exist on an app the user has
- * not added to the regular locked set.
+ * Deliberately separate from App Lock's `LockedPackageCache`: a focus block is
+ * independent of whether an app is PIN-locked, so a timer can exist on an app
+ * the user has not added to the regular locked set.
  */
 class FocusBlockStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -86,7 +86,8 @@ class FocusBlockStore(context: Context) {
 
     /**
      * Drops every focus block. Committed synchronously for the same reason as
-     * [LockedPackageCache.clear] — the monitor service reads this directly.
+     * App Lock's `LockedPackageCache.clear` — the monitor service reads this
+     * directly.
      */
     fun clear() {
         prefs.edit(commit = true) { clear() }

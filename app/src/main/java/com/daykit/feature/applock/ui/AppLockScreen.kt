@@ -60,6 +60,8 @@ import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.applock.domain.InstalledApp
 import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
+import com.daykit.feature.focus.ui.FocusBlockSheet
+import com.daykit.feature.focus.ui.formatFocusRemaining
 
 private enum class AppLockTab {
     All,
@@ -86,24 +88,22 @@ fun AppLockScreen(
     val lockedPackages = remember(lockedApps) { lockedApps.map { it.packageName }.toSet() }
     val secureFolderAvailable = remember(context) { SamsungSecureFolderSupport.isAvailable(context) }
 
-    val focusBlocks by container.appLockRepository
+    val focusBlocks by container.focusRepository
         .observeFocusBlocks()
         .collectAsStateWithLifecycle(initialValue = emptyList())
-    // Ticks every second so the per-row remaining-time chip counts down and
-    // expired blocks disappear without leaving the screen. Only runs while at
-    // least one block is active — otherwise a per-second tick would recompose
-    // the whole app list for nothing (the common, no-block case).
+    // Ticks every second purely to re-render the per-row remaining-time text.
+    // Dropping an expired block is the flow's job (it re-emits at expiry), so
+    // this only needs to run while a block is actually counting down —
+    // otherwise a per-second tick would recompose the whole app list for
+    // nothing in the common, no-block case.
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    val hasActiveBlocks = focusBlocks.any { it.lockUntilMillis > nowMillis }
+    val hasActiveBlocks = focusBlocks.isNotEmpty()
     LaunchedEffect(hasActiveBlocks) {
         if (!hasActiveBlocks) return@LaunchedEffect
-        // Re-check against the live list each tick so the loop stops once the
-        // last block expires (rather than spinning until the screen closes).
-        while (focusBlocks.any { it.lockUntilMillis > System.currentTimeMillis() }) {
+        while (true) {
             nowMillis = System.currentTimeMillis()
             kotlinx.coroutines.delay(1000L)
         }
-        nowMillis = System.currentTimeMillis()
     }
     val focusBlockByPackage = remember(focusBlocks, nowMillis) {
         focusBlocks.filter { it.lockUntilMillis > nowMillis }
@@ -370,7 +370,7 @@ fun AppLockScreen(
                 focusSheetApp = null
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 errors.launchGuarded("Couldn't start the focus block for ${app.label}.") {
-                    container.appLockRepository.startFocusBlock(
+                    container.focusRepository.startFocusBlock(
                         packageName = app.packageName,
                         label = app.label,
                         durationMillis = durationMillis,
