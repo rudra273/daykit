@@ -67,11 +67,25 @@ Key invariants:
 
 ## Persistence
 
-Room + KSP, database version **11**, `exportSchema = false`. Every schema change needs a hand-written `Migration` added to the list in [DayKitDatabase.create](app/src/main/java/com/daykit/core/data/DayKitDatabase.kt) — there is no destructive fallback, so a missing migration crashes on upgrade. Note the existing downgrade migration `MIGRATION_7_6`.
+Room + KSP, database version **1**, `exportSchema = false`. The app is pre-release, so the migration history was deliberately collapsed — there are no `Migration` objects and no `.addMigrations(...)` call. Once there are real installs, every schema change needs a hand-written `Migration` added in [DayKitDatabase.create](app/src/main/java/com/daykit/core/data/DayKitDatabase.kt); there is deliberately **no** `fallbackToDestructiveMigration`, so a missing migration must crash on upgrade rather than silently wipe data.
 
 Non-secret plumbing lives in plain SharedPreferences mirrors so startup never blocks on Keystore + SQLCipher: `SettingFlagCache` (boolean settings), `LockedPackageCache` (locked package list, read by the monitor service), `FocusBlockStore`. The encrypted DB stays the source of truth; these are caches that must be refreshed on every write.
 
-`FocusBlockStore` is the exception: it is not a cache of anything, it *is* the source of truth for focus blocks (plain prefs so `AppMonitorService` can read it before the DB is unlocked). It lives in `feature/focus/` behind `FocusRepository`, deliberately independent of App Lock's locked-package set — a block can exist on an app that was never PIN-locked, and `AppMonitorService` checks it ahead of the PIN gate. A focus block must never be openable by PIN or biometric; three separate guards enforce that (the `shouldLock` OR in `AppMonitorService`, the grant skip in `LockActivity`, and the `isFocusBlocked` lambda in `LockOverlayController`) — keep all three.
+`FocusBlockStore` is the exception: it is not a cache of anything, it *is* the source of truth for one-off focus blocks (plain prefs so `AppMonitorService` can read it before the DB is unlocked).
+
+## Focus (`feature/focus/`)
+
+Three layers, and the split matters:
+
+- **One-off blocks** — `FocusBlockStore` (plain prefs) behind `FocusRepository`. Always Strict: no cancel API exists, and the typed-`LOCK` confirmation in `FocusBlockSheet` is there because the action is irreversible. Don't add a `stopBlock`.
+- **Groups + schedules** — Room (`focus_groups`, `focus_schedules`) behind `FocusGroupRepository` / `FocusScheduleRepository`. Non-secret (package names the user picked), so they use the plain DAO path, **not** `SessionValueCipher` — enforcement has to act on them while the vault is locked.
+- **`FocusScheduleCache`** — a plain-prefs *projection* of the next occurrence of every enabled schedule, rewritten on every change. `AppMonitorService` and `FocusScheduleReceiver` read only this, never the repositories: the service seeds its blocked map synchronously in `onCreate`, and on a cold start SQLCipher may not be unlocked. Active windows are derived from the armed list, so a Doze-deferred end alarm can't strand an app.
+
+`FocusRecurrence` holds the weekday bitmask (**bit 0 = Monday**) and next-occurrence math. It's pure and unit-tested — put scheduling logic there, not in a composable.
+
+Strictness is the safety valve: a **Normal** scheduled session can be ended early with the PIN, a **Strict** one cannot. `FocusScheduleRepository.endSessionEarly` rejects Strict at the data layer rather than trusting the UI to hide the button. A focus block must never be openable by PIN or biometric; three separate guards enforce that (the `shouldLock` OR in `AppMonitorService`, the grant skip in `LockActivity`, and the `isFocusBlocked` lambda in `LockOverlayController`) — keep all three.
+
+Schedules use exact alarms (`FocusScheduleScheduler`, modelled on `ReminderScheduler`) and **re-arm themselves** in `FocusScheduleReceiver` — AlarmManager has no weekday recurrence, so never `setRepeating`. `AppLockBootReceiver` re-projects and re-arms after boot. Exact-alarm permission is checked via `AppLockPermissionChecker.canScheduleExactAlarms` and deliberately excluded from `AppLockPermissionState.allGranted` — App Lock works without it; only schedules need it, and the Focus screen warns when it's missing rather than silently drifting.
 
 All settings keys are `const val KEY_*` on `SecureSettingRepository.Companion` — add new ones there, not as loose strings.
 

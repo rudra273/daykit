@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.daykit.DayKitApplication
 import com.daykit.core.permissions.AppLockPermissionChecker
+import com.daykit.feature.focus.service.FocusScheduleScheduler
 import com.daykit.feature.reminder.notification.ReminderScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +42,9 @@ class AppLockBootReceiver : BroadcastReceiver() {
         val hasPinLockedApps = container.credentialRepository.hasCredential() &&
             container.appLockRepository.getLockedPackages().isNotEmpty()
         val hasActiveFocusBlocks = container.focusRepository.activeFocusPackages().isNotEmpty()
-        if (hasUsageAccess && (hasPinLockedApps || hasActiveFocusBlocks)) {
+        // Read the prefs projection, not the DB: this runs before any unlock.
+        val hasArmedSessions = container.focusScheduleCache.getArmed().isNotEmpty()
+        if (hasUsageAccess && (hasPinLockedApps || hasActiveFocusBlocks || hasArmedSessions)) {
             AppMonitorService.start(context)
         }
 
@@ -55,6 +58,12 @@ class AppLockBootReceiver : BroadcastReceiver() {
                 val scheduler = ReminderScheduler(context)
                 container.reminderRepository.getPendingFutureReminders()
                     .forEach(scheduler::schedule)
+
+                // Focus schedules lose their alarms on boot too. Re-project first
+                // so a window that elapsed while powered off is replaced by the
+                // next occurrence rather than being armed in the past.
+                val armed = container.focusScheduleRepository.reproject()
+                FocusScheduleScheduler(context).arm(armed)
             } catch (t: Throwable) {
                 // Never let a failed reschedule crash the boot broadcast — the
                 // user can still re-arm a reminder by editing it.

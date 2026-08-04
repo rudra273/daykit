@@ -24,6 +24,7 @@ import com.daykit.core.session.AppLockSessionManager
 import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
 import com.daykit.feature.applock.domain.SettingsPackageResolver
 import com.daykit.feature.applock.ui.LockActivity
+import com.daykit.feature.focus.data.FocusScheduleCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,6 +38,10 @@ class AppMonitorService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var detector: ForegroundAppDetector
     private lateinit var overlayController: LockOverlayController
+    // Read on the poll loop for scheduled focus sessions. Plain prefs, so it
+    // works before the encrypted DB is unlocked — same reason as
+    // LockedPackageCache. Never swap this for the repository.
+    private lateinit var focusScheduleCache: FocusScheduleCache
     private lateinit var settingsPackage: String
     private var lockedPackages = emptySet<String>()
     // Package -> epoch-millis at which its strict timed lock ("focus block")
@@ -80,13 +85,20 @@ class AppMonitorService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         val container = (application as DayKitApplication).container
         detector = ForegroundAppDetector(this)
+        focusScheduleCache = container.focusScheduleCache
         settingsPackage = SettingsPackageResolver.resolve(this)
         overlayController = LockOverlayController(
             context = this,
             credentialRepository = container.credentialRepository,
             onBiometricRequested = { packageName -> launchActivityLockScreen(packageName) },
             isFocusBlocked = { packageName ->
-                focusBlockedPackages[packageName]?.let { it > System.currentTimeMillis() } == true
+                val now = System.currentTimeMillis()
+                val manuallyBlocked = focusBlockedPackages[packageName]?.let { it > now } == true
+                // Session windows count too, or a PIN entered on the overlay
+                // could open an app a scheduled session is blocking.
+                val sessionBlocked = focusScheduleCache.activeWindows(now)
+                    .containsKey(packageName)
+                manuallyBlocked || sessionBlocked
             },
         )
         // Seed synchronously from the prefs caches so there is no window where the
@@ -228,8 +240,21 @@ class AppMonitorService : Service() {
                 // matter what — a PIN grant must NOT satisfy it. This is OR'd in
                 // ahead of the normal grant check and applies even to apps that
                 // are not in the PIN-locked set.
-                val focusBlockUntil = focusBlockedPackages[foregroundPackage]
+                // A scheduled session blocks its group's apps for the duration of
+                // the window. Read straight from the prefs cache — never the
+                // repository, which would touch the encrypted DB and may be
+                // unavailable here. It also self-corrects if the end alarm was
+                // deferred by Doze, since the window simply stops matching.
+                val sessionUntil = focusScheduleCache
+                    .activeWindows()[foregroundPackage]
+                    ?.endMillis
                     ?.takeIf { it > System.currentTimeMillis() }
+
+                val focusBlockUntil = listOfNotNull(
+                    focusBlockedPackages[foregroundPackage]
+                        ?.takeIf { it > System.currentTimeMillis() },
+                    sessionUntil,
+                ).maxOrNull()
                 val focusBlocked = focusBlockUntil != null
 
                 // When a focus block expires, its countdown LockActivity finishes

@@ -139,6 +139,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".feature.focus.service.FocusScheduleReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".core.security.DayKitDeviceAdmin"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">

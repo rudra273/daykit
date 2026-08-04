@@ -94,8 +94,13 @@ class LockActivity : FragmentActivity() {
                         settings = container.secureSettingRepository,
                         onUnlocked = {
                             // Belt-and-suspenders: never let a PIN grant open an app
-                            // whose focus block is still active.
-                            if (container.focusRepository.focusBlockUntil(lockedPackageName) == null) {
+                            // held by a manual block or a scheduled session.
+                            val sessionBlocked = container.focusScheduleCache
+                                .activeWindows()
+                                .containsKey(lockedPackageName)
+                            if (!sessionBlocked &&
+                                container.focusRepository.focusBlockUntil(lockedPackageName) == null
+                            ) {
                                 AppLockSessionManager.allow(lockedPackageName)
                             }
                             finish()
