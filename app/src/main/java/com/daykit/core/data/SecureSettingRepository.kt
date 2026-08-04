@@ -74,6 +74,7 @@ class SecureSettingRepository(
         const val KEY_BIOMETRIC_ENABLED = "app_lock.biometric_enabled"
         const val KEY_BACKUP_PASSWORD = "backup.password"
         const val KEY_DRIVE_BACKUP_SCHEDULE = "backup.drive.schedule"
+        /** When the last backup ran. Also the automatic schedule's due-check clock. */
         const val KEY_DRIVE_LAST_BACKUP_AT = "backup.drive.last_backup_at"
         const val KEY_DRIVE_LAST_BACKUP_SIZE_BYTES = "backup.drive.last_backup_size_bytes"
         const val KEY_DRIVE_LAST_UPLOAD_AT = "backup.drive.last_upload_at"

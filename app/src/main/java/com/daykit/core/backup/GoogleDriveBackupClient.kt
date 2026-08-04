@@ -38,7 +38,11 @@ class GoogleDriveBackupClient {
         retainCount: Int = RETAIN_BACKUP_COUNT,
     ): DriveUploadResult {
         val folderId = findBackupFolder(accessToken) ?: createBackupFolder(accessToken)
-        val fileName = BackupFileNames.backupName(payloadVersion = payloadVersion, createdAt = createdAt)
+        val fileName = BackupFileNames.backupName(
+            payloadVersion = payloadVersion,
+            createdAt = createdAt,
+            source = source,
+        )
         val file = createBackupFile(
             accessToken = accessToken,
             folderId = folderId,
@@ -157,7 +161,13 @@ class GoogleDriveBackupClient {
             ?.toIntOrNull()
             ?: parsedName?.version
             ?: DayKitBackupService.PAYLOAD_VERSION
-        val source = DriveBackupSource.fromValue(appProperties?.optString("source"))
+        // appProperties is authoritative; the `-m`/`-a` name marker is the fallback for
+        // files whose metadata is missing (copied/re-uploaded outside the app).
+        val source = appProperties?.optString("source")
+            ?.takeIf(String::isNotBlank)
+            ?.let(DriveBackupSource::fromValue)
+            ?: parsedName?.source
+            ?: DriveBackupSource.Manual
         val sizeBytes = optString("size").toLongOrNull()
         return DriveBackupFile(
             id = id,
