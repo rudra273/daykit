@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
+import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.extendedColors
 
@@ -227,24 +228,33 @@ fun BetaTopBarTitle(title: String, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Back affordance: a 34dp circle centred in a 48dp touch target. The visual size stays
+ * compact so the header reads right; only the hit area grows to the Material minimum.
+ */
 @Composable
 fun AppBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FilledIconButton(
-        onClick = onClick,
-        modifier = modifier.size(34.dp),
-        shape = CircleShape,
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.extendedColors.inputField,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
+    Box(
+        modifier = modifier.size(MinTouchTarget),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            Icons.AutoMirrored.Rounded.ArrowBack,
-            contentDescription = "Back",
-            modifier = Modifier.size(18.dp),
-        )
+        FilledIconButton(
+            onClick = onClick,
+            modifier = Modifier.size(34.dp),
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.extendedColors.inputField,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }

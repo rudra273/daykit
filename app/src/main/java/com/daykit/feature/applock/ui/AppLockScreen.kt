@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +34,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,12 +54,12 @@ import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.applock.domain.InstalledApp
 import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
-import kotlinx.coroutines.launch
 
 private enum class AppLockTab {
     All,
@@ -74,7 +74,7 @@ fun AppLockScreen(
     onSelectionChanged: () -> Unit,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val errors = rememberErrorReporter()
     val haptics = LocalHapticFeedback.current
     var query by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
@@ -168,6 +168,7 @@ fun AppLockScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(errors.host) },
         topBar = {
             SearchAppTopBar(
                 title = "App Lock",
@@ -191,7 +192,12 @@ fun AppLockScreen(
             } else {
                 val onCheckedChange: (InstalledApp, Boolean) -> Unit = { app, checked ->
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    scope.launch {
+                    // A silent failure here would leave the switch showing "locked" for an
+                    // app that isn't — say so explicitly rather than implying protection.
+                    errors.launchGuarded(
+                        if (checked) "Couldn't lock ${app.label}. It is not protected."
+                        else "Couldn't unlock ${app.label}.",
+                    ) {
                         container.appLockRepository.setLocked(
                             packageName = app.packageName,
                             label = app.label,
@@ -363,7 +369,7 @@ fun AppLockScreen(
             onConfirm = { durationMillis ->
                 focusSheetApp = null
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                scope.launch {
+                errors.launchGuarded("Couldn't start the focus block for ${app.label}.") {
                     container.appLockRepository.startFocusBlock(
                         packageName = app.packageName,
                         label = app.label,

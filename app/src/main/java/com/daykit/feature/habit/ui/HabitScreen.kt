@@ -10,6 +10,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,13 +60,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +79,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -88,6 +93,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
+import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.extendedColors
@@ -101,6 +107,7 @@ import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.StatTile
@@ -110,7 +117,6 @@ import com.daykit.feature.habit.data.HabitGoalType
 import com.daykit.feature.habit.data.HabitKind
 import com.daykit.feature.habit.data.HabitLog
 import com.daykit.feature.habit.reminder.HabitReminderScheduler
-import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -147,7 +153,7 @@ fun HabitScreen(
     container: AppContainer,
     onBack: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    val errors = rememberErrorReporter()
     val context = LocalContext.current
     val scheduler = remember(context) { HabitReminderScheduler(context) }
     val dashboard by container.habitRepository
@@ -173,7 +179,10 @@ fun HabitScreen(
             initialKind = addKind,
             onDismiss = { addOpen = false },
             onSave = { draft ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't save that habit.",
+                    onFailure = { addOpen = false },
+                ) {
                     val habit = container.habitRepository.addHabit(
                         name = draft.name,
                         kind = draft.kind,
@@ -201,7 +210,10 @@ fun HabitScreen(
                     initialKind = habit.kind,
                     onDismiss = { editHabit = null },
                     onSave = { draft ->
-                        scope.launch {
+                        errors.launchGuarded(
+                            failureMessage = "Couldn't save your changes.",
+                            onFailure = { editHabit = null },
+                        ) {
                             container.habitRepository.updateHabit(
                                 habitId = habit.habitId,
                                 name = draft.name,
@@ -238,6 +250,7 @@ fun HabitScreen(
         }
 
         else -> HabitHome(
+            snackbarHostState = errors.host,
             dashboard = dashboard,
             selectedTab = selectedTab,
             onTabChange = { selectedTab = it },
@@ -285,7 +298,7 @@ fun HabitScreen(
                     val existing = dashboard?.logFor(habit.habitId, selectedDate)
                     val newChecked = !(existing?.completed ?: false)
                     val completed = isGoalComplete(habit, 0, 0, checked = newChecked)
-                    scope.launch {
+                    errors.launchGuarded("Couldn't update that habit.") {
                         container.habitRepository.saveDailyProgress(
                             habitId = habit.habitId,
                             date = selectedDate,
@@ -313,7 +326,10 @@ fun HabitScreen(
             onDismiss = { logHabit = null },
             onSave = { minutes, count, note ->
                 val completed = isGoalComplete(habit, minutes, count, checked = true)
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't save your progress.",
+                    onFailure = { logHabit = null },
+                ) {
                     container.habitRepository.saveDailyProgress(
                         habitId = habit.habitId,
                         date = selectedDate,
@@ -333,7 +349,10 @@ fun HabitScreen(
             habit = habit,
             onDismiss = { relapseHabit = null },
             onSave = { note ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't record that.",
+                    onFailure = { relapseHabit = null },
+                ) {
                     container.habitRepository.addRelapse(habit.habitId, LocalDate.now(), note)
                     relapseHabit = null
                 }
@@ -349,10 +368,10 @@ fun HabitScreen(
             confirmText = "Delete",
             destructiveConfirm = true,
             onConfirm = {
-                scope.launch {
+                deleteHabit = null
+                errors.launchGuarded("Couldn't delete that habit.") {
                     scheduler.cancel(habit.habitId)
                     container.habitRepository.deleteHabit(habit.habitId)
-                    deleteHabit = null
                 }
             },
         )
@@ -361,6 +380,7 @@ fun HabitScreen(
 
 @Composable
 private fun HabitHome(
+    snackbarHostState: SnackbarHostState,
     dashboard: HabitDashboard?,
     selectedTab: HabitTab,
     onTabChange: (HabitTab) -> Unit,
@@ -386,6 +406,7 @@ private fun HabitHome(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = { AppTopBar(title = "Habits", onBack = onBack) },
         floatingActionButton = {
             AppFab(
@@ -777,11 +798,21 @@ private fun HabitManageCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurface)
+            IconButton(onClick = onEdit, modifier = Modifier.size(MinTouchTarget)) {
+                Icon(
+                    Icons.Rounded.Edit,
+                    contentDescription = "Edit",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp),
+                )
             }
-            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = MaterialTheme.extendedColors.danger)
+            IconButton(onClick = onDelete, modifier = Modifier.size(MinTouchTarget)) {
+                Icon(
+                    Icons.Rounded.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.extendedColors.danger,
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
     }
@@ -1852,19 +1883,31 @@ private fun HabitEditorPage(
                             habitPalette.indices.chunked(5).forEach { row ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                                     row.forEach { index ->
+                                        // 36dp swatch centred in a 48dp touch target.
                                         Box(
                                             modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .then(
-                                                    if (colorIndex == index) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier
+                                                .size(MinTouchTarget)
+                                                .selectable(
+                                                    selected = colorIndex == index,
+                                                    onClick = { colorIndex = index },
+                                                    role = Role.RadioButton,
                                                 )
-                                                .background(habitColor(index))
-                                                .clickable { colorIndex = index },
+                                                .semantics { contentDescription = "Color ${index + 1}" },
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            if (colorIndex == index) {
-                                                Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .clip(CircleShape)
+                                                    .then(
+                                                        if (colorIndex == index) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier
+                                                    )
+                                                    .background(habitColor(index)),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                if (colorIndex == index) {
+                                                    Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                                }
                                             }
                                         }
                                     }
@@ -2076,7 +2119,11 @@ private fun Stepper(
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            StepperButton(icon = Icons.Rounded.Remove, onClick = { onValueChange(value - step) })
+            StepperButton(
+                icon = Icons.Rounded.Remove,
+                contentDescription = "Decrease",
+                onClick = { onValueChange(value - step) },
+            )
             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 BasicTextField(
                     value = text,
@@ -2106,7 +2153,11 @@ private fun Stepper(
                 )
                 Text(label, color = MaterialTheme.extendedColors.textMuted, style = MaterialTheme.typography.labelSmall)
             }
-            StepperButton(icon = Icons.Rounded.Add, onClick = { onValueChange(value + step) })
+            StepperButton(
+                icon = Icons.Rounded.Add,
+                contentDescription = "Increase",
+                onClick = { onValueChange(value + step) },
+            )
         }
         if (onGoal != null && goalLabel != null) {
             SecondaryButton(text = goalLabel, modifier = Modifier.fillMaxWidth(), onClick = onGoal)
@@ -2115,13 +2166,14 @@ private fun Stepper(
 }
 
 @Composable
-private fun StepperButton(icon: ImageVector, onClick: () -> Unit) {
+private fun StepperButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(48.dp)
+            .size(MinTouchTarget)
             .clip(CircleShape)
             .background(MaterialTheme.extendedColors.inputField)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick, role = Role.Button)
+            .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))

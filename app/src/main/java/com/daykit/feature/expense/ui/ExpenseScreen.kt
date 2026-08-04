@@ -48,6 +48,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -56,7 +57,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,6 +84,7 @@ import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
@@ -93,7 +94,7 @@ import com.daykit.feature.expense.data.ExpenseEntry
 import com.daykit.feature.expense.data.ExpenseEntryKind
 import com.daykit.feature.expense.data.ExpenseMonthSummary
 import com.daykit.feature.expense.data.MonthlyBill
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -124,7 +125,7 @@ fun ExpenseScreen(
     container: AppContainer,
     onBack: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    val errors = rememberErrorReporter()
     var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
     val monthKey = remember(selectedMonth) { selectedMonth.toString() }
     val summary by container.expenseRepository
@@ -157,7 +158,14 @@ fun ExpenseScreen(
     }
 
     LaunchedEffect(monthKey) {
-        container.expenseRepository.ensureMonth(monthKey)
+        try {
+            container.expenseRepository.ensureMonth(monthKey)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("DayKit", "ensureMonth failed for $monthKey", e)
+            errors.show("Couldn't load this month.")
+        }
     }
 
     val listState = rememberLazyListState()
@@ -165,6 +173,7 @@ fun ExpenseScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(errors.host) },
         topBar = {
             if (manageBillsOpen) {
                 AppTopBar(
@@ -257,7 +266,10 @@ fun ExpenseScreen(
             initialDate = LocalDate.now().toString(),
             onDismiss = { addDailyOpen = false },
             onSave = { title, category, amount, note, expenseDate ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't save that expense.",
+                    onFailure = { addDailyOpen = false },
+                ) {
                     container.expenseRepository.addDailyExpense(expenseDate, title, category, amount, note)
                     selectedMonth = YearMonth.from(LocalDate.parse(expenseDate))
                     addDailyOpen = false
@@ -276,7 +288,10 @@ fun ExpenseScreen(
             initialDate = entry.expenseDate,
             onDismiss = { editEntry = null },
             onSave = { title, category, amount, note, expenseDate ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't save your changes.",
+                    onFailure = { editEntry = null },
+                ) {
                     container.expenseRepository.updateEntry(entry.entryId, title, category, amount, note, expenseDate)
                     selectedMonth = YearMonth.from(LocalDate.parse(expenseDate))
                     editEntry = null
@@ -290,7 +305,10 @@ fun ExpenseScreen(
             currentLimit = summary?.limitMinor ?: 0L,
             onDismiss = { limitOpen = false },
             onSave = { amount ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't update the monthly limit.",
+                    onFailure = { limitOpen = false },
+                ) {
                     container.expenseRepository.setMonthlyLimit(monthKey, amount)
                     limitOpen = false
                 }
@@ -310,7 +328,10 @@ fun ExpenseScreen(
             showAmount = true,
             onDismiss = { addBillOpen = false },
             onSave = { title, category, amount, startMonth, endMonth, dueDay ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't add that bill.",
+                    onFailure = { addBillOpen = false },
+                ) {
                     container.expenseRepository.addMonthlyBill(title, category, amount, startMonth, endMonth, dueDay)
                     addBillOpen = false
                 }
@@ -330,7 +351,10 @@ fun ExpenseScreen(
             showAmount = false,
             onDismiss = { editBill = null },
             onSave = { title, category, _, startMonth, endMonth, dueDay ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't save that bill.",
+                    onFailure = { editBill = null },
+                ) {
                     container.expenseRepository.updateMonthlyBill(bill.billId, title, category, startMonth, endMonth, dueDay)
                     container.expenseRepository.ensureMonth(monthKey)
                     editBill = null
@@ -345,7 +369,10 @@ fun ExpenseScreen(
             defaultMonth = selectedMonth.plusMonths(1),
             onDismiss = { updateBillAmount = null },
             onSave = { effectiveMonth, amount ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't update that amount.",
+                    onFailure = { updateBillAmount = null },
+                ) {
                     container.expenseRepository.updateMonthlyBillAmount(bill.billId, effectiveMonth, amount)
                     container.expenseRepository.ensureMonth(monthKey)
                     updateBillAmount = null
@@ -377,9 +404,9 @@ fun ExpenseScreen(
             confirmText = "Delete",
             destructiveConfirm = true,
             onConfirm = {
-                scope.launch {
+                deleteEntry = null
+                errors.launchGuarded("Couldn't delete that expense.") {
                     container.expenseRepository.deleteEntry(entry.entryId)
-                    deleteEntry = null
                 }
             },
         )
@@ -393,10 +420,10 @@ fun ExpenseScreen(
             confirmText = "Stop",
             destructiveConfirm = true,
             onConfirm = {
-                scope.launch {
+                stopBill = null
+                errors.launchGuarded("Couldn't stop that bill.") {
                     container.expenseRepository.stopMonthlyBill(bill.billId)
                     container.expenseRepository.ensureMonth(monthKey)
-                    stopBill = null
                 }
             },
         )

@@ -72,6 +72,7 @@ import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SearchAppTopBar
+import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
@@ -102,6 +103,7 @@ fun KeyStoreScreen(
     var selectedLabel by remember { mutableStateOf<String?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val errors = rememberErrorReporter(snackbarHostState, scope)
 
     BackHandler {
         if (searchActive) {
@@ -253,9 +255,9 @@ fun KeyStoreScreen(
             confirmText = "Delete",
             destructiveConfirm = true,
             onConfirm = {
-                scope.launch {
+                confirmDeleteEntry = null
+                errors.launchGuarded("Couldn't delete that key.") {
                     container.keyStoreRepository.deleteEntry(entry.entryId)
-                    confirmDeleteEntry = null
                 }
             },
         )
@@ -267,7 +269,10 @@ fun KeyStoreScreen(
             entry = editing?.entry,
             onDismiss = { editorState = null },
             onSave = { name, label, value ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't save that key.",
+                    onFailure = { editorState = null },
+                ) {
                     if (editing != null) {
                         container.keyStoreRepository.updateEntry(
                             entryId = editing.entry.entryId,

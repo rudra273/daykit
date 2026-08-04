@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AccentIconTile
@@ -320,7 +321,7 @@ private fun ProviderCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = onCopy, modifier = Modifier.size(38.dp)) {
+            IconButton(onClick = onCopy, modifier = Modifier.size(MinTouchTarget)) {
                 Icon(
                     Icons.Rounded.ContentCopy,
                     contentDescription = "Copy ${provider.hostname}",

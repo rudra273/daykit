@@ -75,6 +75,7 @@ import com.daykit.core.backup.DriveBackupSchedule
 import com.daykit.core.backup.DriveBackupSource
 import com.daykit.core.backup.DayKitBackupService
 import com.daykit.core.data.SecureSettingRepository
+import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
@@ -1347,7 +1348,7 @@ private fun BackupPasswordField(
         isError = isError,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
-            IconButton(onClick = { visible = !visible }, modifier = Modifier.size(34.dp)) {
+            IconButton(onClick = { visible = !visible }, modifier = Modifier.size(MinTouchTarget)) {
                 Icon(
                     if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                     contentDescription = if (visible) "Hide" else "Show",

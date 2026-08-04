@@ -39,6 +39,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -76,6 +77,7 @@ import com.daykit.core.designsystem.components.DestructiveButton
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.reminder.data.Reminder
@@ -97,6 +99,7 @@ fun ReminderScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val errors = rememberErrorReporter(scope)
     val scheduler = remember(context) { ReminderScheduler(context) }
     val reminders by container.reminderRepository
         .observeReminders()
@@ -109,7 +112,7 @@ fun ReminderScreen(
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
     fun complete(reminder: Reminder) {
-        scope.launch {
+        errors.launchGuarded("Couldn't complete that reminder.") {
             container.reminderRepository.markComplete(reminder.reminderId)
             scheduler.cancel(reminder.reminderId)
             NotificationManagerCompat.from(context).cancel(ReminderNotifier.notificationId(reminder.reminderId))
@@ -119,6 +122,7 @@ fun ReminderScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { AppTopBar(title = "Reminders", onBack = onBack) },
+        snackbarHost = { SnackbarHost(errors.host) },
         floatingActionButton = {
             AppFab(icon = Icons.Rounded.Add, contentDescription = "Add reminder", onClick = { addOpen = true })
         },
@@ -143,7 +147,10 @@ fun ReminderScreen(
             initial = null,
             onDismiss = { addOpen = false },
             onSave = { title, scheduledAtMillis ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't save that reminder.",
+                    onFailure = { addOpen = false },
+                ) {
                     val reminder = container.reminderRepository.addReminder(title, scheduledAtMillis)
                     scheduler.schedule(reminder)
                     requestNotificationPermissionIfNeeded(context as? Activity)
@@ -160,7 +167,10 @@ fun ReminderScreen(
             initial = editing,
             onDismiss = { editReminder = null },
             onSave = { title, scheduledAtMillis ->
-                scope.launch {
+                errors.launchGuarded(
+                    failureMessage = "Couldn't save your changes.",
+                    onFailure = { editReminder = null },
+                ) {
                     val updated = container.reminderRepository
                         .updateReminder(editing.reminderId, title, scheduledAtMillis)
                     if (updated != null) {
@@ -200,7 +210,7 @@ fun ReminderScreen(
             destructiveConfirm = true,
             onConfirm = {
                 deleteReminder = null
-                scope.launch {
+                errors.launchGuarded("Couldn't delete that reminder.") {
                     container.reminderRepository.deleteReminder(reminder.reminderId)
                     scheduler.cancel(reminder.reminderId)
                     NotificationManagerCompat.from(context).cancel(ReminderNotifier.notificationId(reminder.reminderId))

@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,7 +57,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,10 +82,11 @@ import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.SearchAppTopBar
+import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.notes.data.SecureNote
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 
 private sealed interface NoteEditorState {
@@ -99,7 +100,7 @@ fun SecureNotesScreen(
     onBack: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
+    val errors = rememberErrorReporter()
     var editorState by remember { mutableStateOf<NoteEditorState?>(null) }
     var actionNote by remember { mutableStateOf<SecureNote?>(null) }
     var confirmDeleteNote by remember { mutableStateOf<SecureNote?>(null) }
@@ -160,6 +161,7 @@ fun SecureNotesScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(errors.host) },
         topBar = {
             SearchAppTopBar(
                 title = "Notes",
@@ -286,9 +288,9 @@ fun SecureNotesScreen(
             confirmText = "Delete",
             destructiveConfirm = true,
             onConfirm = {
-                scope.launch {
+                confirmDeleteNote = null
+                errors.launchGuarded("Couldn't delete that note.") {
                     container.secureNoteRepository.deleteNote(note.noteId)
-                    confirmDeleteNote = null
                 }
             },
         )
@@ -424,7 +426,7 @@ private fun NoteEditorPage(
     onClose: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
+    val errors = rememberErrorReporter()
     val editingNote = (state as? NoteEditorState.Edit)?.note
     var title by remember(editingNote?.noteId) { mutableStateOf(editingNote?.title.orEmpty()) }
     var content by remember(editingNote?.noteId) { mutableStateOf(editingNote?.content.orEmpty()) }
@@ -440,8 +442,15 @@ private fun NoteEditorPage(
     }
 
     LaunchedEffect(editingNote?.noteId) {
-        val id = editingNote?.noteId
-        if (id != null) images = repository.getImages(id)
+        val id = editingNote?.noteId ?: return@LaunchedEffect
+        try {
+            images = repository.getImages(id)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("DayKit", "Loading note images failed", e)
+            errors.show("Couldn't load this note's images.")
+        }
     }
 
     val cleanTitleFor = { title.ifBlank { "Untitled" } }
@@ -463,7 +472,7 @@ private fun NoteEditorPage(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri != null) {
-            scope.launch {
+            errors.launchGuarded("Couldn't attach that image.") {
                 val bytes = withContext(Dispatchers.IO) { decodeImageBytes(context, uri) }
                 if (bytes != null) {
                     val noteId = ensureNoteId()
@@ -475,7 +484,9 @@ private fun NoteEditorPage(
     }
 
     fun finish() {
-        scope.launch {
+        // On failure the editor deliberately stays open with the text intact — closing
+        // here would silently discard whatever the user just wrote.
+        errors.launchGuarded("Couldn't save this note. Your text is still here.") {
             val existing = persistedNoteId
             if (existing != null) {
                 // Note already persisted (e.g. images attached) — update text/labels.
@@ -493,6 +504,7 @@ private fun NoteEditorPage(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(errors.host) },
         topBar = {
             AppTopBar(
                 title = "",
@@ -576,7 +588,7 @@ private fun NoteEditorPage(
                             EditorImageThumbnail(
                                 image = image,
                                 onDelete = {
-                                    scope.launch {
+                                    errors.launchGuarded("Couldn't remove that image.") {
                                         repository.deleteImage(image.imageId)
                                         persistedNoteId?.let { images = repository.getImages(it) }
                                     }

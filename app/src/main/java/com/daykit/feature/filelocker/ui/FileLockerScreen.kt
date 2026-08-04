@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppAlertDialog
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppExtendedFab
 import com.daykit.core.designsystem.components.AppTopBar
@@ -86,6 +87,7 @@ import com.daykit.core.designsystem.components.BetaTopBarTitle
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.StatTile
+import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.filelocker.data.VaultFile
 import com.daykit.feature.filelocker.data.VaultFileRepository
@@ -103,9 +105,12 @@ fun FileLockerScreen(
     val scope = rememberCoroutineScope()
     val repository = container.vaultFileRepository
     val snackbarHostState = remember { SnackbarHostState() }
+    val errors = rememberErrorReporter(snackbarHostState, scope)
     val selectedIds = remember { mutableStateListOf<String>() }
     var working by remember { mutableStateOf(false) }
     var previewItem by remember { mutableStateOf<FileLockerPreviewItem?>(null) }
+    // Non-null while the delete confirm is showing; holds the count being deleted.
+    var confirmDeleteCount by remember { mutableStateOf<Int?>(null) }
 
     val files by repository.observeFiles().collectAsStateWithLifecycle(initialValue = emptyList())
     val selectionMode = selectedIds.isNotEmpty()
@@ -136,7 +141,11 @@ fun FileLockerScreen(
         }
         val selected = files.filter { selectedIds.contains(it.fileId) }
         if (selected.isEmpty()) return@rememberLauncherForActivityResult
-        scope.launch {
+        errors.launchGuarded(
+            failureMessage = "Export failed. The files are still in the vault.",
+            // Always clear the spinner — leaving it set would freeze the action bar.
+            onFailure = { working = false },
+        ) {
             working = true
             val exported = withContext(Dispatchers.IO) {
                 exportFiles(context, repository, selected, destinationUri)
@@ -149,7 +158,10 @@ fun FileLockerScreen(
 
     fun importUris(uris: List<Uri>) {
         if (uris.isEmpty()) return
-        scope.launch {
+        errors.launchGuarded(
+            failureMessage = "Import failed. Nothing was added to the vault.",
+            onFailure = { working = false },
+        ) {
             working = true
             var imported = 0
             var failed = 0
@@ -207,7 +219,10 @@ fun FileLockerScreen(
                     },
                     onRestore = {
                         val toRestore = selectedIds.toList()
-                        scope.launch {
+                        errors.launchGuarded(
+                            failureMessage = "Unlock failed. The files are still in the vault.",
+                            onFailure = { working = false },
+                        ) {
                             working = true
                             var restored = 0
                             withContext(Dispatchers.IO) {
@@ -226,18 +241,7 @@ fun FileLockerScreen(
                             )
                         }
                     },
-                    onDelete = {
-                        val toDelete = selectedIds.toList()
-                        scope.launch {
-                            working = true
-                            withContext(Dispatchers.IO) {
-                                toDelete.forEach { repository.delete(it) }
-                            }
-                            selectedIds.clear()
-                            working = false
-                            snack("${toDelete.size} file(s) deleted from the vault.")
-                        }
-                    },
+                    onDelete = { confirmDeleteCount = selectedIds.size },
                     actionsEnabled = !working,
                 )
             } else {
@@ -353,6 +357,37 @@ fun FileLockerScreen(
                 )
             }
         }
+    }
+
+    // Vault deletes are permanent: the plaintext original was removed from Gallery on
+    // import, and vault files are excluded from backup unless the user opted in.
+    confirmDeleteCount?.let { count ->
+        AppAlertDialog(
+            onDismissRequest = { confirmDeleteCount = null },
+            title = if (count == 1) "Delete this file?" else "Delete $count files?",
+            text = "This permanently erases the encrypted " +
+                (if (count == 1) "copy" else "copies") +
+                " from the vault. It cannot be undone. " +
+                "To keep a copy elsewhere, cancel and use Unlock or Export instead.",
+            confirmText = "Delete",
+            destructiveConfirm = true,
+            onConfirm = {
+                val toDelete = selectedIds.toList()
+                confirmDeleteCount = null
+                errors.launchGuarded(
+                    failureMessage = "Delete failed. Some files may still be in the vault.",
+                    onFailure = { working = false },
+                ) {
+                    working = true
+                    withContext(Dispatchers.IO) {
+                        toDelete.forEach { repository.delete(it) }
+                    }
+                    selectedIds.clear()
+                    working = false
+                    snack("${toDelete.size} file(s) deleted from the vault.")
+                }
+            },
+        )
     }
 }
 
