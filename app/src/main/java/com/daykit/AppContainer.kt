@@ -19,6 +19,7 @@ import com.daykit.core.security.SensitiveKeyManager
 import com.daykit.core.security.SensitiveValueCipher
 import com.daykit.core.security.SessionValueCipher
 import com.daykit.feature.applock.data.AppLockRepository
+import com.daykit.feature.focus.data.FocusBackupContributor
 import com.daykit.feature.focus.data.FocusBlockStore
 import com.daykit.feature.focus.data.FocusRepository
 import com.daykit.feature.applock.data.LockedPackageCache
@@ -142,6 +143,7 @@ class AppContainer(context: Context) {
                 SecureNoteBackupContributor(secureNoteRepository),
                 HabitBackupContributor(habitRepository),
                 VaultBackupContributor(vaultFileRepository),
+                FocusBackupContributor(focusBlockStore),
             ),
         )
     }

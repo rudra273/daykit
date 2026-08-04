@@ -863,6 +863,7 @@ private fun toolDisplayName(toolKey: String): String = when (toolKey) {
     BackupToolKeys.EXPENSES -> "Expenses"
     BackupToolKeys.HABITS -> "Habits"
     BackupToolKeys.VAULT -> "File Vault"
+    BackupToolKeys.FOCUS -> "Focus"
     else -> toolKey
 }
 

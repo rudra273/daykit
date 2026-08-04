@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.daykit.AppContainer
 import com.daykit.feature.applock.ui.AppLockScreen
+import com.daykit.feature.focus.ui.FocusScreen
 import com.daykit.feature.dns.ui.DnsManagerScreen
 import com.daykit.feature.editor.ui.EditorScreen
 import com.daykit.feature.eventlight.ui.EventLightScreen
@@ -85,6 +86,13 @@ fun DayKitNavHost(
         composable(Routes.TOOL_KEYSTORE) { KeyStoreScreen(container = container, onBack = back) }
         composable(Routes.TOOL_NOTES) { SecureNotesScreen(container = container, onBack = back) }
         composable(Routes.TOOL_FILEVAULT) { FileLockerScreen(container = container, onBack = back) }
+        composable(Routes.TOOL_FOCUS) {
+            FocusScreen(
+                container = container,
+                onBack = back,
+                onMonitorNeeded = onAppLockSelectionChanged,
+            )
+        }
         composable(Routes.TOOL_HABITS) { HabitScreen(container = container, onBack = back) }
         composable(Routes.TOOL_REMINDERS) { ReminderScreen(container = container, onBack = back) }
         composable(Routes.TOOL_EXPENSES) { ExpenseScreen(container = container, onBack = back) }

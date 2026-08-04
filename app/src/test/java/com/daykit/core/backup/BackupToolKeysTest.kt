@@ -7,16 +7,20 @@ import org.junit.Test
 
 class BackupToolKeysTest {
     @Test
-    fun keyStoreAndNotesAreAlwaysIncluded() {
-        // Even with every optional toggle off, the two tools the user cannot
-        // reconstruct are present.
+    fun unconditionalToolsAreAlwaysIncluded() {
+        // Even with every optional toggle off, the tools the user cannot
+        // reconstruct are present. Focus blocks join them because losing one on
+        // restore hands back an app the user locked themselves out of on purpose.
         val keys = includedBackupToolKeys(
             includeExpenses = false,
             includeHabits = false,
             includeVault = false,
         )
 
-        assertEquals(setOf(BackupToolKeys.KEY_STORE, BackupToolKeys.NOTES), keys)
+        assertEquals(
+            setOf(BackupToolKeys.KEY_STORE, BackupToolKeys.NOTES, BackupToolKeys.FOCUS),
+            keys,
+        )
     }
 
     @Test
@@ -50,6 +54,7 @@ class BackupToolKeysTest {
             setOf(
                 BackupToolKeys.KEY_STORE,
                 BackupToolKeys.NOTES,
+                BackupToolKeys.FOCUS,
                 BackupToolKeys.VAULT,
                 BackupToolKeys.EXPENSES,
                 BackupToolKeys.HABITS,

@@ -1,23 +1,18 @@
 package com.daykit.feature.applock.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.SearchOff
@@ -37,19 +32,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
-import com.daykit.core.designsystem.asAccentContainer
+import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
@@ -419,19 +408,6 @@ private fun AppLockAppRow(
     onCheckedChange: (Boolean) -> Unit,
     onStartFocus: () -> Unit,
 ) {
-    val accents = MaterialTheme.extendedColors.accents
-    val palette = listOf(
-        accents.blue,
-        accents.teal,
-        accents.green,
-        accents.red,
-        accents.orange,
-        accents.yellow,
-        accents.purple,
-        accents.pink,
-        accents.indigo,
-    )
-    val accent = palette[(Math.floorMod(app.packageName.hashCode(), palette.size))]
     val focusActive = focusRemainingMillis != null
     val supporting = when {
         lockDisabled -> "Protected by Samsung"
@@ -442,11 +418,11 @@ private fun AppLockAppRow(
         headline = app.label,
         supporting = supporting,
         leading = {
-            if (app.icon != null) {
-                AppIconTile(icon = app.icon)
-            } else {
-                AppMonogramTile(letter = app.label.firstOrNull()?.uppercase() ?: "#", accent = accent)
-            }
+            AppIconOrMonogram(
+                icon = app.icon,
+                label = app.label,
+                packageName = app.packageName,
+            )
         },
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -475,39 +451,6 @@ private fun AppLockAppRow(
             }
         },
     )
-}
-
-@Composable
-private fun AppIconTile(icon: android.graphics.drawable.Drawable) {
-    val bitmap = remember(icon) { icon.toBitmap(width = 96, height = 96).asImageBitmap() }
-    Image(
-        bitmap = bitmap,
-        contentDescription = null,
-        modifier = Modifier
-            .size(36.dp)
-            .clip(RoundedCornerShape(10.dp)),
-    )
-}
-
-@Composable
-private fun AppMonogramTile(letter: String, accent: androidx.compose.ui.graphics.Color) {
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .background(
-                color = accent.asAccentContainer(),
-                shape = RoundedCornerShape(10.dp),
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = letter,
-            color = accent,
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-        )
-    }
 }
 
 @Composable

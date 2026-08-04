@@ -52,6 +52,28 @@ class FocusBlockStore(context: Context) {
         writeAll(updated)
     }
 
+    /**
+     * Merges [blocks] into the store, keeping the later expiry when a package is
+     * present in both. Used by backup import; expired entries are dropped rather
+     * than resurrected, so restoring an old backup can't re-block an app whose
+     * timer already ran out.
+     */
+    fun mergeBlocks(blocks: List<FocusBlock>, nowMillis: Long = System.currentTimeMillis()) {
+        val incoming = blocks.filter { it.lockUntilMillis > nowMillis }
+        if (incoming.isEmpty()) return
+        val byPackage = readAll()
+            .filter { it.lockUntilMillis > nowMillis }
+            .associateBy { it.packageName }
+            .toMutableMap()
+        incoming.forEach { block ->
+            val existing = byPackage[block.packageName]
+            if (existing == null || block.lockUntilMillis > existing.lockUntilMillis) {
+                byPackage[block.packageName] = block
+            }
+        }
+        writeAll(byPackage.values.toList())
+    }
+
     private fun readAll(): List<FocusBlock> {
         val raw = prefs.getString(KEY_BLOCKS, null) ?: return emptyList()
         return runCatching {

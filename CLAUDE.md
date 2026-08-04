@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-DayKit (`com.daykit`) — a single-module Android app: a local-first "kit" of privacy tools (App Lock, Key Store, Secure Notes, File Vault, Habits, Reminders, Expenses, Editor, DNS, Event Light). 100% Kotlin + Jetpack Compose, minSdk 31 / targetSdk 36. The only network use is user-initiated Google Drive backup of already-encrypted blobs.
+DayKit (`com.daykit`) — a single-module Android app: a local-first "kit" of privacy tools (App Lock, Key Store, Secure Notes, File Vault, Focus, Habits, Reminders, Expenses, Editor, DNS, Event Light). 100% Kotlin + Jetpack Compose, minSdk 31 / targetSdk 36. The only network use is user-initiated Google Drive backup of already-encrypted blobs.
 
 ## Build & test
 
@@ -70,6 +70,8 @@ Key invariants:
 Room + KSP, database version **11**, `exportSchema = false`. Every schema change needs a hand-written `Migration` added to the list in [DayKitDatabase.create](app/src/main/java/com/daykit/core/data/DayKitDatabase.kt) — there is no destructive fallback, so a missing migration crashes on upgrade. Note the existing downgrade migration `MIGRATION_7_6`.
 
 Non-secret plumbing lives in plain SharedPreferences mirrors so startup never blocks on Keystore + SQLCipher: `SettingFlagCache` (boolean settings), `LockedPackageCache` (locked package list, read by the monitor service), `FocusBlockStore`. The encrypted DB stays the source of truth; these are caches that must be refreshed on every write.
+
+`FocusBlockStore` is the exception: it is not a cache of anything, it *is* the source of truth for focus blocks (plain prefs so `AppMonitorService` can read it before the DB is unlocked). It lives in `feature/focus/` behind `FocusRepository`, deliberately independent of App Lock's locked-package set — a block can exist on an app that was never PIN-locked, and `AppMonitorService` checks it ahead of the PIN gate. A focus block must never be openable by PIN or biometric; three separate guards enforce that (the `shouldLock` OR in `AppMonitorService`, the grant skip in `LockActivity`, and the `isFocusBlocked` lambda in `LockOverlayController`) — keep all three.
 
 All settings keys are `const val KEY_*` on `SecureSettingRepository.Companion` — add new ones there, not as loose strings.
 

@@ -43,7 +43,13 @@ class FocusRepository(
                 // write restarts this block, rather than waking on a timer for
                 // as long as the collector lives.
                 val nextExpiry = active.minOfOrNull { it.lockUntilMillis } ?: break
-                delay((nextExpiry - now).coerceAtLeast(1L))
+                // Capped because delay() counts elapsed real time while
+                // lockUntilMillis is wall-clock: a clock change or a long doze
+                // would otherwise leave us sleeping past (or short of) the real
+                // expiry. Re-reading at least this often makes the wait
+                // self-correcting, and the store prunes on read anyway.
+                val wait = (nextExpiry - now).coerceIn(1L, MAX_EXPIRY_WAIT_MILLIS)
+                delay(wait)
             }
         }
     }
@@ -72,5 +78,10 @@ class FocusRepository(
     fun refreshFocusBlocks() {
         focusBlockStore.getActiveBlocks()
         revision.value += 1
+    }
+
+    private companion object {
+        /** Longest a collector will sleep before re-checking expiry. */
+        const val MAX_EXPIRY_WAIT_MILLIS = 60_000L
     }
 }
