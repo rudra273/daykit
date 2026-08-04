@@ -1,12 +1,28 @@
 package com.daykit.core.backup
 
-enum class DriveBackupSource(val value: String, val label: String) {
-    Manual("manual", "Manual"),
-    Automatic("automatic", "Automatic");
+/**
+ * How a backup was triggered. [nameMarker] is the single letter appended to the file
+ * name (see [BackupFileNames]) so the source survives even without `appProperties`.
+ */
+enum class DriveBackupSource(val value: String, val label: String, val nameMarker: String) {
+    Manual("manual", "Manual", "m"),
+
+    /**
+     * A scheduled backup. Runs in the foreground on unlock (see [DriveBackupRunner]),
+     * never in the background — so it holds the PIN-derived key and is just as
+     * complete as a [Manual] one.
+     */
+    Automatic("automatic", "Automatic", "a");
 
     companion object {
         fun fromValue(value: String?): DriveBackupSource {
             return entries.firstOrNull { it.value == value } ?: Manual
+        }
+
+        /** Null for a blank/unknown marker, so callers can fall back to metadata. */
+        fun fromNameMarker(marker: String?): DriveBackupSource? {
+            if (marker.isNullOrBlank()) return null
+            return entries.firstOrNull { it.nameMarker == marker }
         }
     }
 }
@@ -45,19 +61,18 @@ object DriveBackupRetention {
     /**
      * Selects the backups to delete, keeping the newest [retainCount].
      *
-     * The most recent Manual backup is always protected, even if it falls
-     * outside the retain window: automatic backups never contain the sensitive
-     * tools (vault, key store, secure notes) because the background worker has
-     * no PIN-derived key, so a Manual backup is the only Drive copy of that
-     * data. Rotating it away would silently destroy the only cloud backup of it.
+     * Every backup is created with the PIN-derived key available — manual ones from
+     * the button, automatic ones from [DriveBackupRunner] on unlock — so they all
+     * contain the same tools and none needs protecting from rotation. (An earlier
+     * background worker produced partial backups and did need that special case.)
      */
     fun backupsToDelete(backups: List<DriveBackupFile>, retainCount: Int): List<DriveBackupFile> {
         if (retainCount <= 0) return backups
-        val ordered = backups.sortedWith(
-            compareByDescending<DriveBackupFile> { it.createdAtMillis }
-                .thenByDescending { it.name },
-        )
-        val newestManual = ordered.firstOrNull { it.source == DriveBackupSource.Manual }
-        return ordered.drop(retainCount).filter { it.id != newestManual?.id }
+        return backups
+            .sortedWith(
+                compareByDescending<DriveBackupFile> { it.createdAtMillis }
+                    .thenByDescending { it.name },
+            )
+            .drop(retainCount)
     }
 }

@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.daykit.core.backup.BackupCrypto
-import com.daykit.core.backup.DriveBackupScheduler
+import com.daykit.core.backup.DriveBackupRunner
 import com.daykit.core.backup.DayKitBackupService
 import com.daykit.core.backup.GoogleDriveBackupClient
 import com.daykit.core.data.DatabasePassphraseProvider
@@ -19,7 +19,9 @@ import com.daykit.core.security.SensitiveKeyManager
 import com.daykit.core.security.SensitiveValueCipher
 import com.daykit.core.security.SessionValueCipher
 import com.daykit.feature.applock.data.AppLockRepository
-import com.daykit.feature.applock.data.FocusBlockStore
+import com.daykit.feature.focus.data.FocusBackupContributor
+import com.daykit.feature.focus.data.FocusBlockStore
+import com.daykit.feature.focus.data.FocusRepository
 import com.daykit.feature.applock.data.LockedPackageCache
 import com.daykit.feature.applock.domain.InstalledAppProvider
 import com.daykit.feature.expense.data.ExpenseBackupContributor
@@ -96,7 +98,11 @@ class AppContainer(context: Context) {
     }
 
     val appLockRepository: AppLockRepository by lazy {
-        AppLockRepository(lockedPackageCache, focusBlockStore)
+        AppLockRepository(lockedPackageCache)
+    }
+
+    val focusRepository: FocusRepository by lazy {
+        FocusRepository(focusBlockStore)
     }
 
     val keyStoreRepository: KeyStoreRepository by lazy {
@@ -137,6 +143,7 @@ class AppContainer(context: Context) {
                 SecureNoteBackupContributor(secureNoteRepository),
                 HabitBackupContributor(habitRepository),
                 VaultBackupContributor(vaultFileRepository),
+                FocusBackupContributor(focusBlockStore),
             ),
         )
     }
@@ -145,8 +152,22 @@ class AppContainer(context: Context) {
         GoogleDriveBackupClient()
     }
 
-    val driveBackupScheduler: DriveBackupScheduler by lazy {
-        DriveBackupScheduler(appContext)
+    /**
+     * The automatic Drive backup. Runs on unlock, in the foreground, where the
+     * PIN-derived MSK exists — the only place Key Store and Secure Notes can
+     * actually be exported. There is deliberately no background worker.
+     *
+     * It carries its own process-lifetime scope so an in-flight upload is not
+     * cancelled when the unlock gate recomposes or the activity goes away.
+     */
+    val driveBackupRunner: DriveBackupRunner by lazy {
+        DriveBackupRunner(
+            context = appContext,
+            settings = secureSettingRepository,
+            backupService = backupService,
+            sensitiveKeyManager = sensitiveKeyManager,
+            driveClient = googleDriveBackupClient,
+        )
     }
 
     val installedAppProvider = InstalledAppProvider(appContext)

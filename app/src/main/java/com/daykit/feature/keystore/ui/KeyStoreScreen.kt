@@ -66,7 +66,6 @@ import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
 import com.daykit.core.designsystem.components.AppTextField
-import com.daykit.core.designsystem.components.BetaTopBarTitle
 import com.daykit.core.designsystem.components.DestructiveButton
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
@@ -149,7 +148,6 @@ fun KeyStoreScreen(
                 onSearchActiveChange = { searchActive = it; if (!it) query = "" },
                 onBack = onBack,
                 searchPlaceholder = "Search name or label",
-                titleContent = { BetaTopBarTitle("Key Store") },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },

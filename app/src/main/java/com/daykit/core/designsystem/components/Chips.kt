@@ -18,28 +18,6 @@ import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.extendedColors
 
 /**
- * Small "BETA" pill, tinted with the theme primary. Marks a tool whose data format
- * or behaviour may still change, so users know to keep their own backups.
- */
-@Composable
-fun BetaBadge(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .padding(horizontal = 7.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "BETA",
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-        )
-    }
-}
-
-/**
  * Pill filter chip. Selected = primaryContainer fill + primary text.
  * Unselected = inputField fill + onSurface. Matches the old GlassFilterButton signature.
  */

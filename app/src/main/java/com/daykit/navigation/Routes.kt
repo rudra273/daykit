@@ -16,6 +16,7 @@ object Routes {
     const val TOOL_KEYSTORE = "tool/keystore"
     const val TOOL_NOTES = "tool/notes"
     const val TOOL_FILEVAULT = "tool/filevault"
+    const val TOOL_FOCUS = "tool/focus"
     const val TOOL_HABITS = "tool/habits"
     const val TOOL_REMINDERS = "tool/reminders"
     const val TOOL_EXPENSES = "tool/expenses"

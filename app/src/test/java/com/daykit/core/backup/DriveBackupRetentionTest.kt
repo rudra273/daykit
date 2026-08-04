@@ -29,37 +29,43 @@ class DriveBackupRetentionTest {
     }
 
     @Test
-    fun backupsToDelete_protectsNewestManualBackupOutsideRetainWindow() {
-        // The one manual backup is the oldest, so it would normally be pruned.
-        // Automatic backups can't contain the sensitive tools, so it must survive.
+    fun backupsToDelete_keepsEverythingWhenUnderRetainCount() {
+        val backups = listOf(backup("one", 1_000L), backup("two", 2_000L))
+
+        val delete = DriveBackupRetention.backupsToDelete(backups, retainCount = 3)
+
+        assertEquals(emptyList<String>(), delete.map { it.id })
+    }
+
+    @Test
+    fun backupsToDelete_treatsManualAndAutomaticAlike() {
+        // Both kinds run with the PIN-derived key available, so both contain the same
+        // tools and neither is protected from rotation — purely newest-N by date.
         val backups = listOf(
             backup("auto_newest", 5_000L, DriveBackupSource.Automatic),
             backup("auto_2", 4_000L, DriveBackupSource.Automatic),
             backup("auto_3", 3_000L, DriveBackupSource.Automatic),
-            backup("auto_4", 2_000L, DriveBackupSource.Automatic),
+            backup("manual_older", 2_000L, DriveBackupSource.Manual),
             backup("manual_oldest", 1_000L, DriveBackupSource.Manual),
         )
 
         val delete = DriveBackupRetention.backupsToDelete(backups, retainCount = 3)
 
-        // auto_4 falls outside the window and is deleted; the manual one is kept.
-        assertEquals(listOf("auto_4"), delete.map { it.id })
+        assertEquals(listOf("manual_older", "manual_oldest"), delete.map { it.id })
     }
 
     @Test
-    fun backupsToDelete_onlyMostRecentManualIsProtected() {
-        // Two manual backups both outside the window: only the newest is spared.
+    fun backupsToDelete_breaksTiesOnNameSoOrderIsDeterministic() {
+        // Two backups with the same timestamp must not rotate arbitrarily between runs.
         val backups = listOf(
-            backup("auto_newest", 5_000L, DriveBackupSource.Automatic),
-            backup("auto_2", 4_000L, DriveBackupSource.Automatic),
-            backup("auto_3", 3_000L, DriveBackupSource.Automatic),
-            backup("manual_newer", 2_000L, DriveBackupSource.Manual),
-            backup("manual_older", 1_000L, DriveBackupSource.Manual),
+            backup("b", 1_000L),
+            backup("a", 1_000L),
+            backup("c", 1_000L),
         )
 
-        val delete = DriveBackupRetention.backupsToDelete(backups, retainCount = 3)
+        val delete = DriveBackupRetention.backupsToDelete(backups, retainCount = 2)
 
-        assertEquals(listOf("manual_older"), delete.map { it.id })
+        assertEquals(listOf("a"), delete.map { it.id })
     }
 
     private fun backup(

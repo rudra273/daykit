@@ -306,6 +306,19 @@ private fun DayKitApp(
         }
     }
 
+    // The automatic Drive backup is triggered here — on unlock — and nowhere else. Key
+    // Store and Secure Notes are encrypted with the PIN-derived MSK, which only exists
+    // while unlocked, so there is no background equivalent. launchIfDue() is a cheap
+    // no-op unless the Daily/Weekly interval has actually elapsed.
+    //
+    // It runs on the runner's own process-lifetime scope, NOT this coroutine: the MSK
+    // is wiped ~2s after backgrounding, which flips `sensitiveUnlocked` and would
+    // cancel a composition-scoped upload mid-write, leaving a truncated file in Drive
+    // that still counts as a backup for retention purposes.
+    LaunchedEffect(sensitiveUnlocked) {
+        if (sensitiveUnlocked) container.driveBackupRunner.launchIfDue()
+    }
+
     when {
         !credentialReady -> SetupCredentialScreen(
             onCredentialReady = { pin ->

@@ -1,4 +1,4 @@
-package com.daykit.feature.applock.data
+package com.daykit.feature.focus.data
 
 import android.content.Context
 import androidx.core.content.edit
@@ -11,9 +11,9 @@ import org.json.JSONObject
  * expire first. Stored in SharedPreferences (not the in-memory session manager)
  * so a block survives process death, screen-off session resets, and reboot.
  *
- * Deliberately separate from [LockedPackageCache]: a focus block is independent
- * of whether an app is PIN-locked, so a timer can exist on an app the user has
- * not added to the regular locked set.
+ * Deliberately separate from App Lock's `LockedPackageCache`: a focus block is
+ * independent of whether an app is PIN-locked, so a timer can exist on an app
+ * the user has not added to the regular locked set.
  */
 class FocusBlockStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -52,6 +52,28 @@ class FocusBlockStore(context: Context) {
         writeAll(updated)
     }
 
+    /**
+     * Merges [blocks] into the store, keeping the later expiry when a package is
+     * present in both. Used by backup import; expired entries are dropped rather
+     * than resurrected, so restoring an old backup can't re-block an app whose
+     * timer already ran out.
+     */
+    fun mergeBlocks(blocks: List<FocusBlock>, nowMillis: Long = System.currentTimeMillis()) {
+        val incoming = blocks.filter { it.lockUntilMillis > nowMillis }
+        if (incoming.isEmpty()) return
+        val byPackage = readAll()
+            .filter { it.lockUntilMillis > nowMillis }
+            .associateBy { it.packageName }
+            .toMutableMap()
+        incoming.forEach { block ->
+            val existing = byPackage[block.packageName]
+            if (existing == null || block.lockUntilMillis > existing.lockUntilMillis) {
+                byPackage[block.packageName] = block
+            }
+        }
+        writeAll(byPackage.values.toList())
+    }
+
     private fun readAll(): List<FocusBlock> {
         val raw = prefs.getString(KEY_BLOCKS, null) ?: return emptyList()
         return runCatching {
@@ -86,7 +108,8 @@ class FocusBlockStore(context: Context) {
 
     /**
      * Drops every focus block. Committed synchronously for the same reason as
-     * [LockedPackageCache.clear] — the monitor service reads this directly.
+     * App Lock's `LockedPackageCache.clear` — the monitor service reads this
+     * directly.
      */
     fun clear() {
         prefs.edit(commit = true) { clear() }

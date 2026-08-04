@@ -53,6 +53,7 @@ import com.daykit.core.designsystem.components.FrostedLockBackground
 import com.daykit.core.security.BiometricAuthenticator
 import com.daykit.core.security.errorMessageOrNull
 import com.daykit.core.session.AppLockSessionManager
+import com.daykit.feature.focus.ui.formatFocusRemaining
 import com.daykit.feature.lock.ui.LockChallengeContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -94,7 +95,7 @@ class LockActivity : FragmentActivity() {
                         onUnlocked = {
                             // Belt-and-suspenders: never let a PIN grant open an app
                             // whose focus block is still active.
-                            if (container.appLockRepository.focusBlockUntil(lockedPackageName) == null) {
+                            if (container.focusRepository.focusBlockUntil(lockedPackageName) == null) {
                                 AppLockSessionManager.allow(lockedPackageName)
                             }
                             finish()

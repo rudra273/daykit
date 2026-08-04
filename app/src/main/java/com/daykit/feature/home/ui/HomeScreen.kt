@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material.icons.rounded.Notes
@@ -88,6 +89,8 @@ fun HomeScreen(
             listOf("reminder", "notification", "alarm")),
         ToolTile(Routes.TOOL_EXPENSES, "Expenses", Icons.Rounded.Payments, { accents.pink },
             listOf("expenses", "budget", "money")),
+        ToolTile(Routes.TOOL_FOCUS, "Focus", Icons.Rounded.Timer, { accents.red },
+            listOf("focus", "focus block", "block app", "distraction", "screen time")),
     )
     val other = listOf(
         ToolTile(Routes.TOOL_EDITOR, "Editor", Icons.Rounded.EditNote, { accents.yellow },

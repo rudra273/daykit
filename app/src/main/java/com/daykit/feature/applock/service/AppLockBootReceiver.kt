@@ -32,12 +32,16 @@ class AppLockBootReceiver : BroadcastReceiver() {
             return
         }
         val container = (context.applicationContext as DayKitApplication).container
-        val hasProtectedApps = container.appLockRepository.getLockedPackages().isNotEmpty() ||
-            container.appLockRepository.activeFocusPackages().isNotEmpty()
-        val shouldMonitor = container.credentialRepository.hasCredential() &&
-            AppLockPermissionChecker.hasUsageAccess(context) &&
-            hasProtectedApps
-        if (shouldMonitor) {
+        // PIN-locked apps need a credential to be challengeable at all, so their
+        // monitoring is gated on hasCredential(). A focus block is not — it is
+        // enforced by a countdown that ignores the PIN, so it must survive a
+        // reboot even for a user who never set one. Gating both on hasCredential()
+        // silently dropped enforcement for exactly that case.
+        val hasUsageAccess = AppLockPermissionChecker.hasUsageAccess(context)
+        val hasPinLockedApps = container.credentialRepository.hasCredential() &&
+            container.appLockRepository.getLockedPackages().isNotEmpty()
+        val hasActiveFocusBlocks = container.focusRepository.activeFocusPackages().isNotEmpty()
+        if (hasUsageAccess && (hasPinLockedApps || hasActiveFocusBlocks)) {
             AppMonitorService.start(context)
         }
 

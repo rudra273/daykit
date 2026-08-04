@@ -29,7 +29,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Payments
@@ -70,6 +72,8 @@ import com.google.android.gms.common.api.Scope
 import com.google.android.gms.common.AccountPicker
 import com.daykit.AppContainer
 import com.daykit.core.backup.BackupFileNames
+import com.daykit.core.backup.BackupToolKeys
+import com.daykit.core.backup.includedBackupToolKeys
 import com.daykit.core.backup.DriveBackupFile
 import com.daykit.core.backup.DriveBackupSchedule
 import com.daykit.core.backup.DriveBackupSource
@@ -77,6 +81,7 @@ import com.daykit.core.backup.DayKitBackupService
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppListRow
@@ -98,11 +103,6 @@ import kotlinx.coroutines.withContext
 private const val DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
 private const val GOOGLE_ACCOUNT_TYPE = "com.google"
 private const val LOCAL_BACKUP_MIME_TYPE = "application/vnd.daykit.backup+json"
-private const val BACKUP_TOOL_KEY_STORE = "key_store"
-private const val BACKUP_TOOL_NOTES = "secure_notes"
-private const val BACKUP_TOOL_EXPENSES = "expenses"
-private const val BACKUP_TOOL_HABITS = "habits"
-private const val BACKUP_TOOL_VAULT = "vault_files"
 
 private enum class BackupSheet {
     Password,
@@ -160,13 +160,13 @@ fun BackupRestoreScreen(
         .collectAsStateWithLifecycle(initialValue = false)
 
     val driveSchedule = DriveBackupSchedule.fromValue(driveScheduleValue)
-    // Manual backup runs in the foreground after the app unlock gate, so the
-    // PIN-derived key is available and the sensitive tools can be included.
+    val driveLastError by container.secureSettingRepository
+        .observeString(SecureSettingRepository.KEY_DRIVE_LAST_ERROR)
+        .collectAsStateWithLifecycle(initialValue = null)
     val backupToolKeys = includedBackupToolKeys(
         includeExpenses = includeExpenses == true,
         includeHabits = includeHabits == true,
         includeVault = includeVault == true,
-        includeSensitive = true,
     )
     var activeSheet by remember { mutableStateOf<BackupSheet?>(null) }
     var driveBackups by remember { mutableStateOf<List<DriveBackupFile>>(emptyList()) }
@@ -311,7 +311,7 @@ fun BackupRestoreScreen(
             return
         }
         container.sensitiveKeyManager.expectingActivityResult = true
-        localBackupLauncher.launch(BackupFileNames.backupName())
+        localBackupLauncher.launch(BackupFileNames.backupName(source = DriveBackupSource.Manual))
     }
 
     fun startLocalRestore() {
@@ -350,7 +350,7 @@ fun BackupRestoreScreen(
                 container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_DRIVE_NEEDS_AUTHORIZATION, false)
                 container.secureSettingRepository.delete(SecureSettingRepository.KEY_DRIVE_LAST_ERROR)
             }.onFailure { error ->
-                showSnackbar("Could not load backups: ${error.message ?: "unknown error"}")
+                showSnackbar("Could not load backups: ${driveErrorReason(error)}")
             }
             driveBusy = false
         }
@@ -398,7 +398,7 @@ fun BackupRestoreScreen(
                 showSnackbar("Backup complete")
             }.onFailure { error ->
                 passwordChars.fill('\u0000')
-                showSnackbar("Backup failed: ${error.message ?: "unknown error"}")
+                showSnackbar("Backup failed: ${driveErrorReason(error)}")
             }
             driveBusy = false
         }
@@ -431,7 +431,7 @@ fun BackupRestoreScreen(
                     }
                 }.onFailure { error ->
                     driveBusy = false
-                    showSnackbar("Could not check existing backups: ${error.message ?: "unknown error"}")
+                    showSnackbar("Could not check existing backups: ${driveErrorReason(error)}")
                     return@launch
                 }
             }
@@ -584,7 +584,6 @@ fun BackupRestoreScreen(
     fun setSchedule(schedule: DriveBackupSchedule) {
         scope.launch {
             container.secureSettingRepository.putString(SecureSettingRepository.KEY_DRIVE_BACKUP_SCHEDULE, schedule.value)
-            container.driveBackupScheduler.applySchedule(schedule)
             activeSheet = null
         }
     }
@@ -620,11 +619,22 @@ fun BackupRestoreScreen(
             if (!backupPasswordLoaded) {
                 LoadingPanel()
             } else {
+                if (!passwordSet) {
+                    PasswordMissingBanner(
+                        onClick = {
+                            clearPasswordDrafts()
+                            passwordSheetMode = "set"
+                            activeSheet = BackupSheet.Password
+                        },
+                    )
+                }
+
                 BackupStatusCard(
                     lastBackup = lastBackupText,
                     size = lastBackupSizeText,
                     account = accountSubtitle,
-                    schedule = driveSchedule.shortLabel(),
+                    schedule = driveSchedule.rowSubtitle(),
+                    lastError = driveLastError?.takeIf(String::isNotBlank),
                     backingUp = driveBusy && pendingDriveAction == null,
                     onBackupNow = {
                         if (!passwordSet) {
@@ -666,7 +676,7 @@ fun BackupRestoreScreen(
                     RowDivider()
                     AppListRow(
                         headline = "Automatic backups",
-                        supporting = driveSchedule.shortLabel(),
+                        supporting = driveSchedule.rowSubtitle(),
                         leadingIcon = Icons.Rounded.Schedule,
                         leadingAccent = MaterialTheme.extendedColors.accents.indigo,
                         onClick = { activeSheet = BackupSheet.Schedule },
@@ -675,7 +685,7 @@ fun BackupRestoreScreen(
 
                 SectionHeader(text = "What's included")
                 Text(
-                    "Key Store and Secure Notes are always included. App Lock is never included.",
+                    "Key Store and Secure Notes are always included, in manual and automatic backups alike. App Lock is never included. The options below are off by default.",
                     color = MaterialTheme.extendedColors.textMuted,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(
@@ -782,7 +792,6 @@ fun BackupRestoreScreen(
                                     SecureSettingRepository.KEY_DRIVE_BACKUP_SCHEDULE,
                                     DriveBackupSchedule.Off.value,
                                 )
-                                container.driveBackupScheduler.applySchedule(DriveBackupSchedule.Off)
                                 clearPasswordDrafts()
                                 activeSheet = null
                                 showSnackbar("Backup password removed")
@@ -849,11 +858,12 @@ private val PaddingValuesZero = androidx.compose.foundation.layout.PaddingValues
 
 /** Human label for a contributor's toolKey, for restore messages. */
 private fun toolDisplayName(toolKey: String): String = when (toolKey) {
-    BACKUP_TOOL_KEY_STORE -> "Key Store"
-    BACKUP_TOOL_NOTES -> "Secure Notes"
-    BACKUP_TOOL_EXPENSES -> "Expenses"
-    BACKUP_TOOL_HABITS -> "Habits"
-    BACKUP_TOOL_VAULT -> "File Vault"
+    BackupToolKeys.KEY_STORE -> "Key Store"
+    BackupToolKeys.NOTES -> "Secure Notes"
+    BackupToolKeys.EXPENSES -> "Expenses"
+    BackupToolKeys.HABITS -> "Habits"
+    BackupToolKeys.VAULT -> "File Vault"
+    BackupToolKeys.FOCUS -> "Focus"
     else -> toolKey
 }
 
@@ -875,21 +885,18 @@ private fun restoreErrorMessage(error: Throwable): String = when (error) {
     else -> "Incorrect password"
 }
 
-private fun includedBackupToolKeys(
-    includeExpenses: Boolean,
-    includeHabits: Boolean,
-    includeVault: Boolean,
-    includeSensitive: Boolean,
-): Set<String> {
-    return buildSet {
-        if (includeSensitive) {
-            add(BACKUP_TOOL_KEY_STORE)
-            add(BACKUP_TOOL_NOTES)
-            if (includeVault) add(BACKUP_TOOL_VAULT)
-        }
-        if (includeExpenses) add(BACKUP_TOOL_EXPENSES)
-        if (includeHabits) add(BACKUP_TOOL_HABITS)
-    }
+/**
+ * Reason text for a failed Drive call. A Drive failure's [Throwable.message] embeds
+ * the raw Google API response body, which does not belong in a snackbar the user may
+ * screenshot for support, so it is mapped to something meaningful instead.
+ */
+private fun driveErrorReason(error: Throwable): String = when (error) {
+    is java.net.UnknownHostException,
+    is java.net.SocketTimeoutException,
+    is java.io.InterruptedIOException,
+    -> "no internet connection"
+    is java.io.IOException -> "could not reach Google Drive"
+    else -> "please try again"
 }
 
 @Composable
@@ -938,12 +945,54 @@ private fun BackupContentOptions(
     }
 }
 
+/**
+ * Shown until a backup password exists. Without one, every backup path is a no-op —
+ * manual backup refuses to start and [com.daykit.core.backup.DriveBackupRunner]
+ * returns `NoPassword` — so this is the one action that unblocks the whole screen.
+ */
+@Composable
+private fun PasswordMissingBanner(onClick: () -> Unit) {
+    val warning = MaterialTheme.extendedColors.warning
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.sm),
+        onClick = onClick,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AccentIconTile(icon = Icons.Rounded.Key, accent = warning)
+            Spacer(Modifier.width(Spacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Set backup password for automatic backups.",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Tap to set one — backups stay off until you do.",
+                    color = MaterialTheme.extendedColors.textMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Spacer(Modifier.width(Spacing.sm))
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.extendedColors.textMuted,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun BackupStatusCard(
     lastBackup: String,
     size: String,
     account: String,
     schedule: String,
+    lastError: String?,
     backingUp: Boolean,
     onBackupNow: () -> Unit,
     onShowAll: () -> Unit,
@@ -962,6 +1011,33 @@ private fun BackupStatusCard(
         StatusLine("Account", account)
         Spacer(Modifier.height(Spacing.xs))
         StatusLine("Schedule", schedule)
+        if (lastError != null) {
+            // A backup that quietly stopped working looks identical to one that is
+            // working, so the last failure is always shown until a backup succeeds
+            // (every success path deletes this key).
+            Spacer(Modifier.height(Spacing.md))
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    Icons.Rounded.ErrorOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.extendedColors.danger,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Column {
+                    Text(
+                        "Last backup attempt failed",
+                        color = MaterialTheme.extendedColors.danger,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        lastError,
+                        color = MaterialTheme.extendedColors.textMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(Spacing.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             PrimaryButton(
@@ -1302,6 +1378,14 @@ private fun ScheduleSheet(
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleLarge,
         )
+        Text(
+            "DayKit checks when you open the app and backs up if this much time has " +
+                "passed. Backups can't run in the background, because your Key Store " +
+                "and Secure Notes can only be read after you enter your PIN.",
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(bottom = Spacing.xs),
+        )
         listOf(
             DriveBackupSchedule.Daily,
             DriveBackupSchedule.Weekly,
@@ -1364,6 +1448,18 @@ private fun BackupPasswordField(
 private fun DriveBackupSchedule.shortLabel(): String = when (this) {
     DriveBackupSchedule.Daily -> "Daily"
     DriveBackupSchedule.Weekly -> "Weekly"
+    DriveBackupSchedule.Manual -> "Only when I tap 'Back up now'"
+    DriveBackupSchedule.Off -> "Off"
+}
+
+/**
+ * The settings row and status card say when a backup happens, not just how often.
+ * "Daily" on its own reads as "while you sleep", which is not what this does — the
+ * backup needs the PIN-derived key, so it runs when the app is opened and unlocked.
+ */
+private fun DriveBackupSchedule.rowSubtitle(): String = when (this) {
+    DriveBackupSchedule.Daily -> "Daily, when you open the app"
+    DriveBackupSchedule.Weekly -> "Weekly, when you open the app"
     DriveBackupSchedule.Manual -> "Only when I tap 'Back up now'"
     DriveBackupSchedule.Off -> "Off"
 }
