@@ -3,14 +3,12 @@ package com.daykit.feature.focus.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,14 +43,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
-import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
 import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppSwitch
+import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTopBar
-import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
@@ -81,7 +78,12 @@ private sealed interface FocusEditor {
  * A running block cannot be cancelled — Strict sessions and manual blocks are
  * irreversible by design, and only a Normal scheduled session offers an early
  * exit (behind the PIN). So this screen is read-only for anything already
- * running; the FAB is the only way to start something new.
+ * running.
+ *
+ * The list is three fixed sections — Session, Groups, Schedules — each present
+ * even when empty, so the tool explains itself without a hero empty state. Each
+ * creatable section carries its own action: Groups and Schedules create from
+ * their header, and the FAB blocks a single app now.
  *
  * [onMonitorNeeded] starts the App Lock monitor, which is what actually enforces
  * a block. Called after anything is armed, so blocks work for a user who has
@@ -147,7 +149,6 @@ private fun FocusHome(
         .collectAsStateWithLifecycle(initialValue = emptyList())
 
     var installedApps by remember { mutableStateOf<List<InstalledApp>?>(null) }
-    var createSheetOpen by remember { mutableStateOf(false) }
     var quickBlockApp by remember { mutableStateOf<InstalledApp?>(null) }
     var quickPickerOpen by remember { mutableStateOf(false) }
     var groupToBlock by remember { mutableStateOf<FocusGroup?>(null) }
@@ -202,17 +203,18 @@ private fun FocusHome(
     val blockedPackages = remember(focusBlocks) { focusBlocks.map { it.packageName }.toSet() }
     val sortedBlocks = remember(focusBlocks) { focusBlocks.sortedBy { it.lockUntilMillis } }
     val groupsById = remember(groups) { groups.associateBy { it.groupId } }
-    val isEmpty = groups.isEmpty() && schedules.isEmpty() && sortedBlocks.isEmpty()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(errors.host) },
         topBar = { AppTopBar(title = "Focus", onBack = onBack) },
+        // Straight to the app picker: groups and schedules are created from their
+        // own section headers, so the FAB means exactly one thing — block an app now.
         floatingActionButton = {
             AppFab(
                 icon = Icons.Rounded.Add,
-                contentDescription = "New focus block",
-                onClick = { createSheetOpen = true },
+                contentDescription = "Block one app now",
+                onClick = { quickPickerOpen = true },
             )
         },
     ) { innerPadding ->
@@ -256,8 +258,14 @@ private fun FocusHome(
                 }
             }
 
-            if (activeSessions.isNotEmpty() || sortedBlocks.isNotEmpty()) {
-                item(key = "header-active") { SectionHeader("In session") }
+            // No create action: a session is only ever started by a schedule
+            // firing or by blocking apps below, never from here.
+            item(key = "header-session") { FocusSectionHeader("Session") }
+
+            if (activeSessions.isEmpty() && sortedBlocks.isEmpty()) {
+                item(key = "empty-session") {
+                    FocusSectionEmpty("Nothing is blocked right now.")
+                }
             }
 
             items(activeSessions, key = { "session-${it.scheduleId}-${it.startMillis}" }) { session ->
@@ -305,22 +313,6 @@ private fun FocusHome(
                 )
             }
 
-            if (isEmpty) {
-                item(key = "empty") {
-                    AppCard(modifier = Modifier.fillMaxWidth()) {
-                        EmptyState(
-                            icon = Icons.Rounded.Timer,
-                            title = "Nothing blocked yet",
-                            description = "Group the apps that distract you, then block them on a " +
-                                "schedule or right now. Once a block starts it can't be undone " +
-                                "until the timer ends.",
-                            actionText = "Create a group",
-                            onAction = { onEdit(FocusEditor.Group(null)) },
-                        )
-                    }
-                }
-            }
-
             if (groups.isNotEmpty() || schedules.isNotEmpty()) {
                 item(key = "stats") {
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -347,44 +339,64 @@ private fun FocusHome(
                 }
             }
 
-            if (groups.isNotEmpty()) {
-                item(key = "header-groups") { SectionHeader("Groups") }
-                items(groups, key = { "group-${it.groupId}" }) { group ->
-                    GroupRow(
-                        group = group,
-                        onStart = { groupToBlock = group },
-                        onEdit = { onEdit(FocusEditor.Group(group)) },
+            item(key = "header-groups") {
+                FocusSectionHeader(
+                    title = "Groups",
+                    actionText = "Create",
+                    onAction = { onEdit(FocusEditor.Group(null)) },
+                )
+            }
+            if (groups.isEmpty()) {
+                item(key = "empty-groups") {
+                    FocusSectionEmpty("Group the apps that distract you, then block them together.")
+                }
+            }
+            items(groups, key = { "group-${it.groupId}" }) { group ->
+                GroupRow(
+                    group = group,
+                    onStart = { groupToBlock = group },
+                    onEdit = { onEdit(FocusEditor.Group(group)) },
+                )
+            }
+
+            item(key = "header-schedules") {
+                FocusSectionHeader(
+                    title = "Schedules",
+                    // A schedule blocks a group, so there is nothing to schedule
+                    // until one exists; the placeholder below says so.
+                    actionText = if (groups.isNotEmpty()) "Create" else null,
+                    onAction = if (groups.isNotEmpty()) {
+                        { onEdit(FocusEditor.Schedule(null)) }
+                    } else {
+                        null
+                    },
+                )
+            }
+            if (schedules.isEmpty()) {
+                item(key = "empty-schedules") {
+                    FocusSectionEmpty(
+                        if (groups.isEmpty()) {
+                            "Create a group first, then block it at the same time each week."
+                        } else {
+                            "Block a group at the same time each week."
+                        },
                     )
                 }
             }
-
-            if (schedules.isNotEmpty()) {
-                item(key = "header-schedules") { SectionHeader("Schedules") }
-                items(schedules, key = { "schedule-${it.scheduleId}" }) { schedule ->
-                    ScheduleRow(
-                        schedule = schedule,
-                        groupName = groupsById[schedule.groupId]?.name ?: "Deleted group",
-                        onToggle = { enabled ->
-                            errors.launchGuarded("Couldn't update the schedule.") {
-                                container.focusScheduleRepository
-                                    .setEnabled(schedule.scheduleId, enabled)
-                            }
-                        },
-                        onEdit = { onEdit(FocusEditor.Schedule(schedule)) },
-                    )
-                }
+            items(schedules, key = { "schedule-${it.scheduleId}" }) { schedule ->
+                ScheduleRow(
+                    schedule = schedule,
+                    groupName = groupsById[schedule.groupId]?.name ?: "Deleted group",
+                    onToggle = { enabled ->
+                        errors.launchGuarded("Couldn't update the schedule.") {
+                            container.focusScheduleRepository
+                                .setEnabled(schedule.scheduleId, enabled)
+                        }
+                    },
+                    onEdit = { onEdit(FocusEditor.Schedule(schedule)) },
+                )
             }
         }
-    }
-
-    if (createSheetOpen) {
-        CreateActionSheet(
-            canSchedule = groups.isNotEmpty(),
-            onNewGroup = { createSheetOpen = false; onEdit(FocusEditor.Group(null)) },
-            onNewSchedule = { createSheetOpen = false; onEdit(FocusEditor.Schedule(null)) },
-            onQuickBlock = { createSheetOpen = false; quickPickerOpen = true },
-            onDismiss = { createSheetOpen = false },
-        )
     }
 
     if (quickPickerOpen) {
@@ -566,41 +578,43 @@ private fun ScheduleRow(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * A [SectionHeader] with an optional create action on the right.
+ *
+ * Groups and Schedules each own their create button so the three sections are
+ * always visible and self-explanatory, even when every one of them is empty —
+ * that replaces the old single full-bleed empty-state card, which hid Schedules
+ * behind "create a group first" and said nothing about sessions.
+ */
 @Composable
-private fun CreateActionSheet(
-    canSchedule: Boolean,
-    onNewGroup: () -> Unit,
-    onNewSchedule: () -> Unit,
-    onQuickBlock: () -> Unit,
-    onDismiss: () -> Unit,
+private fun FocusSectionHeader(
+    title: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
-    AppBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.md)) {
-            AppListRow(
-                headline = "New group",
-                supporting = "Block a set of apps together",
-                leadingIcon = Icons.Rounded.Timer,
-                onClick = onNewGroup,
-            )
-            AppListRow(
-                headline = "New schedule",
-                supporting = if (canSchedule) {
-                    "Block a group at the same time each week"
-                } else {
-                    "Create a group first"
-                },
-                leadingIcon = Icons.Rounded.Schedule,
-                enabled = canSchedule,
-                onClick = if (canSchedule) onNewSchedule else null,
-            )
-            AppListRow(
-                headline = "Block one app now",
-                supporting = "Pick an app and a duration",
-                leadingIcon = Icons.Rounded.Lock,
-                onClick = onQuickBlock,
-            )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SectionHeader(text = title, modifier = Modifier.weight(1f))
+        if (actionText != null && onAction != null) {
+            AppTextButton(text = actionText, onClick = onAction)
         }
+    }
+}
+
+/** Quiet one-liner placeholder for an empty section — not a hero card. */
+@Composable
+private fun FocusSectionEmpty(text: String) {
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(Spacing.md),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.extendedColors.textMuted,
+        )
     }
 }
 

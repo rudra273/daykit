@@ -4,15 +4,16 @@ package com.daykit.feature.keystore.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.text.KeyboardOptions
 import com.daykit.AppContainer
+import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AppAlertDialog
@@ -70,6 +71,7 @@ import com.daykit.core.designsystem.components.DestructiveButton
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.components.RowDivider
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SecondaryButton
@@ -159,66 +161,76 @@ fun KeyStoreScreen(
             )
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = Spacing.lg,
-                    end = Spacing.lg,
-                    top = innerPadding.calculateTopPadding() + Spacing.sm,
-                    bottom = Spacing.xxl + 72.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                if (uniqueLabels.isNotEmpty()) {
-                    item(key = "filters") {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            items(uniqueLabels) { lbl ->
-                                val isSelected = selectedLabel == lbl
-                                FilterChipButton(
-                                    text = lbl,
-                                    selected = isSelected,
-                                    onClick = { selectedLabel = if (isSelected) null else lbl },
-                                )
-                            }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = Spacing.lg,
+                end = Spacing.lg,
+                top = innerPadding.calculateTopPadding() + Spacing.sm,
+                bottom = Spacing.xxl + 72.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            if (uniqueLabels.isNotEmpty()) {
+                item(key = "filters") {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        items(uniqueLabels) { lbl ->
+                            val isSelected = selectedLabel == lbl
+                            FilterChipButton(
+                                text = lbl,
+                                selected = isSelected,
+                                onClick = { selectedLabel = if (isSelected) null else lbl },
+                            )
                         }
                     }
                 }
+            }
 
-                val currentEntries = entries
-                if (currentEntries != null && currentEntries.isEmpty()) {
-                    item(key = "empty-all") {
-                        EmptyState(
-                            icon = Icons.Rounded.VpnKey,
-                            title = "No keys saved",
-                            description = "Tap + to add your first key.",
-                        )
+            val currentEntries = entries
+            if (currentEntries != null && currentEntries.isEmpty()) {
+                item(key = "empty-all") {
+                    EmptyState(
+                        icon = Icons.Rounded.VpnKey,
+                        title = "No keys saved",
+                        description = "Tap + to add your first key.",
+                    )
+                }
+            } else if (currentEntries != null && filteredEntries.isEmpty()) {
+                item(key = "empty-filter") {
+                    EmptyState(
+                        icon = Icons.Rounded.SearchOff,
+                        title = "No matching keys",
+                    )
+                }
+            } else {
+                grouped.forEach { (group, groupEntries) ->
+                    item(key = "section-$group") {
+                        SectionHeader(text = group)
                     }
-                } else if (currentEntries != null && filteredEntries.isEmpty()) {
-                    item(key = "empty-filter") {
-                        EmptyState(
-                            icon = Icons.Rounded.SearchOff,
-                            title = "No matching keys",
-                        )
-                    }
-                } else {
-                    grouped.forEach { (group, groupEntries) ->
-                        item(key = "section-$group") {
-                            SectionHeader(text = group, modifier = Modifier.padding(top = Spacing.xs))
-                        }
-                        items(groupEntries, key = { it.entryId }) { entry ->
-                            KeyEntryCard(
-                                entry = entry,
-                                onClick = { actionEntry = entry },
-                                onCopy = {
-                                    clipboard.setText(AnnotatedString(entry.value))
-                                    scope.launch { snackbarHostState.showSnackbar("Copied") }
-                                },
-                            )
+                    // One card per label group rather than per entry: the per-row card
+                    // border + 8dp gap was most of each row's height.
+                    item(key = "group-$group") {
+                        AppCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(0.dp),
+                        ) {
+                            groupEntries.forEachIndexed { index, entry ->
+                                KeyEntryRow(
+                                    entry = entry,
+                                    onClick = { actionEntry = entry },
+                                    onCopy = {
+                                        clipboard.setText(AnnotatedString(entry.value))
+                                        scope.launch { snackbarHostState.showSnackbar("Copied") }
+                                    },
+                                )
+                                if (index < groupEntries.lastIndex) {
+                                    RowDivider(startIndent = RowDividerIndent)
+                                }
+                            }
                         }
                     }
                 }
@@ -288,6 +300,11 @@ fun KeyStoreScreen(
     }
 }
 
+private val MonogramTileSize = 30.dp
+
+/** Indent that lands the divider flush with the row's text column, past the monogram tile. */
+private val RowDividerIndent = Spacing.lg + MonogramTileSize + Spacing.md
+
 private val AccentPalette: @Composable () -> List<Color>
     get() = {
         val a = MaterialTheme.extendedColors.accents
@@ -301,63 +318,69 @@ private fun accentFor(key: String): Color {
     return palette[idx]
 }
 
+/**
+ * A single-line key row for the grouped Key Store card. Deliberately local rather than
+ * [com.daykit.core.designsystem.components.AppListRow], whose 60dp minHeight floor exists
+ * for the settings switch-row rhythm — here the floor is the 48dp copy-button touch target
+ * and nothing more. The label isn't repeated in the row: it's already the section header
+ * above, and the monogram accent is derived from it.
+ */
 @Composable
-private fun KeyEntryCard(
+private fun KeyEntryRow(
     entry: KeyStoreEntry,
     onClick: () -> Unit,
     onCopy: () -> Unit,
 ) {
     val accent = accentFor(entry.label.ifBlank { entry.name })
-    AppCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        contentPadding = PaddingValues(Spacing.md),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = MinTouchTarget)
+            .clickable(onClick = onClick)
+            .padding(start = Spacing.lg, end = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = entry.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (entry.label.isNotBlank()) {
-                        Spacer(Modifier.width(Spacing.sm))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(accent.asAccentContainer())
-                                .padding(horizontal = Spacing.sm, vertical = 2.dp),
-                        ) {
-                            Text(
-                                text = entry.label,
-                                color = accent,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "••••••••",
-                    color = MaterialTheme.extendedColors.textMuted,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            Spacer(Modifier.width(Spacing.sm))
-            IconButton(onClick = onCopy) {
-                Icon(
-                    Icons.Rounded.ContentCopy,
-                    contentDescription = "Copy value",
-                    tint = MaterialTheme.extendedColors.textMuted,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+        KeyMonogramTile(
+            letter = entry.name.trim().firstOrNull()?.uppercase() ?: "#",
+            accent = accent,
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            text = entry.name,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onCopy, modifier = Modifier.size(MinTouchTarget)) {
+            Icon(
+                Icons.Rounded.ContentCopy,
+                // Named per row so TalkBack doesn't read N identical "Copy value" buttons.
+                contentDescription = "Copy value for ${entry.name}",
+                tint = MaterialTheme.extendedColors.textMuted,
+                modifier = Modifier.size(20.dp),
+            )
         }
+    }
+}
+
+/** 30dp accent monogram, matching `AccentIconTile`'s geometry for a text leading slot. */
+@Composable
+private fun KeyMonogramTile(letter: String, accent: Color) {
+    Box(
+        modifier = Modifier
+            .size(MonogramTileSize)
+            .clip(MaterialTheme.shapes.medium)
+            .background(accent.asAccentContainer()),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = letter,
+            color = accent,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
