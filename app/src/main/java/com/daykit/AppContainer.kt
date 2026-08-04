@@ -21,7 +21,11 @@ import com.daykit.core.security.SessionValueCipher
 import com.daykit.feature.applock.data.AppLockRepository
 import com.daykit.feature.focus.data.FocusBackupContributor
 import com.daykit.feature.focus.data.FocusBlockStore
+import com.daykit.feature.focus.data.FocusGroupRepository
 import com.daykit.feature.focus.data.FocusRepository
+import com.daykit.feature.focus.data.FocusScheduleCache
+import com.daykit.feature.focus.data.FocusScheduleRepository
+import com.daykit.feature.focus.service.FocusScheduleScheduler
 import com.daykit.feature.applock.data.LockedPackageCache
 import com.daykit.feature.applock.domain.InstalledAppProvider
 import com.daykit.feature.expense.data.ExpenseBackupContributor
@@ -54,6 +58,7 @@ class AppContainer(context: Context) {
     val sessionValueCipher = SessionValueCipher(sensitiveKeyManager)
     val lockedPackageCache = LockedPackageCache(appContext)
     val focusBlockStore = FocusBlockStore(appContext)
+    val focusScheduleCache = FocusScheduleCache(appContext)
     val settingFlagCache = SettingFlagCache(appContext)
 
     /**
@@ -89,6 +94,7 @@ class AppContainer(context: Context) {
         runCatching { credentialRepository.clear() }
         runCatching { lockedPackageCache.clear() }
         runCatching { focusBlockStore.clear() }
+        runCatching { focusScheduleCache.clear() }
         runCatching { settingFlagCache.clear() }
         runCatching { File(appContext.filesDir, "vault").deleteRecursively() }
     }
@@ -103,6 +109,18 @@ class AppContainer(context: Context) {
 
     val focusRepository: FocusRepository by lazy {
         FocusRepository(focusBlockStore)
+    }
+
+    val focusGroupRepository: FocusGroupRepository by lazy {
+        FocusGroupRepository(database.focusGroupDao())
+    }
+
+    val focusScheduleRepository: FocusScheduleRepository by lazy {
+        FocusScheduleRepository(
+            dao = database.focusScheduleDao(),
+            groupDao = database.focusGroupDao(),
+            cache = focusScheduleCache,
+        )
     }
 
     val keyStoreRepository: KeyStoreRepository by lazy {
@@ -143,7 +161,15 @@ class AppContainer(context: Context) {
                 SecureNoteBackupContributor(secureNoteRepository),
                 HabitBackupContributor(habitRepository),
                 VaultBackupContributor(vaultFileRepository),
-                FocusBackupContributor(focusBlockStore),
+                FocusBackupContributor(
+                    focusBlockStore = focusBlockStore,
+                    groupDao = database.focusGroupDao(),
+                    scheduleDao = database.focusScheduleDao(),
+                    onImported = {
+                        val armed = focusScheduleRepository.reproject()
+                        FocusScheduleScheduler(appContext).arm(armed)
+                    },
+                ),
             ),
         )
     }
