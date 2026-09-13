@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Folder
@@ -94,7 +95,9 @@ fun HomeScreen(
     )
     val other = listOf(
         ToolTile(Routes.TOOL_EDITOR, "Editor", Icons.Rounded.EditNote, { accents.yellow },
-            listOf("editor", "document", "text")),
+            listOf("editor", "document", "text", "pdf")),
+        ToolTile(Routes.TOOL_SCANNER, "Document Scanner", Icons.Rounded.DocumentScanner, { accents.blue },
+            listOf("scanner", "scan document", "document", "camera", "pdf")),
         ToolTile(Routes.TOOL_DNS, "DNS Manager", Icons.Rounded.Dns, { accents.red },
             listOf("dns", "ad block", "private dns")),
         ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", Icons.Rounded.FlashOn, { accents.yellow },

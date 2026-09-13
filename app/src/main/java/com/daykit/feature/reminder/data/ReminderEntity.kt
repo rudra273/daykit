@@ -20,4 +20,18 @@ data class ReminderEntity(
     val updatedAtMillis: Long,
     val recurrenceRule: String? = null,
     val pendingOccurrenceMillis: Long? = null,
+    val paused: Boolean = false,
+    val snoozedUntilMillis: Long? = null,
+)
+
+@Entity(
+    tableName = "reminder_occurrences",
+    indices = [Index(value = ["reminderId", "occurrenceMillis"], unique = true)],
+)
+data class ReminderOccurrenceEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val reminderId: String,
+    val occurrenceMillis: Long,
+    val action: String,
+    val actionAtMillis: Long,
 )

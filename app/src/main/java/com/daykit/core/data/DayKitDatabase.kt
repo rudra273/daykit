@@ -27,6 +27,7 @@ import com.daykit.feature.notes.data.SecureNoteEntity
 import com.daykit.feature.notes.data.SecureNoteImageEntity
 import com.daykit.feature.reminder.data.ReminderDao
 import com.daykit.feature.reminder.data.ReminderEntity
+import com.daykit.feature.reminder.data.ReminderOccurrenceEntity
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
@@ -43,11 +44,12 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         HabitEntity::class,
         HabitLogEntity::class,
         ReminderEntity::class,
+        ReminderOccurrenceEntity::class,
         VaultFileEntity::class,
         FocusGroupEntity::class,
         FocusScheduleEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -79,6 +81,14 @@ abstract class DayKitDatabase : RoomDatabase() {
                     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                         db.execSQL("ALTER TABLE reminders ADD COLUMN recurrenceRule TEXT")
                         db.execSQL("ALTER TABLE reminders ADD COLUMN pendingOccurrenceMillis INTEGER")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(2, 3) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE reminders ADD COLUMN paused INTEGER NOT NULL DEFAULT 0")
+                        db.execSQL("ALTER TABLE reminders ADD COLUMN snoozedUntilMillis INTEGER")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS reminder_occurrences (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` TEXT NOT NULL, `occurrenceMillis` INTEGER NOT NULL, `action` TEXT NOT NULL, `actionAtMillis` INTEGER NOT NULL)")
+                        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_reminder_occurrences_reminderId_occurrenceMillis ON reminder_occurrences (`reminderId`, `occurrenceMillis`)")
                     }
                 })
                 .build()

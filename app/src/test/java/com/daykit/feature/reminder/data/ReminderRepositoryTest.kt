@@ -13,9 +13,16 @@ class ReminderRepositoryTest {
         override suspend fun getReminder(reminderId: String) = rows[reminderId]
         override suspend fun getAllReminders() = rows.values.toList()
         override suspend fun upsertReminders(entities: List<ReminderEntity>) { entities.forEach { upsertReminder(it) } }
-        override suspend fun getPendingReminders() = rows.values.filter { !it.completed }
+        override suspend fun getPendingReminders() = rows.values.filter { !it.completed && !it.paused }
         override suspend fun upsertReminder(entity: ReminderEntity) { rows[entity.reminderId] = entity }
         override suspend fun deleteReminder(reminderId: String) { rows.remove(reminderId) }
+        val history = mutableListOf<ReminderOccurrenceEntity>()
+        override suspend fun getOccurrenceHistory(reminderId: String) = history.filter { it.reminderId == reminderId }
+        override suspend fun upsertOccurrence(entity: ReminderOccurrenceEntity) {
+            history.removeAll { it.reminderId == entity.reminderId && it.occurrenceMillis == entity.occurrenceMillis }
+            history += entity
+        }
+        override suspend fun deleteOccurrences(reminderId: String) { history.removeAll { it.reminderId == reminderId } }
     }
     private val day = 86_400_000L
 
@@ -67,6 +74,8 @@ class ReminderRepositoryTest {
         assertFalse(repo.getReminder(r.reminderId)!!.completed)
         assertNull(repo.getReminder(r.reminderId)!!.pendingOccurrenceMillis)
         assertEquals(3 * day, scheduled!!.scheduledAtMillis)
+        val history = repo.getOccurrenceHistory(r.reminderId)
+        assertEquals(ReminderOccurrenceAction.COMPLETED, history.single().action)
     }
 
     @Test fun finalOccurrenceCompletesAndOneTimeReminderStillWorks() = runBlocking {
@@ -114,5 +123,36 @@ class ReminderRepositoryTest {
         repo.fireDue(r.reminderId) { fail("Edited reminder fired early") }
         repo.deleteReminder(r.reminderId)
         repo.fireDue(r.reminderId) { fail("Deleted reminder fired") }
+    }
+
+    @Test fun snoozeKeepsNextRecurrenceAndRejectsStaleOccurrence() = runBlocking {
+        val dao = FakeDao()
+        var now = day
+        val repo = ReminderRepository(dao, clock = { now })
+        val reminder = repo.addReminder("Daily", 2 * day,
+            ReminderRecurrence(ReminderFrequency.DAILY, zoneId = "UTC", anchorMillis = 2 * day))
+        now = 2 * day
+        repo.fireDue(reminder.reminderId) {}
+        repo.snooze(reminder.reminderId, 2 * day, 10 * 60_000L)
+        val snoozed = repo.getReminder(reminder.reminderId)!!
+        assertEquals(3 * day, snoozed.scheduledAtMillis)
+        assertEquals(now + 10 * 60_000L, snoozed.snoozedUntilMillis)
+        repo.snooze(reminder.reminderId, day, 5 * 60_000L)
+        assertEquals(snoozed, repo.getReminder(reminder.reminderId))
+    }
+
+    @Test fun pauseAndResumeMovesSeriesToNextFutureOccurrence() = runBlocking {
+        val dao = FakeDao()
+        var now = 1L
+        val repo = ReminderRepository(dao, clock = { now })
+        val reminder = repo.addReminder("Daily", day,
+            ReminderRecurrence(ReminderFrequency.DAILY, zoneId = "UTC", anchorMillis = day))
+        repo.setPaused(reminder.reminderId, true)
+        assertTrue(repo.getReminder(reminder.reminderId)!!.paused)
+        now = 3 * day + 1
+        repo.setPaused(reminder.reminderId, false)
+        val resumed = repo.getReminder(reminder.reminderId)!!
+        assertFalse(resumed.paused)
+        assertEquals(4 * day, resumed.scheduledAtMillis)
     }
 }

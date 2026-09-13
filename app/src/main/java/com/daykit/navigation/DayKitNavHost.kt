@@ -21,6 +21,7 @@ import com.daykit.feature.home.ui.HomeScreen
 import com.daykit.feature.keystore.ui.KeyStoreScreen
 import com.daykit.feature.notes.ui.SecureNotesScreen
 import com.daykit.feature.reminder.ui.ReminderScreen
+import com.daykit.feature.scanner.ui.DocumentScannerScreen
 import com.daykit.feature.settings.ui.AboutAppScreen
 import com.daykit.feature.settings.ui.AppearanceScreen
 import com.daykit.feature.settings.ui.BackupRestoreScreen
@@ -97,6 +98,7 @@ fun DayKitNavHost(
         composable(Routes.TOOL_REMINDERS) { ReminderScreen(container = container, onBack = back) }
         composable(Routes.TOOL_EXPENSES) { ExpenseScreen(container = container, onBack = back) }
         composable(Routes.TOOL_EDITOR) { EditorScreen(onBack = back) }
+        composable(Routes.TOOL_SCANNER) { DocumentScannerScreen(container = container, onBack = back) }
         composable(Routes.TOOL_DNS) { DnsManagerScreen(onBack = back) }
         composable(Routes.TOOL_EVENTLIGHT) { EventLightScreen(onBack = back) }
 

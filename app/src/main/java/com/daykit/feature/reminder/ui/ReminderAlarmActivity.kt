@@ -29,7 +29,6 @@ import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.feature.reminder.notification.ReminderActionReceiver
 import com.daykit.feature.reminder.notification.ReminderNotifier
-import com.daykit.feature.reminder.notification.ReminderScheduler
 import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +58,7 @@ class ReminderAlarmActivity : ComponentActivity() {
                 ReminderAlarmScreen(
                     title = reminderTitle,
                     onComplete = { complete() },
+                    onSnooze = { snooze(it) },
                     onDismiss = { snoozeToNotification() },
                 )
             }
@@ -96,6 +96,17 @@ class ReminderAlarmActivity : ComponentActivity() {
         finish()
     }
 
+    private fun snooze(durationMillis: Long) {
+        val id = reminderId
+        val occurrence = intent.getLongExtra(ReminderActionReceiver.EXTRA_OCCURRENCE, Long.MIN_VALUE)
+        val appContext = applicationContext
+        ioScope.launch {
+            val repository = (appContext as DayKitApplication).container.reminderRepository
+            if (occurrence != Long.MIN_VALUE) repository.snooze(id, occurrence, durationMillis)
+        }
+        finish()
+    }
+
     /**
      * Closing the full-screen page without completing falls back to the persistent
      * notification so the reminder is not lost.
@@ -121,6 +132,7 @@ class ReminderAlarmActivity : ComponentActivity() {
 private fun ReminderAlarmScreen(
     title: String,
     onComplete: () -> Unit,
+    onSnooze: (Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Swallow back so the reminder is acknowledged deliberately, matching the lock screen.
@@ -152,6 +164,25 @@ private fun ReminderAlarmScreen(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onComplete,
             )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Snooze",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(5, 10, 30).forEach { minutes ->
+                    SecondaryButton(
+                        text = "$minutes min",
+                        modifier = Modifier.weight(1f),
+                        onClick = { onSnooze(minutes * 60_000L) },
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             SecondaryButton(
                 text = "Dismiss",

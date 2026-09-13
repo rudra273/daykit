@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
@@ -80,6 +81,7 @@ import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.reminder.data.Reminder
+import com.daykit.feature.reminder.data.ReminderOccurrence
 import com.daykit.feature.reminder.data.ReminderRecurrence
 import com.daykit.feature.reminder.data.ReminderFrequency
 import com.daykit.core.designsystem.components.FilterChipButton
@@ -111,6 +113,7 @@ fun ReminderScreen(
     var editReminder by remember { mutableStateOf<Reminder?>(null) }
     var actionReminder by remember { mutableStateOf<Reminder?>(null) }
     var deleteReminder by remember { mutableStateOf<Reminder?>(null) }
+    var actionHistory by remember { mutableStateOf<List<ReminderOccurrence>>(emptyList()) }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
@@ -135,7 +138,14 @@ fun ReminderScreen(
                     reminders = current,
                     listState = listState,
                     onComplete = ::complete,
-                    onLongPress = { actionReminder = it },
+                    onLongPress = {
+                        actionReminder = it
+                        actionHistory = emptyList()
+                        scope.launch {
+                            val loaded = container.reminderRepository.getOccurrenceHistory(it.reminderId)
+                            if (actionReminder?.reminderId == it.reminderId) actionHistory = loaded
+                        }
+                    },
                 )
             }
         }
@@ -185,6 +195,7 @@ fun ReminderScreen(
     actionReminder?.let { reminder ->
         ReminderActionSheet(
             reminder = reminder,
+            history = actionHistory,
             onDismiss = { actionReminder = null },
             onEdit = {
                 actionReminder = null
@@ -193,6 +204,18 @@ fun ReminderScreen(
             onDelete = {
                 actionReminder = null
                 deleteReminder = reminder
+            },
+            onSkipNext = {
+                actionReminder = null
+                errors.launchGuarded("Couldn't skip that occurrence.") {
+                    container.reminderRepository.skipNext(reminder.reminderId)
+                }
+            },
+            onTogglePause = {
+                actionReminder = null
+                errors.launchGuarded("Couldn't update that reminder.") {
+                    container.reminderRepository.setPaused(reminder.reminderId, !reminder.paused)
+                }
             },
         )
     }
@@ -234,7 +257,8 @@ private fun ReminderContent(
     }
 
     val now = System.currentTimeMillis()
-    val active = reminders.filter { !it.completed }.sortedBy { it.scheduledAtMillis }
+    val active = reminders.filter { !it.completed && !it.paused }.sortedBy { it.scheduledAtMillis }
+    val paused = reminders.filter { !it.completed && it.paused }.sortedBy { it.scheduledAtMillis }
     val completed = reminders.filter { it.completed }.sortedByDescending { it.scheduledAtMillis }
     val startOfTomorrow = LocalDate.now().plusDays(1)
         .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -259,6 +283,7 @@ private fun ReminderContent(
         section("Overdue", overdue, accentDanger = true, onComplete, onLongPress)
         section("Today", today, accentDanger = false, onComplete, onLongPress)
         section("Upcoming", upcoming, accentDanger = false, onComplete, onLongPress)
+        section("Paused", paused, accentDanger = false, onComplete, onLongPress)
         if (completed.isNotEmpty()) {
             item {
                 Text(
@@ -367,7 +392,7 @@ private fun ReminderRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Tap-to-complete circle
-            if (reminder.completed) {
+            if (reminder.completed || reminder.paused) {
                 Box(
                     modifier = Modifier
                         .size(26.dp)
@@ -375,8 +400,8 @@ private fun ReminderRow(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Icons.Rounded.Check,
-                        contentDescription = null,
+                        if (reminder.paused) Icons.Rounded.Pause else Icons.Rounded.Check,
+                        contentDescription = if (reminder.paused) "Paused" else null,
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(16.dp),
                     )
@@ -405,7 +430,8 @@ private fun ReminderRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = reminder.scheduledAtMillis.toAbsoluteText() + (reminder.recurrence?.let { "\n${it.describe()}" } ?: ""),
+                    text = (if (reminder.paused) "Paused · " else "") + reminder.scheduledAtMillis.toAbsoluteText() +
+                        (reminder.recurrence?.let { "\n${it.describe()}" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (accentDanger) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.textMuted,
                 )
@@ -417,9 +443,12 @@ private fun ReminderRow(
 @Composable
 private fun ReminderActionSheet(
     reminder: Reminder,
+    history: List<ReminderOccurrence>,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onSkipNext: () -> Unit,
+    onTogglePause: () -> Unit,
 ) {
     AppBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -441,6 +470,28 @@ private fun ReminderActionSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 SecondaryButton(text = "Edit", modifier = Modifier.weight(1f), onClick = onEdit)
                 DestructiveButton(text = "Delete", modifier = Modifier.weight(1f), onClick = onDelete)
+            }
+            if (!reminder.completed) {
+                if (reminder.recurrence != null) {
+                    SecondaryButton(
+                        text = if (reminder.paused) "Resume series" else "Pause series",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onTogglePause,
+                    )
+                }
+                if (!reminder.paused) {
+                    SecondaryButton(text = "Skip next", modifier = Modifier.fillMaxWidth(), onClick = onSkipNext)
+                }
+            }
+            if (history.isNotEmpty()) {
+                Text("Recent activity", style = MaterialTheme.typography.titleSmall)
+                history.take(5).forEach { occurrence ->
+                    Text(
+                        "${occurrence.action.name.lowercase().replaceFirstChar(Char::uppercase)} · ${occurrence.occurrenceMillis.toAbsoluteText()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.extendedColors.textMuted,
+                    )
+                }
             }
         }
     }

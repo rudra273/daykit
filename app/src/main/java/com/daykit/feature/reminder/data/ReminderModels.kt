@@ -10,4 +10,14 @@ data class Reminder(
     val updatedAtMillis: Long,
     val recurrence: ReminderRecurrence? = null,
     val pendingOccurrenceMillis: Long? = null,
+    val paused: Boolean = false,
+    val snoozedUntilMillis: Long? = null,
+)
+
+enum class ReminderOccurrenceAction { COMPLETED, SKIPPED }
+
+data class ReminderOccurrence(
+    val occurrenceMillis: Long,
+    val action: ReminderOccurrenceAction,
+    val actionAtMillis: Long,
 )

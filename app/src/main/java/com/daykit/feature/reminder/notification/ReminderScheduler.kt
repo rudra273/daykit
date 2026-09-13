@@ -19,13 +19,18 @@ class ReminderScheduler(
     private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
 
     fun schedule(reminder: Reminder) {
-        if (reminder.completed || reminder.pendingOccurrenceMillis == reminder.scheduledAtMillis) {
-            cancel(reminder.reminderId)
-            return
+        cancel(reminder.reminderId)
+        if (!reminder.completed && !reminder.paused && reminder.pendingOccurrenceMillis != reminder.scheduledAtMillis) {
+            scheduleAt(reminder.scheduledAtMillis, alarmPendingIntent(reminder.reminderId))
         }
-        val triggerAtMillis = reminder.scheduledAtMillis
-            .coerceAtLeast(System.currentTimeMillis() + 1_000L)
-        val pendingIntent = alarmPendingIntent(reminder.reminderId)
+        val snoozeAt = reminder.snoozedUntilMillis
+        if (!reminder.completed && !reminder.paused && reminder.pendingOccurrenceMillis != null && snoozeAt != null) {
+            scheduleAt(snoozeAt, snoozePendingIntent(reminder.reminderId, snoozeAt))
+        }
+    }
+
+    private fun scheduleAt(requestedMillis: Long, pendingIntent: PendingIntent) {
+        val triggerAtMillis = requestedMillis.coerceAtLeast(System.currentTimeMillis() + 1_000L)
 
         if (canScheduleExactAlarms()) {
             try {
@@ -46,6 +51,7 @@ class ReminderScheduler(
 
     fun cancel(reminderId: String) {
         alarmManager.cancel(alarmPendingIntent(reminderId))
+        alarmManager.cancel(snoozePendingIntent(reminderId, 0L))
     }
 
     private fun canScheduleExactAlarms(): Boolean =
@@ -62,5 +68,23 @@ class ReminderScheduler(
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    private fun snoozePendingIntent(reminderId: String, snoozedUntilMillis: Long): PendingIntent {
+        val intent = Intent(appContext, ReminderAlarmReceiver::class.java)
+            .setAction(ReminderAlarmReceiver.ACTION_SNOOZE_FIRE)
+            .setData(android.net.Uri.parse("daykit://reminder/$reminderId/snooze"))
+            .putExtra(ReminderAlarmReceiver.EXTRA_REMINDER_ID, reminderId)
+            .putExtra(ReminderAlarmReceiver.EXTRA_SNOOZED_UNTIL, snoozedUntilMillis)
+        return PendingIntent.getBroadcast(
+            appContext,
+            reminderId.hashCode() xor SNOOZE_REQUEST_CODE_MASK,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    companion object {
+        private const val SNOOZE_REQUEST_CODE_MASK = 0x51_00_2E
     }
 }

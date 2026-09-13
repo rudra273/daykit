@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
  */
 class ReminderAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION_FIRE) return
+        if (intent.action != ACTION_FIRE && intent.action != ACTION_SNOOZE_FIRE) return
         val reminderId = intent.getStringExtra(EXTRA_REMINDER_ID).orEmpty()
         if (reminderId.isBlank()) return
 
@@ -23,8 +23,14 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
             try {
                 val repository = (context.applicationContext as DayKitApplication)
                     .container.reminderRepository
-                repository.fireDue(reminderId) { reminder ->
+                val show: (com.daykit.feature.reminder.data.Reminder) -> Unit = { reminder ->
                     ReminderNotifier.show(context, reminder.reminderId, reminder.title, reminder.scheduledAtMillis)
+                }
+                if (intent.action == ACTION_SNOOZE_FIRE) {
+                    val snoozedUntil = intent.getLongExtra(EXTRA_SNOOZED_UNTIL, Long.MIN_VALUE)
+                    if (snoozedUntil != Long.MIN_VALUE) repository.fireSnoozed(reminderId, snoozedUntil, show)
+                } else {
+                    repository.fireDue(reminderId, show)
                 }
             } finally {
                 pendingResult.finish()
@@ -34,6 +40,8 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_FIRE = "com.daykit.reminder.FIRE"
+        const val ACTION_SNOOZE_FIRE = "com.daykit.reminder.SNOOZE_FIRE"
         const val EXTRA_REMINDER_ID = "reminder_id"
+        const val EXTRA_SNOOZED_UNTIL = "snoozed_until"
     }
 }

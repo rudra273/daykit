@@ -30,7 +30,7 @@ class ReminderRepository(
         val entity = dao.getReminder(reminderId) ?: return@withLock null
         val updated = entity.toDomain().copy(title = title.trim(), scheduledAtMillis = scheduledAtMillis,
             completed = false, acknowledgedAtMillis = null, updatedAtMillis = clock(), recurrence = recurrence,
-            pendingOccurrenceMillis = null)
+            pendingOccurrenceMillis = null, paused = false, snoozedUntilMillis = null)
         dao.upsertReminder(updated.toEntity().copy(id = entity.id))
         onChanged(reminderId, updated)
         updated
@@ -40,34 +40,86 @@ class ReminderRepository(
     suspend fun markComplete(reminderId: String, occurrenceMillis: Long? = null) = mutex.withLock {
         val entity = dao.getReminder(reminderId) ?: return@withLock
         val current = entity.toDomain()
-        if (current.completed) return@withLock
+        if (current.completed || current.paused) return@withLock
         if (occurrenceMillis != null && current.pendingOccurrenceMillis != occurrenceMillis) return@withLock
         val now = clock()
+        val occurrence = current.pendingOccurrenceMillis ?: current.scheduledAtMillis
         val next = if (current.pendingOccurrenceMillis != null && current.scheduledAtMillis > current.pendingOccurrenceMillis) {
             current.scheduledAtMillis
         } else current.recurrence?.nextAfter(maxOf(now, current.scheduledAtMillis))
         val updated = current.copy(scheduledAtMillis = next ?: current.scheduledAtMillis, completed = next == null,
-            pendingOccurrenceMillis = null, acknowledgedAtMillis = now, updatedAtMillis = now)
+            pendingOccurrenceMillis = null, snoozedUntilMillis = null, acknowledgedAtMillis = now, updatedAtMillis = now)
+        dao.upsertReminderAndOccurrence(updated.toEntity().copy(id = entity.id), ReminderOccurrenceEntity(
+            reminderId = reminderId,
+            occurrenceMillis = occurrence,
+            action = if (current.pendingOccurrenceMillis != null) ReminderOccurrenceAction.COMPLETED.name else ReminderOccurrenceAction.SKIPPED.name,
+            actionAtMillis = now,
+        ))
+        onChanged(reminderId, updated)
+    }
+
+    suspend fun skipNext(reminderId: String) = markComplete(reminderId)
+
+    suspend fun setPaused(reminderId: String, paused: Boolean) = mutex.withLock {
+        val entity = dao.getReminder(reminderId) ?: return@withLock
+        val current = entity.toDomain()
+        if (current.recurrence == null || current.completed || current.paused == paused) return@withLock
+        val now = clock()
+        val next = if (!paused) current.recurrence.nextAfter(now) else current.scheduledAtMillis
+        val updated = current.copy(
+            paused = paused,
+            scheduledAtMillis = next ?: current.scheduledAtMillis,
+            completed = !paused && next == null,
+            pendingOccurrenceMillis = null,
+            snoozedUntilMillis = null,
+            updatedAtMillis = now,
+        )
         dao.upsertReminder(updated.toEntity().copy(id = entity.id))
         onChanged(reminderId, updated)
     }
+
+    suspend fun snooze(reminderId: String, occurrenceMillis: Long, durationMillis: Long) = mutex.withLock {
+        require(durationMillis in 60_000L..86_400_000L) { "Invalid snooze duration" }
+        val entity = dao.getReminder(reminderId) ?: return@withLock
+        val current = entity.toDomain()
+        if (current.completed || current.paused || current.pendingOccurrenceMillis != occurrenceMillis) return@withLock
+        val updated = current.copy(snoozedUntilMillis = clock() + durationMillis, updatedAtMillis = clock())
+        dao.upsertReminder(updated.toEntity().copy(id = entity.id))
+        onChanged(reminderId, updated)
+    }
+
+    suspend fun fireSnoozed(reminderId: String, snoozedUntilMillis: Long, show: (Reminder) -> Unit) = mutex.withLock {
+        val entity = dao.getReminder(reminderId) ?: return@withLock
+        val current = entity.toDomain()
+        if (current.completed || current.paused || current.snoozedUntilMillis != snoozedUntilMillis ||
+            current.pendingOccurrenceMillis == null || snoozedUntilMillis > clock()) return@withLock
+        val updated = current.copy(snoozedUntilMillis = null, updatedAtMillis = clock())
+        dao.upsertReminder(updated.toEntity().copy(id = entity.id))
+        onChanged(reminderId, updated)
+        show(updated.copy(scheduledAtMillis = current.pendingOccurrenceMillis))
+    }
+
+    suspend fun getOccurrenceHistory(reminderId: String): List<ReminderOccurrence> =
+        dao.getOccurrenceHistory(reminderId).map {
+            ReminderOccurrence(it.occurrenceMillis, ReminderOccurrenceAction.valueOf(it.action), it.actionAtMillis)
+        }
 
     /** Persist and arm the next occurrence before displaying this one; duplicate/stale broadcasts are ignored. */
     suspend fun fireDue(reminderId: String, show: (Reminder) -> Unit) = mutex.withLock {
         val entity = dao.getReminder(reminderId) ?: return@withLock
         val current = entity.toDomain()
         val now = clock()
-        if (current.completed || current.scheduledAtMillis > now || current.pendingOccurrenceMillis == current.scheduledAtMillis) return@withLock
+        if (current.completed || current.paused || current.scheduledAtMillis > now || current.pendingOccurrenceMillis == current.scheduledAtMillis) return@withLock
         val next = current.recurrence?.nextAfter(now)
         val updated = current.copy(scheduledAtMillis = next ?: current.scheduledAtMillis,
-            pendingOccurrenceMillis = current.scheduledAtMillis, updatedAtMillis = now)
+            pendingOccurrenceMillis = current.scheduledAtMillis, snoozedUntilMillis = null, updatedAtMillis = now)
         dao.upsertReminder(updated.toEntity().copy(id = entity.id))
         onChanged(reminderId, updated)
         show(current)
     }
 
     suspend fun deleteReminder(reminderId: String) = mutex.withLock {
-        dao.deleteReminder(reminderId)
+        dao.deleteReminderAndOccurrences(reminderId)
         onChanged(reminderId, null)
     }
 
@@ -77,7 +129,9 @@ class ReminderRepository(
         dao.getPendingReminders().forEach { entity ->
             val reminder = entity.toDomain()
             onChanged(reminder.reminderId, reminder)
-            reminder.pendingOccurrenceMillis?.let { show(reminder.copy(scheduledAtMillis = it)) }
+            if (reminder.snoozedUntilMillis == null) {
+                reminder.pendingOccurrenceMillis?.let { show(reminder.copy(scheduledAtMillis = it)) }
+            }
         }
     }
 
@@ -92,6 +146,7 @@ class ReminderRepository(
             require(reminder.title.isNotBlank() && reminder.title.length <= 80) { "Invalid reminder title" }
             require(reminder.scheduledAtMillis >= 0)
             require(reminder.pendingOccurrenceMillis == null || reminder.pendingOccurrenceMillis in 0..reminder.scheduledAtMillis)
+            require(reminder.snoozedUntilMillis == null || reminder.pendingOccurrenceMillis != null)
             require(reminder.recurrence == null || reminder.recurrence.nextAfter(reminder.scheduledAtMillis - 1) == reminder.scheduledAtMillis) { "Invalid reminder recurrence" }
         }
         require(reminders.map { it.reminderId }.distinct().size == reminders.size) { "Duplicate reminder IDs" }
@@ -108,8 +163,10 @@ class ReminderRepository(
 }
 
 fun ReminderEntity.toDomain() = Reminder(reminderId, title, scheduledAtMillis, completed, acknowledgedAtMillis,
-    createdAtMillis, updatedAtMillis, recurrenceRule?.let(ReminderRecurrence::decode), pendingOccurrenceMillis)
+    createdAtMillis, updatedAtMillis, recurrenceRule?.let(ReminderRecurrence::decode), pendingOccurrenceMillis,
+    paused, snoozedUntilMillis)
 
 fun Reminder.toEntity() = ReminderEntity(reminderId = reminderId, title = title, scheduledAtMillis = scheduledAtMillis,
     completed = completed, acknowledgedAtMillis = acknowledgedAtMillis, createdAtMillis = createdAtMillis,
-    updatedAtMillis = updatedAtMillis, recurrenceRule = recurrence?.encode(), pendingOccurrenceMillis = pendingOccurrenceMillis)
+    updatedAtMillis = updatedAtMillis, recurrenceRule = recurrence?.encode(), pendingOccurrenceMillis = pendingOccurrenceMillis,
+    paused = paused, snoozedUntilMillis = snoozedUntilMillis)

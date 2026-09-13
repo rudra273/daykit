@@ -54,6 +54,17 @@ object ReminderNotifier {
                 .putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val snoozePendingIntent = PendingIntent.getBroadcast(
+            appContext,
+            reminderId.hashCode() xor 0x51_00_2E,
+            Intent(appContext, ReminderActionReceiver::class.java)
+                .setAction(ReminderActionReceiver.ACTION_SNOOZE)
+                .setData(android.net.Uri.parse("daykit://reminder/$reminderId/$occurrenceMillis/snooze"))
+                .putExtra(ReminderActionReceiver.EXTRA_OCCURRENCE, occurrenceMillis)
+                .putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId)
+                .putExtra(ReminderActionReceiver.EXTRA_SNOOZE_DURATION, ReminderActionReceiver.TEN_MINUTES),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -67,6 +78,7 @@ object ReminderNotifier {
             .setOngoing(true)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .addAction(R.drawable.ic_todo_tracker, "Snooze 10 min", snoozePendingIntent)
             .addAction(R.drawable.ic_todo_tracker, "Complete", completePendingIntent)
             .build()
         NotificationManagerCompat.from(appContext).notify(notificationId(reminderId), notification)

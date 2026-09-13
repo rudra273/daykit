@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Password
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.SearchOff
@@ -78,6 +80,8 @@ import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.keystore.data.KeyStoreEntry
+import com.daykit.feature.keystore.data.PasswordGenerator
+import com.daykit.feature.keystore.data.PasswordGeneratorOptions
 import kotlinx.coroutines.launch
 
 private sealed interface KeyEditorState {
@@ -484,6 +488,12 @@ private fun KeyFormSheet(
     var label by remember(editKey) { mutableStateOf(entry?.label ?: "") }
     var valueVisible by remember(editKey) { mutableStateOf(false) }
     var confirmVisible by remember(editKey) { mutableStateOf(false) }
+    var generatorExpanded by remember(editKey) { mutableStateOf(false) }
+    var generatedLength by remember(editKey) { mutableStateOf(20) }
+    var useUppercase by remember(editKey) { mutableStateOf(true) }
+    var useLowercase by remember(editKey) { mutableStateOf(true) }
+    var useNumbers by remember(editKey) { mutableStateOf(true) }
+    var useSymbols by remember(editKey) { mutableStateOf(true) }
 
     val mismatch = confirmValue.isNotEmpty() && value != confirmValue
     val canSave = name.isNotBlank() && value.isNotBlank() && value == confirmValue
@@ -545,6 +555,65 @@ private fun KeyFormSheet(
                     }
                 },
             )
+            SecondaryButton(
+                text = if (generatorExpanded) "Hide generator" else "Generate password",
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = { Icon(Icons.Rounded.Password, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                onClick = { generatorExpanded = !generatorExpanded },
+            )
+            if (generatorExpanded) {
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    Text("Password generator", style = MaterialTheme.typography.titleSmall)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("Length", style = MaterialTheme.typography.bodyMedium)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { generatedLength = (generatedLength - 1).coerceAtLeast(8) }) {
+                                Icon(Icons.Rounded.Remove, contentDescription = "Shorter")
+                            }
+                            Text("$generatedLength", style = MaterialTheme.typography.titleMedium)
+                            IconButton(onClick = { generatedLength = (generatedLength + 1).coerceAtMost(128) }) {
+                                Icon(Icons.Rounded.Add, contentDescription = "Longer")
+                            }
+                        }
+                    }
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        FilterChipButton("Uppercase", useUppercase) {
+                            if (!useUppercase || useLowercase || useNumbers || useSymbols) useUppercase = !useUppercase
+                        }
+                        FilterChipButton("Lowercase", useLowercase) {
+                            if (!useLowercase || useUppercase || useNumbers || useSymbols) useLowercase = !useLowercase
+                        }
+                        FilterChipButton("Numbers", useNumbers) {
+                            if (!useNumbers || useUppercase || useLowercase || useSymbols) useNumbers = !useNumbers
+                        }
+                        FilterChipButton("Symbols", useSymbols) {
+                            if (!useSymbols || useUppercase || useLowercase || useNumbers) useSymbols = !useSymbols
+                        }
+                    }
+                    PrimaryButton(
+                        text = "Use generated password",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            val generated = PasswordGenerator.generate(PasswordGeneratorOptions(
+                                length = generatedLength,
+                                uppercase = useUppercase,
+                                lowercase = useLowercase,
+                                numbers = useNumbers,
+                                symbols = useSymbols,
+                            ))
+                            value = generated
+                            confirmValue = generated
+                            valueVisible = true
+                        },
+                    )
+                }
+            }
             AppTextField(
                 value = label,
                 onValueChange = { label = it },

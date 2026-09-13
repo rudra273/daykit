@@ -83,7 +83,7 @@ fun TodayScreen(
 
     val buildHabits = habitDashboard?.buildHabits.orEmpty()
     val now = System.currentTimeMillis()
-    val pending = reminders.filter { !it.completed }.sortedBy { it.scheduledAtMillis }
+    val pending = reminders.filter { !it.completed && !it.paused }.sortedBy { it.scheduledAtMillis }
     val allEmpty = buildHabits.isEmpty() && pending.isEmpty() && monthSummary == null
 
     Column(Modifier.fillMaxSize()) {
