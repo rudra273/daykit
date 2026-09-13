@@ -36,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
@@ -48,8 +47,6 @@ import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.util.Money
 import com.daykit.feature.habit.data.HabitGoalType
 import com.daykit.feature.reminder.data.Reminder
-import com.daykit.feature.reminder.notification.ReminderNotifier
-import com.daykit.feature.reminder.notification.ReminderScheduler
 import com.daykit.navigation.Routes
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -65,7 +62,6 @@ fun TodayScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val scheduler = remember(context) { ReminderScheduler(context) }
     val monthKey = remember { YearMonth.now().toString() }
 
     androidx.compose.runtime.LaunchedEffect(monthKey) {
@@ -166,9 +162,6 @@ fun TodayScreen(
                         onComplete = {
                             scope.launch {
                                 container.reminderRepository.markComplete(reminder.reminderId)
-                                scheduler.cancel(reminder.reminderId)
-                                NotificationManagerCompat.from(context)
-                                    .cancel(ReminderNotifier.notificationId(reminder.reminderId))
                             }
                         },
                     )

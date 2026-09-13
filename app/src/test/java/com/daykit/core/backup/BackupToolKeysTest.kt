@@ -7,6 +7,18 @@ import org.junit.Test
 
 class BackupToolKeysTest {
     @Test
+    fun newUtilityTogglesAreIndependentAndDefaultOff() {
+        val defaults = includedBackupToolKeys(false, false, false)
+        val additions = listOf(BackupToolKeys.REMINDERS, BackupToolKeys.APP_LOCK, BackupToolKeys.EVENT_LIGHT, BackupToolKeys.APP_PREFERENCES)
+        for (mask in 0 until 16) {
+            val flags = (0..3).map { mask and (1 shl it) != 0 }
+            val actual = includedBackupToolKeys(false, false, false, flags[0], flags[1], flags[2], flags[3])
+            assertEquals(defaults + additions.filterIndexed { index, _ -> flags[index] }, actual)
+        }
+        additions.forEach { assertFalse(it in defaults) }
+    }
+
+    @Test
     fun unconditionalToolsAreAlwaysIncluded() {
         // Even with every optional toggle off, the tools the user cannot
         // reconstruct are present. Focus blocks join them because losing one on

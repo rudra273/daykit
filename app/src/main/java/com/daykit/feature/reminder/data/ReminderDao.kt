@@ -13,40 +13,17 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE reminderId = :reminderId LIMIT 1")
     suspend fun getReminder(reminderId: String): ReminderEntity?
 
-    @Query("SELECT * FROM reminders WHERE completed = 0 AND scheduledAtMillis > :nowMillis ORDER BY scheduledAtMillis ASC")
-    suspend fun getPendingFutureReminders(nowMillis: Long): List<ReminderEntity>
+    @Query("SELECT * FROM reminders WHERE completed = 0 ORDER BY scheduledAtMillis ASC")
+    suspend fun getPendingReminders(): List<ReminderEntity>
+
+    @Query("SELECT * FROM reminders ORDER BY scheduledAtMillis ASC")
+    suspend fun getAllReminders(): List<ReminderEntity>
+
+    @Upsert
+    suspend fun upsertReminders(entities: List<ReminderEntity>)
 
     @Upsert
     suspend fun upsertReminder(entity: ReminderEntity)
-
-    @Query(
-        """
-        UPDATE reminders
-        SET completed = 1,
-            acknowledgedAtMillis = :acknowledgedAtMillis,
-            updatedAtMillis = :acknowledgedAtMillis
-        WHERE reminderId = :reminderId
-        """,
-    )
-    suspend fun markComplete(reminderId: String, acknowledgedAtMillis: Long)
-
-    @Query(
-        """
-        UPDATE reminders
-        SET title = :title,
-            scheduledAtMillis = :scheduledAtMillis,
-            completed = 0,
-            acknowledgedAtMillis = NULL,
-            updatedAtMillis = :updatedAtMillis
-        WHERE reminderId = :reminderId
-        """,
-    )
-    suspend fun updateReminder(
-        reminderId: String,
-        title: String,
-        scheduledAtMillis: Long,
-        updatedAtMillis: Long,
-    )
 
     @Query("DELETE FROM reminders WHERE reminderId = :reminderId")
     suspend fun deleteReminder(reminderId: String)

@@ -27,6 +27,7 @@ import com.daykit.DayKitApplication
 import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
+import com.daykit.feature.reminder.notification.ReminderActionReceiver
 import com.daykit.feature.reminder.notification.ReminderNotifier
 import com.daykit.feature.reminder.notification.ReminderScheduler
 import androidx.core.app.NotificationManagerCompat
@@ -67,6 +68,7 @@ class ReminderAlarmActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        recreate()
     }
 
     private fun showWhenLockedAndTurnScreenOn() {
@@ -85,12 +87,11 @@ class ReminderAlarmActivity : ComponentActivity() {
 
     private fun complete() {
         val id = reminderId
+        val occurrence = intent.getLongExtra(ReminderActionReceiver.EXTRA_OCCURRENCE, Long.MIN_VALUE)
         val appContext = applicationContext
-        NotificationManagerCompat.from(appContext).cancel(ReminderNotifier.notificationId(id))
         ioScope.launch {
             val repository = (appContext as DayKitApplication).container.reminderRepository
-            repository.markComplete(id)
-            ReminderScheduler(appContext).cancel(id)
+            if (occurrence != Long.MIN_VALUE) repository.markComplete(id, occurrence)
         }
         finish()
     }
@@ -100,15 +101,6 @@ class ReminderAlarmActivity : ComponentActivity() {
      * notification so the reminder is not lost.
      */
     private fun snoozeToNotification() {
-        val id = reminderId
-        val title = reminderTitle
-        val appContext = applicationContext
-        ioScope.launch {
-            val reminder = (appContext as DayKitApplication).container.reminderRepository.getReminder(id)
-            if (reminder != null && !reminder.completed) {
-                ReminderNotifier.show(appContext, id, title)
-            }
-        }
         finish()
     }
 
@@ -116,10 +108,11 @@ class ReminderAlarmActivity : ComponentActivity() {
         private const val EXTRA_REMINDER_ID = "reminder_id"
         private const val EXTRA_TITLE = "reminder_title"
 
-        fun intent(context: Context, reminderId: String, title: String): Intent {
+        fun intent(context: Context, reminderId: String, title: String, occurrenceMillis: Long): Intent {
             return Intent(context, ReminderAlarmActivity::class.java)
                 .putExtra(EXTRA_REMINDER_ID, reminderId)
                 .putExtra(EXTRA_TITLE, title)
+                .putExtra(ReminderActionReceiver.EXTRA_OCCURRENCE, occurrenceMillis)
         }
     }
 }

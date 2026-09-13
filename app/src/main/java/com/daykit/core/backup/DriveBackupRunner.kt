@@ -114,6 +114,10 @@ class DriveBackupRunner(
             // Vault files can be large, so they are opt-in — same toggle the manual
             // backup uses. Off by default.
             includeVault = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT) == true,
+            includeReminders = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_REMINDERS) == true,
+            includeAppLock = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_LOCK) == true,
+            includeEventLight = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_EVENT_LIGHT) == true,
+            includeAppPreferences = settings.getBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_PREFERENCES) == true,
         )
 
         val accessToken = authorize() ?: return Outcome.NeedsAuthorization
@@ -210,6 +214,7 @@ class DriveBackupRunner(
      * The full error still goes to logcat for debugging.
      */
     private fun userFacingError(error: Throwable, fallback: String): String = when (error) {
+        is BackupSizeException -> error.message.orEmpty()
         is java.net.UnknownHostException,
         is java.net.SocketTimeoutException,
         is java.io.InterruptedIOException,

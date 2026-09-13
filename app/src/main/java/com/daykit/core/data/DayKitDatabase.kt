@@ -47,7 +47,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         FocusGroupEntity::class,
         FocusScheduleEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -75,10 +75,12 @@ abstract class DayKitDatabase : RoomDatabase() {
                 "daykit_secure.db",
             )
                 .openHelperFactory(factory)
-                // No migrations and deliberately no destructive fallback: the app is
-                // pre-release, so the schema starts fresh at version 1. Once there are
-                // real installs, every schema change needs a hand-written Migration
-                // added here — a missing one must crash rather than silently wipe data.
+                .addMigrations(object : androidx.room.migration.Migration(1, 2) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE reminders ADD COLUMN recurrenceRule TEXT")
+                        db.execSQL("ALTER TABLE reminders ADD COLUMN pendingOccurrenceMillis INTEGER")
+                    }
+                })
                 .build()
         }
     }

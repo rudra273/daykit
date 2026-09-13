@@ -140,7 +140,12 @@ class AppContainer(context: Context) {
     }
 
     val reminderRepository: ReminderRepository by lazy {
-        ReminderRepository(database.reminderDao())
+        ReminderRepository(database.reminderDao(), onChanged = { id, reminder ->
+            val scheduler = com.daykit.feature.reminder.notification.ReminderScheduler(appContext)
+            androidx.core.app.NotificationManagerCompat.from(appContext).cancel(
+                com.daykit.feature.reminder.notification.ReminderNotifier.notificationId(id))
+            if (reminder == null) scheduler.cancel(id) else scheduler.schedule(reminder)
+        })
     }
 
     val vaultFileRepository: VaultFileRepository by lazy {
@@ -161,6 +166,20 @@ class AppContainer(context: Context) {
                 SecureNoteBackupContributor(secureNoteRepository),
                 HabitBackupContributor(habitRepository),
                 VaultBackupContributor(vaultFileRepository),
+                com.daykit.feature.reminder.data.ReminderBackupContributor(reminderRepository) {
+                    reminderRepository.restoreAlarms { reminder ->
+                        com.daykit.feature.reminder.notification.ReminderNotifier.show(
+                            appContext, reminder.reminderId, reminder.title, reminder.scheduledAtMillis, alert = false)
+                    }
+                },
+                com.daykit.feature.applock.data.AppLockBackupContributor(appLockRepository, appContext.packageName) {
+                    if (credentialRepository.hasCredential() &&
+                        com.daykit.core.permissions.AppLockPermissionChecker.hasUsageAccess(appContext)) {
+                        com.daykit.feature.applock.service.AppMonitorService.start(appContext)
+                    }
+                },
+                com.daykit.feature.eventlight.data.EventLightBackupContributor(appContext),
+                com.daykit.core.backup.AppPreferencesBackupContributor(appContext, secureSettingRepository),
                 FocusBackupContributor(
                     focusBlockStore = focusBlockStore,
                     groupDao = database.focusGroupDao(),

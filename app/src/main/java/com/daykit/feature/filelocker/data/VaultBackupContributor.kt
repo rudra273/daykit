@@ -1,6 +1,7 @@
 package com.daykit.feature.filelocker.data
 
 import android.util.Base64
+import com.daykit.core.backup.BackupLimits
 import com.daykit.core.backup.BackupContributor
 import org.json.JSONArray
 import org.json.JSONObject
@@ -26,20 +27,30 @@ class VaultBackupContributor(
     override suspend fun exportJson(): JSONObject {
         val files = JSONArray()
         repository.exportForBackup().forEach { record ->
-            files.put(
+            try {
+                files.put(
                 JSONObject()
                     .put("fileId", record.fileId)
                     .put("name", record.name)
                     .put("mimeType", record.mimeType)
                     .put("createdAtMillis", record.createdAtMillis)
                     .put("bytes", Base64.encodeToString(record.plaintext, Base64.NO_WRAP)),
-            )
+                )
+            } finally { record.plaintext.fill(0) }
         }
         return JSONObject().put("files", files)
     }
 
     override suspend fun importJson(payload: JSONObject) {
         val files = payload.optJSONArray("files") ?: JSONArray()
+        // Reject malformed IDs and oversized encoded data before decoding any file.
+        val decodedSizes = mutableListOf<Long>()
+        for (index in 0 until files.length()) {
+            val file = files.getJSONObject(index)
+            VaultStorageSafety.validateId(file.getString("fileId"))
+            decodedSizes += BackupLimits.decodedBase64Size(file.getString("bytes"))
+        }
+        BackupLimits.checkVaultSizes(decodedSizes)
         val records = buildList {
             for (index in 0 until files.length()) {
                 val file = files.getJSONObject(index)
@@ -54,7 +65,7 @@ class VaultBackupContributor(
                 )
             }
         }
-        repository.importFromBackup(records)
+        try { repository.importFromBackup(records) } finally { records.forEach { it.plaintext.fill(0) } }
     }
 
     companion object {

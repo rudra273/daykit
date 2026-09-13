@@ -19,6 +19,10 @@ object BackupToolKeys {
     const val HABITS = "habits"
     const val VAULT = "vault_files"
     const val FOCUS = "focus_blocks"
+    const val REMINDERS = "reminders"
+    const val APP_LOCK = "app_lock"
+    const val EVENT_LIGHT = "event_light"
+    const val APP_PREFERENCES = "app_preferences"
 }
 
 /**
@@ -38,6 +42,10 @@ fun includedBackupToolKeys(
     includeExpenses: Boolean,
     includeHabits: Boolean,
     includeVault: Boolean,
+    includeReminders: Boolean = false,
+    includeAppLock: Boolean = false,
+    includeEventLight: Boolean = false,
+    includeAppPreferences: Boolean = false,
 ): Set<String> = buildSet {
     add(BackupToolKeys.KEY_STORE)
     add(BackupToolKeys.NOTES)
@@ -45,4 +53,8 @@ fun includedBackupToolKeys(
     if (includeVault) add(BackupToolKeys.VAULT)
     if (includeExpenses) add(BackupToolKeys.EXPENSES)
     if (includeHabits) add(BackupToolKeys.HABITS)
+    if (includeReminders) add(BackupToolKeys.REMINDERS)
+    if (includeAppLock) add(BackupToolKeys.APP_LOCK)
+    if (includeEventLight) add(BackupToolKeys.EVENT_LIGHT)
+    if (includeAppPreferences) add(BackupToolKeys.APP_PREFERENCES)
 }

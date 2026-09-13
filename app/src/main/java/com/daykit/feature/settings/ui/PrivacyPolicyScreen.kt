@@ -80,9 +80,9 @@ fun PrivacyPolicyScreen(
                 title = "Backup And Google Drive",
                 body = listOf(
                     "Backups are encrypted on the device before they are saved or uploaded. The backup password is used to derive the backup encryption key, and backup content is encrypted before it leaves the device.",
-                    "Key Store and Secure Notes are always included in encrypted backup files. Expenses, Habits, and File Vault files are optional and can be enabled or disabled in Backup & Restore settings. File Vault backup is off by default; vault files are only included when the user explicitly turns it on.",
+                    "Key Store and Secure Notes are always included in encrypted backup files. Focus is also included. Expenses, Habits, File Vault, Reminders, App Lock selections, Event Light settings, and appearance/widget preferences are optional and off by default in Backup & Restore.",
                     "Restoring a backup requires the master PIN, because it replaces the data currently on the device.",
-                    "App Lock package selections, theme preferences, widget settings, DNS choices, reminder schedules, and editor cache are not included in app backup files.",
+                    "DNS choices and editor cache are not included. App Lock backups contain selections, not the master PIN or Android permission grants. Restoring preferences does not enable backup options or connect a Google account.",
                     "When Google Drive backup is enabled, DayKit requests access to create and manage its own backup files in the user's Google Drive. The app uploads encrypted backup files; it does not upload plain Key Store values, notes, expenses, or habits.",
                     "Google account authorization is used only for the backup and restore actions chosen by the user or for automatic backup when the user enables it.",
                 ),

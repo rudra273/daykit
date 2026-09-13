@@ -135,6 +135,15 @@
             android:exported="false" />
 
         <receiver
+            android:name=".feature.reminder.notification.ReminderRestoreReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".feature.reminder.notification.ReminderAlarmReceiver"
             android:exported="false" />
 

@@ -1,5 +1,6 @@
 package com.daykit.feature.filelocker.data
 
+import com.daykit.core.backup.BackupLimits
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -65,8 +66,8 @@ class VaultFileRepository(
     suspend fun importFile(uri: Uri): Boolean {
         val meta = resolveSourceMeta(uri)
         val fileId = UUID.randomUUID().toString()
-        val storedName = "$fileId$BLOB_EXTENSION"
-        val blob = File(vaultDir, storedName)
+        val blob = VaultStorageSafety.createBlob(vaultDir)
+        val storedName = blob.name
 
         val dek = ByteArray(DEK_BYTES).also(secureRandom::nextBytes)
         try {
@@ -157,8 +158,10 @@ class VaultFileRepository(
 
     suspend fun delete(fileId: String) {
         val entity = dao.getByFileId(fileId) ?: return
-        File(vaultDir, entity.storedFileName).delete()
+        // A database failure leaves the encrypted source intact. Failed file cleanup
+        // leaves only an orphan, not an unreadable row pointing at a missing source.
         dao.deleteByFileId(fileId)
+        File(vaultDir, entity.storedFileName).delete()
     }
 
     /**
@@ -168,8 +171,14 @@ class VaultFileRepository(
      * re-protected by the backup's own AES-256-GCM envelope.
      */
     suspend fun exportForBackup(): List<VaultBackupRecord> {
-        return dao.observeAllOnce().map { entity ->
-            val bytes = openDecryptedStream(entity.fileId)?.use { it.readBytes() } ?: ByteArray(0)
+        val entities = dao.observeAllOnce()
+        BackupLimits.checkVaultSizes(entities.map { it.sizeBytes })
+        var remaining = BackupLimits.MAX_VAULT_BYTES
+        return entities.map { entity ->
+            val bytes = openDecryptedStream(entity.fileId)?.use {
+                BackupLimits.readBounded(it, remaining, BackupLimits.VAULT_LIMIT_MESSAGE)
+            } ?: error("A vault file is missing. Backup stopped to avoid saving an empty replacement.")
+            remaining -= bytes.size
             VaultBackupRecord(
                 fileId = entity.fileId,
                 name = cipher.decryptString(CipherPayload(entity.nameCiphertext, entity.nameIv), entity.fileId),
@@ -182,10 +191,14 @@ class VaultFileRepository(
 
     /** Re-imports vault files from a backup, re-encrypting each with a fresh DEK. */
     suspend fun importFromBackup(records: List<VaultBackupRecord>) {
+        // Validate the entire section before touching files or database rows.
+        records.forEach { VaultStorageSafety.validateId(it.fileId) }
+        require(records.map { it.fileId }.distinct().size == records.size) { "Duplicate vault IDs in backup" }
+        BackupLimits.checkVaultSizes(records.map { it.plaintext.size.toLong() })
         records.forEach { record ->
             if (dao.getByFileId(record.fileId) != null) return@forEach
-            val storedName = "${record.fileId}$BLOB_EXTENSION"
-            val blob = File(vaultDir, storedName)
+            val blob = VaultStorageSafety.createBlob(vaultDir)
+            val storedName = blob.name
             val dek = ByteArray(DEK_BYTES).also(secureRandom::nextBytes)
             try {
                 FileOutputStream(blob).use { fileOut ->
@@ -302,19 +315,19 @@ class VaultFileRepository(
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val target = resolver.insert(collection, values) ?: return false
-        return try {
-            val out = resolver.openOutputStream(target)
-                ?: throw IllegalStateException("Could not open destination for restore")
-            if (!exportTo(fileId, out)) error("Vault file missing")
-            values.clear()
-            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
-            resolver.update(target, values, null, null)
-            delete(fileId)
-            true
-        } catch (error: Throwable) {
-            runCatching { resolver.delete(target, null, null) }
-            false
-        }
+        return restoreVaultCopy(
+            publish = {
+                val out = resolver.openOutputStream(target)
+                    ?: error("Could not open destination for restore")
+                out.use { if (!exportTo(fileId, it)) error("Vault file missing") }
+                values.clear()
+                values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                check(resolver.update(target, values, null, null) == 1) { "Could not publish restored file" }
+            },
+            cleanupSource = { delete(fileId) },
+            discardUnpublished = { resolver.delete(target, null, null) },
+            cleanupFailed = { android.util.Log.w("VaultRestore", "File restored; vault cleanup will need retry", it) },
+        )
     }
 
     private fun InputStream.copyToCounting(out: OutputStream): Long {

@@ -1,18 +1,23 @@
 package com.daykit.core.backup
 
 import org.json.JSONObject
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class DayKitBackupService(
     private val crypto: BackupCrypto,
     private val contributors: List<BackupContributor>,
 ) {
-    suspend fun exportEncrypted(
-        password: CharArray,
-        includedToolKeys: Set<String>? = null,
-    ): String {
+    private val operationMutex = Mutex()
+
+    suspend fun exportEncrypted(password: CharArray, includedToolKeys: Set<String> = includedBackupToolKeys(false, false, false)): String =
+        try { operationMutex.withLock { exportInternal(password, includedToolKeys) } }
+        finally { password.fill('\u0000') }
+
+    private suspend fun exportInternal(password: CharArray, includedToolKeys: Set<String>): String {
         val tools = JSONObject()
         contributors
-            .filter { contributor -> includedToolKeys == null || contributor.toolKey in includedToolKeys }
+            .filter { contributor -> contributor.toolKey in includedToolKeys }
             .forEach { contributor ->
             tools.put(
                 contributor.toolKey,
@@ -28,7 +33,11 @@ class DayKitBackupService(
             .put("exportedAtMillis", System.currentTimeMillis())
             .put("tools", tools)
 
-        return crypto.encrypt(payload, password).toString()
+        val encrypted = crypto.encrypt(payload, password).toString()
+        if (encrypted.length > BackupLimits.MAX_ENVELOPE_BYTES) {
+            throw BackupSizeException("This backup exceeds the supported 16 MiB file size. Turn off optional utilities to reduce its size.")
+        }
+        return encrypted
     }
 
     /**
@@ -39,7 +48,14 @@ class DayKitBackupService(
      * A payload written by an *older* app version is accepted; only a payload from a
      * newer version than this build understands is rejected outright.
      */
-    suspend fun importEncrypted(encryptedBackup: String, password: CharArray): ImportReport {
+    suspend fun importEncrypted(encryptedBackup: String, password: CharArray): ImportReport =
+        try { operationMutex.withLock { importInternal(encryptedBackup, password) } }
+        finally { password.fill('\u0000') }
+
+    private suspend fun importInternal(encryptedBackup: String, password: CharArray): ImportReport {
+        if (encryptedBackup.length > BackupLimits.MAX_ENVELOPE_BYTES) {
+            throw BackupSizeException("This backup exceeds the supported 16 MiB file size.")
+        }
         val payload = crypto.decrypt(JSONObject(encryptedBackup), password)
         val payloadVersion = payload.getInt("payloadVersion")
         if (payloadVersion > PAYLOAD_VERSION) {
@@ -50,6 +66,9 @@ class DayKitBackupService(
         val restored = mutableListOf<String>()
         val skipped = mutableListOf<SkippedSection>()
 
+        tools.keys().forEach { key ->
+            if (contributors.none { it.toolKey == key }) skipped += SkippedSection(key, "This utility is not supported by this app version")
+        }
         contributors.forEach { contributor ->
             if (!tools.has(contributor.toolKey)) return@forEach
             // One malformed or future-shaped section must not abort the whole

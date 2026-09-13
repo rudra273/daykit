@@ -8,4 +8,6 @@ data class Reminder(
     val acknowledgedAtMillis: Long?,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
+    val recurrence: ReminderRecurrence? = null,
+    val pendingOccurrenceMillis: Long? = null,
 )

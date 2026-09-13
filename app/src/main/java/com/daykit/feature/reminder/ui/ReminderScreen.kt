@@ -61,7 +61,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
@@ -81,8 +80,13 @@ import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.reminder.data.Reminder
-import com.daykit.feature.reminder.notification.ReminderNotifier
-import com.daykit.feature.reminder.notification.ReminderScheduler
+import com.daykit.feature.reminder.data.ReminderRecurrence
+import com.daykit.feature.reminder.data.ReminderFrequency
+import com.daykit.core.designsystem.components.FilterChipButton
+import com.daykit.feature.focus.ui.FocusWeekdayPicker
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.ui.text.input.KeyboardType
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -100,7 +104,6 @@ fun ReminderScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val errors = rememberErrorReporter(scope)
-    val scheduler = remember(context) { ReminderScheduler(context) }
     val reminders by container.reminderRepository
         .observeReminders()
         .collectAsStateWithLifecycle(initialValue = null)
@@ -114,14 +117,12 @@ fun ReminderScreen(
     fun complete(reminder: Reminder) {
         errors.launchGuarded("Couldn't complete that reminder.") {
             container.reminderRepository.markComplete(reminder.reminderId)
-            scheduler.cancel(reminder.reminderId)
-            NotificationManagerCompat.from(context).cancel(ReminderNotifier.notificationId(reminder.reminderId))
         }
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { AppTopBar(title = "Reminders", onBack = onBack) },
+        topBar = { Column { AppTopBar(title = "Reminders", onBack = onBack); ReminderPermissionNotice() } },
         snackbarHost = { SnackbarHost(errors.host) },
         floatingActionButton = {
             AppFab(icon = Icons.Rounded.Add, contentDescription = "Add reminder", onClick = { addOpen = true })
@@ -146,13 +147,12 @@ fun ReminderScreen(
             confirmText = "Add reminder",
             initial = null,
             onDismiss = { addOpen = false },
-            onSave = { title, scheduledAtMillis ->
+            onSave = { title, scheduledAtMillis, recurrence ->
                 errors.launchGuarded(
                     failureMessage = "Couldn't save that reminder.",
                     onFailure = { addOpen = false },
                 ) {
-                    val reminder = container.reminderRepository.addReminder(title, scheduledAtMillis)
-                    scheduler.schedule(reminder)
+                    container.reminderRepository.addReminder(title, scheduledAtMillis, recurrence)
                     requestNotificationPermissionIfNeeded(context as? Activity)
                     addOpen = false
                 }
@@ -166,18 +166,14 @@ fun ReminderScreen(
             confirmText = "Save changes",
             initial = editing,
             onDismiss = { editReminder = null },
-            onSave = { title, scheduledAtMillis ->
+            onSave = { title, scheduledAtMillis, recurrence ->
                 errors.launchGuarded(
                     failureMessage = "Couldn't save your changes.",
                     onFailure = { editReminder = null },
                 ) {
                     val updated = container.reminderRepository
-                        .updateReminder(editing.reminderId, title, scheduledAtMillis)
+                        .updateReminder(editing.reminderId, title, scheduledAtMillis, recurrence)
                     if (updated != null) {
-                        scheduler.cancel(updated.reminderId)
-                        NotificationManagerCompat.from(context)
-                            .cancel(ReminderNotifier.notificationId(updated.reminderId))
-                        scheduler.schedule(updated)
                         requestNotificationPermissionIfNeeded(context as? Activity)
                     }
                     editReminder = null
@@ -212,8 +208,6 @@ fun ReminderScreen(
                 deleteReminder = null
                 errors.launchGuarded("Couldn't delete that reminder.") {
                     container.reminderRepository.deleteReminder(reminder.reminderId)
-                    scheduler.cancel(reminder.reminderId)
-                    NotificationManagerCompat.from(context).cancel(ReminderNotifier.notificationId(reminder.reminderId))
                 }
             },
         )
@@ -411,7 +405,7 @@ private fun ReminderRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = reminder.scheduledAtMillis.toAbsoluteText(),
+                    text = reminder.scheduledAtMillis.toAbsoluteText() + (reminder.recurrence?.let { "\n${it.describe()}" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (accentDanger) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.textMuted,
                 )
@@ -452,18 +446,20 @@ private fun ReminderActionSheet(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ReminderFormSheet(
     heading: String,
     confirmText: String,
     initial: Reminder?,
     onDismiss: () -> Unit,
-    onSave: (String, Long) -> Unit,
+    onSave: (String, Long, ReminderRecurrence?) -> Unit,
 ) {
+    val zone = remember(initial) { ZoneId.of(initial?.recurrence?.zoneId ?: ZoneId.systemDefault().id) }
     val default = remember(initial) {
         initial?.let {
-            Instant.ofEpochMilli(it.scheduledAtMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
-        } ?: LocalDateTime.now().plusMinutes(5)
+            Instant.ofEpochMilli(it.scheduledAtMillis).atZone(zone).toLocalDateTime()
+        } ?: LocalDateTime.now().plusMinutes(5).withSecond(0).withNano(0)
     }
     var title by remember { mutableStateOf(initial?.title ?: "") }
     var date by remember { mutableStateOf(default.toLocalDate()) }
@@ -472,10 +468,22 @@ private fun ReminderFormSheet(
     var dateOpen by remember { mutableStateOf(false) }
     var timeOpen by remember { mutableStateOf(false) }
 
-    val scheduledAtMillis = remember(date, time) {
-        LocalDateTime.of(date, time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    var frequency by remember { mutableStateOf(initial?.recurrence?.frequency) }
+    var intervalText by remember { mutableStateOf((initial?.recurrence?.interval ?: 1).toString()) }
+    var weekdays by remember { mutableStateOf(initial?.recurrence?.weekdays?.takeIf { it != 0 } ?: (1 shl (date.dayOfWeek.value - 1))) }
+    var endDate by remember { mutableStateOf(initial?.recurrence?.untilEpochDay?.let(LocalDate::ofEpochDay)) }
+    var endOpen by remember { mutableStateOf(false) }
+    val startMillis = LocalDateTime.of(date, time).atZone(zone).toInstant().toEpochMilli()
+    val recurrence = frequency?.let { selected ->
+        runCatching {
+            val old = initial?.recurrence
+            val anchor = if (initial?.scheduledAtMillis == startMillis && old?.frequency == selected &&
+                old.interval == intervalText.toIntOrNull() && old.weekdays == weekdays) old.anchorMillis else startMillis
+            ReminderRecurrence(selected, intervalText.toInt(), weekdays, endDate?.toEpochDay(), zone.id, anchor)
+        }.getOrNull()
     }
-    val canSave = title.trim().isNotBlank() && scheduledAtMillis > System.currentTimeMillis()
+    val scheduledAtMillis = if (frequency == null) startMillis else recurrence?.nextAfter(startMillis - 1)
+    val canSave = title.trim().isNotBlank() && scheduledAtMillis != null && scheduledAtMillis > System.currentTimeMillis()
 
     AppBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg)) {
@@ -508,8 +516,35 @@ private fun ReminderFormSheet(
                 )
             }
             Spacer(Modifier.height(Spacing.md))
+            Text("Repeat", style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                FilterChipButton(text = "Once", selected = frequency == null, onClick = { frequency = null })
+                ReminderFrequency.entries.forEach { option ->
+                    FilterChipButton(text = option.displayName(),
+                        selected = frequency == option, onClick = { frequency = option })
+                }
+            }
+            if (frequency != null) {
+                AppTextField(value = intervalText, onValueChange = { intervalText = it.filter(Char::isDigit).take(3) },
+                    label = "Repeat every ${frequency!!.intervalUnit()} (1–999)",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                if (frequency == ReminderFrequency.WEEKLY) {
+                    FocusWeekdayPicker(daysMask = weekdays, onDaysMaskChange = { weekdays = it })
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    TextButton(onClick = { endOpen = true }) { Text(endDate?.let { "Ends $it" } ?: "Ends: Never") }
+                    if (endDate != null) TextButton(onClick = { endDate = null }) { Text("No end date") }
+                }
+                Text(recurrence?.describe() ?: "Enter a valid interval, weekdays, and end date.", style = MaterialTheme.typography.bodySmall)
+                Text("Time zone: ${zone.id}. Completing acknowledges one occurrence; delete to stop the series.", style = MaterialTheme.typography.bodySmall)
+                if (frequency == ReminderFrequency.MONTHLY || frequency == ReminderFrequency.YEARLY) {
+                    Text("If the date is missing, use the last day of that month.", style = MaterialTheme.typography.bodySmall)
+                }
+                scheduledAtMillis?.let { Text("Next: ${it.toAbsoluteText()}", style = MaterialTheme.typography.bodySmall) }
+            }
+            Spacer(Modifier.height(Spacing.md))
             Text(
-                text = if (canSave) "Notification stays until you tap complete." else "Choose a future date and time.",
+                text = if (canSave) "Notification stays until you tap complete." else "Choose a valid repeat rule and future date and time.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.extendedColors.textMuted,
             )
@@ -518,7 +553,7 @@ private fun ReminderFormSheet(
                 text = confirmText,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = canSave,
-                onClick = { onSave(title, scheduledAtMillis) },
+                onClick = { if (canSave) onSave(title, scheduledAtMillis!!, recurrence) },
             )
         }
     }
@@ -536,6 +571,18 @@ private fun ReminderFormSheet(
             dismissButton = { TextButton(onClick = { dateOpen = false }) { Text("Cancel") } },
             colors = DatePickerDefaults.colors(containerColor = MaterialTheme.extendedColors.card),
         ) {
+            DatePicker(state = state)
+        }
+    }
+
+    if (endOpen) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = (endDate ?: date).toMillis())
+        DatePickerDialog(onDismissRequest = { endOpen = false }, confirmButton = {
+            TextButton(onClick = {
+                state.selectedDateMillis?.let { endDate = it.toLocalDate() }
+                endOpen = false
+            }) { Text("Select") }
+        }, dismissButton = { TextButton(onClick = { endOpen = false }) { Text("Cancel") } }) {
             DatePicker(state = state)
         }
     }
@@ -606,13 +653,31 @@ private fun Long.toAbsoluteText(): String {
 }
 
 private fun LocalDate.toMillis(): Long =
-    atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
 
 private fun Long.toLocalDate(): LocalDate =
-    Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
+    Instant.ofEpochMilli(this).atZone(java.time.ZoneOffset.UTC).toLocalDate()
 
 private fun requestNotificationPermissionIfNeeded(activity: Activity?) {
     if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
     if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
     ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 51)
+}
+
+private fun ReminderFrequency.displayName(): String = when (this) {
+    ReminderFrequency.MINUTELY -> "Minutes"
+    ReminderFrequency.HOURLY -> "Hours"
+    ReminderFrequency.DAILY -> "Daily"
+    ReminderFrequency.WEEKLY -> "Weekly"
+    ReminderFrequency.MONTHLY -> "Monthly"
+    ReminderFrequency.YEARLY -> "Yearly"
+}
+
+private fun ReminderFrequency.intervalUnit(): String = when (this) {
+    ReminderFrequency.MINUTELY -> "minutes"
+    ReminderFrequency.HOURLY -> "hours"
+    ReminderFrequency.DAILY -> "days"
+    ReminderFrequency.WEEKLY -> "weeks"
+    ReminderFrequency.MONTHLY -> "months"
+    ReminderFrequency.YEARLY -> "years"
 }

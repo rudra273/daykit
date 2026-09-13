@@ -55,9 +55,10 @@ class AppLockBootReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                val scheduler = ReminderScheduler(context)
-                container.reminderRepository.getPendingFutureReminders()
-                    .forEach(scheduler::schedule)
+                container.reminderRepository.restoreAlarms { reminder ->
+                    com.daykit.feature.reminder.notification.ReminderNotifier.show(
+                        context, reminder.reminderId, reminder.title, reminder.scheduledAtMillis, alert = false)
+                }
 
                 // Focus schedules lose their alarms on boot too. Re-project first
                 // so a window that elapsed while powered off is replaced by the

@@ -208,9 +208,9 @@ class GoogleDriveBackupClient {
     private fun HttpURLConnection.readTextBody(): String {
         val code = responseCode
         val body = if (code in 200..299) {
-            inputStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            inputStream?.use(BackupLimits::readEnvelope).orEmpty()
         } else {
-            errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            errorStream?.use { BackupLimits.readBounded(it, 64 * 1024, "Drive error response too large").toString(Charsets.UTF_8) }.orEmpty()
         }
         if (code !in 200..299) {
             error("Drive request failed ($code): ${body.ifBlank { responseMessage }}")

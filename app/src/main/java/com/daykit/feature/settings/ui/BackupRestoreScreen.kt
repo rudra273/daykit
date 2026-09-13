@@ -159,6 +159,19 @@ fun BackupRestoreScreen(
         .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT)
         .collectAsStateWithLifecycle(initialValue = false)
 
+    val includeReminders by container.secureSettingRepository
+        .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_REMINDERS)
+        .collectAsStateWithLifecycle(initialValue = false)
+    val includeAppLock by container.secureSettingRepository
+        .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_LOCK)
+        .collectAsStateWithLifecycle(initialValue = false)
+    val includeEventLight by container.secureSettingRepository
+        .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_EVENT_LIGHT)
+        .collectAsStateWithLifecycle(initialValue = false)
+    val includeAppPreferences by container.secureSettingRepository
+        .observeBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_PREFERENCES)
+        .collectAsStateWithLifecycle(initialValue = false)
+
     val driveSchedule = DriveBackupSchedule.fromValue(driveScheduleValue)
     val driveLastError by container.secureSettingRepository
         .observeString(SecureSettingRepository.KEY_DRIVE_LAST_ERROR)
@@ -167,6 +180,10 @@ fun BackupRestoreScreen(
         includeExpenses = includeExpenses == true,
         includeHabits = includeHabits == true,
         includeVault = includeVault == true,
+        includeReminders = includeReminders == true,
+        includeAppLock = includeAppLock == true,
+        includeEventLight = includeEventLight == true,
+        includeAppPreferences = includeAppPreferences == true,
     )
     var activeSheet by remember { mutableStateOf<BackupSheet?>(null) }
     var driveBackups by remember { mutableStateOf<List<DriveBackupFile>>(emptyList()) }
@@ -491,9 +508,7 @@ fun BackupRestoreScreen(
             restoreError = null
             runCatching {
                 val encryptedBackup = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
-                        reader.readText()
-                    } ?: error("Could not open backup file")
+                    context.contentResolver.openInputStream(uri)?.use(com.daykit.core.backup.BackupLimits::readEnvelope) ?: error("Could not open backup file")
                 }
                 withContext(Dispatchers.Default) {
                     container.backupService.importEncrypted(encryptedBackup, passwordChars)
@@ -685,7 +700,7 @@ fun BackupRestoreScreen(
 
                 SectionHeader(text = "What's included")
                 Text(
-                    "Key Store and Secure Notes are always included, in manual and automatic backups alike. App Lock is never included. The options below are off by default.",
+                    "Key Store, Secure Notes, and Focus are always included. All optional utilities below are off by default and apply to local, manual Drive, and automatic backups.",
                     color = MaterialTheme.extendedColors.textMuted,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(
@@ -723,6 +738,43 @@ fun BackupRestoreScreen(
                         }
                     },
                 )
+
+                AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValuesZero) {
+                    AppListRow(
+                        headline = "Reminders",
+                        supporting = "One-time reminders, repeat schedules, and completion state.",
+                        trailing = { AppSwitch(checked = includeReminders == true, onCheckedChange = { enabled ->
+                            scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_REMINDERS, enabled) }
+                        }) },
+                    )
+                    RowDivider(startIndent = Spacing.lg)
+                    AppListRow(
+                        headline = "App Lock selections",
+                        supporting = "Selected apps only. Set up a PIN and permissions on the new device.",
+                        trailing = { AppSwitch(checked = includeAppLock == true, onCheckedChange = { enabled ->
+                            scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_LOCK, enabled) }
+                        }) },
+                    )
+                    RowDivider(startIndent = Spacing.lg)
+                    AppListRow(
+                        headline = "Event Light",
+                        supporting = "Color, brightness, borders, and opacity. Does not switch the light on.",
+                        trailing = { AppSwitch(checked = includeEventLight == true, onCheckedChange = { enabled ->
+                            scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_EVENT_LIGHT, enabled) }
+                        }) },
+                    )
+                    RowDivider(startIndent = Spacing.lg)
+                    AppListRow(
+                        headline = "Appearance and widgets",
+                        supporting = "Theme, haptics, and dashboard widget preferences.",
+                        trailing = { AppSwitch(checked = includeAppPreferences == true, onCheckedChange = { enabled ->
+                            scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_PREFERENCES, enabled) }
+                        }) },
+                    )
+                }
+                Text("DNS is managed by Android; editor files stay in the locations where you save them.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.padding(horizontal = Spacing.lg))
 
                 SectionHeader(text = "Local file")
                 ManualBackupCard(
@@ -864,6 +916,10 @@ private fun toolDisplayName(toolKey: String): String = when (toolKey) {
     BackupToolKeys.HABITS -> "Habits"
     BackupToolKeys.VAULT -> "File Vault"
     BackupToolKeys.FOCUS -> "Focus"
+    BackupToolKeys.REMINDERS -> "Reminders"
+    BackupToolKeys.APP_LOCK -> "App Lock selections"
+    BackupToolKeys.EVENT_LIGHT -> "Event Light"
+    BackupToolKeys.APP_PREFERENCES -> "Appearance and widgets"
     else -> toolKey
 }
 
@@ -881,6 +937,7 @@ private fun skippedSectionMessage(report: DayKitBackupService.ImportReport): Str
  * newer app version carries its own explanation and must not be mislabeled.
  */
 private fun restoreErrorMessage(error: Throwable): String = when (error) {
+    is com.daykit.core.backup.BackupSizeException -> error.message.orEmpty()
     is DayKitBackupService.NewerBackupException -> error.message ?: "Update the app to restore this backup."
     else -> "Incorrect password"
 }
@@ -891,6 +948,7 @@ private fun restoreErrorMessage(error: Throwable): String = when (error) {
  * screenshot for support, so it is mapped to something meaningful instead.
  */
 private fun driveErrorReason(error: Throwable): String = when (error) {
+    is com.daykit.core.backup.BackupSizeException -> error.message.orEmpty()
     is java.net.UnknownHostException,
     is java.net.SocketTimeoutException,
     is java.io.InterruptedIOException,
@@ -932,7 +990,7 @@ private fun BackupContentOptions(
         )
         if (includeVault) {
             Text(
-                "Vault files will be encrypted and uploaded with your backup. This can make backups large and slow. Off by default.",
+                "Vault files are encrypted with your backup. This format supports up to 4 MiB of vault files in total; larger collections must be exported separately.",
                 color = MaterialTheme.extendedColors.warning,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(

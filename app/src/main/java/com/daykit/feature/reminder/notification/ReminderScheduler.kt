@@ -19,7 +19,7 @@ class ReminderScheduler(
     private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
 
     fun schedule(reminder: Reminder) {
-        if (reminder.completed) {
+        if (reminder.completed || reminder.pendingOccurrenceMillis == reminder.scheduledAtMillis) {
             cancel(reminder.reminderId)
             return
         }
@@ -28,11 +28,12 @@ class ReminderScheduler(
         val pendingIntent = alarmPendingIntent(reminder.reminderId)
 
         if (canScheduleExactAlarms()) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                triggerAtMillis,
-                pendingIntent,
-            )
+            try {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            } catch (_: SecurityException) {
+                // Permission can change between checking and scheduling.
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            }
         } else {
             // No exact-alarm permission: best-effort, still wakes the device from idle.
             alarmManager.setAndAllowWhileIdle(
@@ -53,6 +54,7 @@ class ReminderScheduler(
     private fun alarmPendingIntent(reminderId: String): PendingIntent {
         val intent = Intent(appContext, ReminderAlarmReceiver::class.java)
             .setAction(ReminderAlarmReceiver.ACTION_FIRE)
+            .setData(android.net.Uri.parse("daykit://reminder/$reminderId"))
             .putExtra(ReminderAlarmReceiver.EXTRA_REMINDER_ID, reminderId)
         return PendingIntent.getBroadcast(
             appContext,

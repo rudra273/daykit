@@ -35,6 +35,10 @@ class DayKitApplication : Application() {
             // touches the DB, with a stack trace pointing at the wrong place.
             runCatching {
                 container.secureSettingRepository.getBoolean(SecureSettingRepository.KEY_BIOMETRIC_ENABLED)
+                container.reminderRepository.restoreAlarms { reminder ->
+                    com.daykit.feature.reminder.notification.ReminderNotifier.show(
+                        this@DayKitApplication, reminder.reminderId, reminder.title, reminder.scheduledAtMillis, alert = false)
+                }
             }.onFailure { error ->
                 Log.w(TAG, "Warm-up failed to open secure storage", error)
             }

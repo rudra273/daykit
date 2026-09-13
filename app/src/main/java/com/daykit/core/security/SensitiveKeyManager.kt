@@ -34,8 +34,7 @@ class SensitiveKeyManager(
 ) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    @Volatile
-    private var cachedKey: ByteArray? = null
+    private val keyCache = SessionKeyCache()
 
     /**
      * Set while the app has intentionally launched another activity (a file
@@ -53,7 +52,7 @@ class SensitiveKeyManager(
         prefs.contains(KEY_SALT) && prefs.contains(KEY_WRAPPED_MSK) && prefs.contains(KEY_WRAPPED_IV)
 
     /** True while the MSK is held in memory (user is unlocked). */
-    fun isUnlocked(): Boolean = cachedKey != null
+    fun isUnlocked(): Boolean = keyCache.isUnlocked()
 
     /**
      * Creates the MSK and wraps it with a key derived from [pin]. Called once,
@@ -62,6 +61,7 @@ class SensitiveKeyManager(
      * (the caller owns it).
      */
     fun initialize(pin: CharArray) {
+        val generation = keyCache.generation()
         val salt = passwordHasher.newSalt()
         val msk = ByteArray(MSK_BYTES).also(secureRandom::nextBytes)
         val wrappingKey = passwordHasher.deriveKey(pin, salt, KDF_CONTEXT)
@@ -72,7 +72,7 @@ class SensitiveKeyManager(
                 putString(KEY_WRAPPED_MSK, wrapped.ciphertext.b64())
                 putString(KEY_WRAPPED_IV, wrapped.iv.b64())
             }
-            cachedKey = msk.copyOf()
+            keyCache.install(msk, generation)
         } finally {
             wrappingKey.fill(0)
             msk.fill(0)
@@ -85,14 +85,14 @@ class SensitiveKeyManager(
      * fails) or the manager is not initialized. Does not wipe [pin].
      */
     fun unlock(pin: CharArray): Boolean {
+        val generation = keyCache.generation()
         val salt = prefs.getString(KEY_SALT, null)?.b64d() ?: return false
         val ct = prefs.getString(KEY_WRAPPED_MSK, null)?.b64d() ?: return false
         val iv = prefs.getString(KEY_WRAPPED_IV, null)?.b64d() ?: return false
         val wrappingKey = passwordHasher.deriveKey(pin, salt, KDF_CONTEXT)
         return try {
             val msk = aesGcmDecrypt(wrappingKey, ct, iv)
-            cachedKey = msk
-            true
+            try { keyCache.install(msk, generation) } finally { msk.fill(0) }
         } catch (error: Exception) {
             // AEADBadTagException (wrong PIN) or any other failure -> stay locked.
             false
@@ -108,6 +108,7 @@ class SensitiveKeyManager(
      * encrypted data — is preserved.
      */
     fun rewrap(oldPin: CharArray, newPin: CharArray): Boolean {
+        val generation = keyCache.generation()
         val salt = prefs.getString(KEY_SALT, null)?.b64d() ?: return false
         val ct = prefs.getString(KEY_WRAPPED_MSK, null)?.b64d() ?: return false
         val iv = prefs.getString(KEY_WRAPPED_IV, null)?.b64d() ?: return false
@@ -128,7 +129,7 @@ class SensitiveKeyManager(
                 putString(KEY_WRAPPED_MSK, wrapped.ciphertext.b64())
                 putString(KEY_WRAPPED_IV, wrapped.iv.b64())
             }
-            cachedKey = msk.copyOf()
+            keyCache.install(msk, generation)
             return true
         } finally {
             newKey.fill(0)
@@ -142,19 +143,18 @@ class SensitiveKeyManager(
      * concurrent [lock] (which zeroes the cached array) cannot corrupt a key that
      * an in-flight cipher operation is still reading.
      */
-    fun key(): ByteArray? = cachedKey?.copyOf()
+    fun key(): ByteArray? = keyCache.copy()
 
     /**
      * A defensive copy of the in-memory MSK; throws [SensitiveDataLockedException]
      * if locked. The caller owns the returned array and must zero it after use.
      */
     fun requireKey(): ByteArray =
-        cachedKey?.copyOf() ?: throw SensitiveDataLockedException()
+        keyCache.copy() ?: throw SensitiveDataLockedException()
 
     /** Wipes the MSK from memory. Called on lock / background. */
     fun lock() {
-        cachedKey?.fill(0)
-        cachedKey = null
+        keyCache.clear()
     }
 
     /**

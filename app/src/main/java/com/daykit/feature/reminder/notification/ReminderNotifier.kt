@@ -18,7 +18,7 @@ import com.daykit.feature.reminder.ui.ReminderAlarmActivity
 object ReminderNotifier {
     private const val CHANNEL_ID = "reminders"
 
-    fun show(context: Context, reminderId: String, title: String) {
+    fun show(context: Context, reminderId: String, title: String, occurrenceMillis: Long, alert: Boolean = true) {
         val appContext = context.applicationContext
         ensureChannel(appContext)
         if (
@@ -39,7 +39,8 @@ object ReminderNotifier {
         val fullScreenPendingIntent = PendingIntent.getActivity(
             appContext,
             reminderId.hashCode() * 17,
-            ReminderAlarmActivity.intent(appContext, reminderId, title)
+            ReminderAlarmActivity.intent(appContext, reminderId, title, occurrenceMillis)
+                .setData(android.net.Uri.parse("daykit://reminder/$reminderId/$occurrenceMillis"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -48,14 +49,8 @@ object ReminderNotifier {
             reminderId.hashCode(),
             Intent(appContext, ReminderActionReceiver::class.java)
                 .setAction(ReminderActionReceiver.ACTION_COMPLETE)
-                .putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val dismissedPendingIntent = PendingIntent.getBroadcast(
-            appContext,
-            reminderId.hashCode() * 31,
-            Intent(appContext, ReminderActionReceiver::class.java)
-                .setAction(ReminderActionReceiver.ACTION_DISMISSED)
+                .setData(android.net.Uri.parse("daykit://reminder/$reminderId/$occurrenceMillis"))
+                .putExtra(ReminderActionReceiver.EXTRA_OCCURRENCE, occurrenceMillis)
                 .putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -65,8 +60,9 @@ object ReminderNotifier {
             .setContentTitle(title)
             .setContentText("Tap Complete after you acknowledge this reminder.")
             .setContentIntent(openPendingIntent)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setDeleteIntent(dismissedPendingIntent)
+            .apply { if (alert) setFullScreenIntent(fullScreenPendingIntent, true) }
+            .setSilent(!alert)
+
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setOngoing(true)
             .setAutoCancel(false)

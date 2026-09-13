@@ -23,9 +23,9 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
             try {
                 val repository = (context.applicationContext as DayKitApplication)
                     .container.reminderRepository
-                val reminder = repository.getReminder(reminderId) ?: return@launch
-                if (reminder.completed) return@launch
-                ReminderNotifier.show(context, reminder.reminderId, reminder.title)
+                repository.fireDue(reminderId) { reminder ->
+                    ReminderNotifier.show(context, reminder.reminderId, reminder.title, reminder.scheduledAtMillis)
+                }
             } finally {
                 pendingResult.finish()
             }
