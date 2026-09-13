@@ -58,9 +58,9 @@ Both ciphers implement `ValueCipher` with the same `CipherPayload` shape, so a r
 
 Key invariants:
 
-- The MSK is a random 256-bit key **wrapped** by an Argon2id-derived key, so a PIN change re-wraps rather than re-encrypts data. Never route the MSK through the Android Keystore — that is the exact threat this design closes.
+- The MSK is a random 256-bit key **wrapped** by an Argon2id-derived key, so a PIN change re-wraps rather than re-encrypts data. The primary copy must remain PIN-wrapped. The optional biometric path may keep a second wrapped copy only through `BiometricUnlockManager`: its Android Keystore key requires a fresh strong biometric for every use and is invalidated by biometric enrollment changes. Never wrap the MSK with an always-available Keystore key.
 - `SessionValueCipher` reads the key fresh per call and throws `SensitiveDataLockedException` when locked. Repositories observing sensitive data must `.catch { if (it is SensitiveDataLockedException) emit(emptyList()) else throw it }` — the DB can re-query in the instant between the key being wiped and the unlock gate recomposing (see `KeyStoreRepository.observeEntries`).
-- The key is wiped when the app is backgrounded, after `LOCK_GRACE_MILLIS` (2s) in [MainActivity](app/src/main/java/com/daykit/MainActivity.kt). **Before launching any picker/chooser/permission dialog, set `container.sensitiveKeyManager.expectingActivityResult = true`**, otherwise the result callback runs with the vault locked and the import/export fails.
+- The key is wiped immediately when the app is backgrounded, including when DayKit launches a picker, chooser, or permission screen. **Before launching an external activity, set `container.sensitiveKeyManager.expectingActivityResult = true`** so the current screen can receive its result behind the unlock gate. Any callback that needs the MSK must use `runWhenUnlocked`; its work resumes only after a fresh PIN or biometric unlock.
 - `MainActivity` and the lock activities set `FLAG_SECURE`; screenshot protection is a user setting that toggles it.
 
 `AppLockSessionManager` is a separate, in-memory, 5-minute-TTL grant map for *third-party* apps the user has locked — unrelated to the MSK.

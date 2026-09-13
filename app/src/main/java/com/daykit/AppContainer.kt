@@ -12,6 +12,7 @@ import com.daykit.core.data.DayKitDatabase
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.data.SettingFlagCache
 import com.daykit.core.security.AndroidKeyStoreCrypto
+import com.daykit.core.security.BiometricUnlockManager
 import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.KeyUnavailableException
 import com.daykit.core.security.PasswordHasher
@@ -52,9 +53,11 @@ class AppContainer(context: Context) {
     val sensitiveValueCipher = SensitiveValueCipher(keyStoreCrypto)
     val credentialRepository = CredentialRepository(appContext, PasswordHasher())
 
-    // PIN-derived key for the sensitive tools (vault, key store, secure notes).
-    // The MSK is only in memory while unlocked; sessionValueCipher throws if locked.
+    // Master key for the sensitive tools (vault, key store, secure notes). Its
+    // primary wrapping key is PIN-derived; biometric unlock is an optional second
+    // wrapper. The MSK is only in memory while unlocked.
     val sensitiveKeyManager = SensitiveKeyManager(appContext, PasswordHasher())
+    val biometricUnlockManager = BiometricUnlockManager(appContext)
     val sessionValueCipher = SessionValueCipher(sensitiveKeyManager)
     val lockedPackageCache = LockedPackageCache(appContext)
     val focusBlockStore = FocusBlockStore(appContext)
@@ -91,6 +94,7 @@ class AppContainer(context: Context) {
         appContext.deleteDatabase("daykit_secure.db")
         runCatching { DatabasePassphraseProvider(appContext, keyStoreCrypto).clear() }
         runCatching { sensitiveKeyManager.clearAll() }
+        runCatching { biometricUnlockManager.clear() }
         runCatching { credentialRepository.clear() }
         runCatching { lockedPackageCache.clear() }
         runCatching { focusBlockStore.clear() }

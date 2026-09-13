@@ -24,9 +24,10 @@ import javax.crypto.spec.SecretKeySpec
  *    is untouched.
  *
  * The unwrapped MSK lives only in memory while unlocked and is wiped on lock.
- * Nothing here touches the Android Keystore: that is deliberate — a key wrapped
- * by the always-available Keystore would be recoverable by root without the PIN,
- * which is exactly the threat this closes.
+ * The primary wrapped copy never touches Android Keystore. When the user opts in,
+ * BiometricUnlockManager stores a second copy behind an auth-per-use Keystore key;
+ * it can only be opened after a fresh strong-biometric check. The PIN copy remains
+ * available as the recovery path.
  */
 class SensitiveKeyManager(
     context: Context,
@@ -36,16 +37,12 @@ class SensitiveKeyManager(
 
     private val keyCache = SessionKeyCache()
 
-    /**
-     * Set while the app has intentionally launched another activity (a file
-     * picker, the account chooser, a permission dialog) and expects to return to
-     * the foreground. The lifecycle ON_STOP that such a launch triggers must NOT
-     * wipe the key — otherwise the picker's result callback would run with the
-     * vault locked and every import/export/backup would fail. Cleared on the
-     * next foreground resume.
-     */
+    /** Set while DayKit expects a result from an external activity. */
     @Volatile
     var expectingActivityResult: Boolean = false
+
+    private val pendingActionLock = Any()
+    private val pendingUnlockActions = mutableListOf<() -> Unit>()
 
     /** True once a PIN has been set and the MSK has been created & wrapped. */
     fun isInitialized(): Boolean =
@@ -99,6 +96,40 @@ class SensitiveKeyManager(
         } finally {
             wrappingKey.fill(0)
         }
+    }
+
+    /** Token that prevents a biometric operation from undoing a later lifecycle lock. */
+    fun unlockGeneration(): Long = keyCache.generation()
+
+    /** Installs an MSK recovered by a successful biometric CryptoObject operation. */
+    fun unlockWithMasterKey(msk: ByteArray, expectedGeneration: Long): Boolean {
+        if (msk.size != MSK_BYTES) return false
+        return keyCache.install(msk, expectedGeneration)
+    }
+
+    /** Defers activity-result work until a fresh unlock has restored the MSK. */
+    fun runWhenUnlocked(action: () -> Unit) {
+        val runNow = synchronized(pendingActionLock) {
+            if (keyCache.isUnlocked()) {
+                true
+            } else {
+                pendingUnlockActions += action
+                false
+            }
+        }
+        if (runNow) action()
+    }
+
+    /** Runs result work only after successful PIN or biometric authentication. */
+    fun resumePendingUnlockActions() {
+        val actions = synchronized(pendingActionLock) {
+            pendingUnlockActions.toList().also { pendingUnlockActions.clear() }
+        }
+        actions.forEach { action -> runCatching(action) }
+    }
+
+    fun discardPendingUnlockActions() {
+        synchronized(pendingActionLock) { pendingUnlockActions.clear() }
     }
 
     /**
@@ -164,6 +195,7 @@ class SensitiveKeyManager(
      */
     fun clearAll() {
         lock()
+        discardPendingUnlockActions()
         prefs.edit { clear() }
     }
 

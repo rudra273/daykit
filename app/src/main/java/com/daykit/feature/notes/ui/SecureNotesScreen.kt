@@ -151,6 +151,7 @@ fun SecureNotesScreen(
             onExpectActivityResult = {
                 container.sensitiveKeyManager.expectingActivityResult = true
             },
+            onResultRequiresUnlock = container.sensitiveKeyManager::runWhenUnlocked,
             onClose = { editorState = null },
         )
         return
@@ -421,6 +422,7 @@ private fun NoteEditorPage(
     existingLabels: List<String>,
     repository: com.daykit.feature.notes.data.SecureNoteRepository,
     onExpectActivityResult: () -> Unit,
+    onResultRequiresUnlock: (() -> Unit) -> Unit,
     onClose: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -470,12 +472,14 @@ private fun NoteEditorPage(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri != null) {
-            errors.launchGuarded("Couldn't attach that image.") {
-                val bytes = withContext(Dispatchers.IO) { decodeImageBytes(context, uri) }
-                if (bytes != null) {
-                    val noteId = ensureNoteId()
-                    repository.addImage(noteId, bytes)
-                    images = repository.getImages(noteId)
+            onResultRequiresUnlock {
+                errors.launchGuarded("Couldn't attach that image.") {
+                    val bytes = withContext(Dispatchers.IO) { decodeImageBytes(context, uri) }
+                    if (bytes != null) {
+                        val noteId = ensureNoteId()
+                        repository.addImage(noteId, bytes)
+                        images = repository.getImages(noteId)
+                    }
                 }
             }
         }

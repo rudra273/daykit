@@ -308,7 +308,9 @@ fun BackupRestoreScreen(
     val localBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument(LOCAL_BACKUP_MIME_TYPE),
     ) { uri ->
-        uri?.let(::performLocalBackup)
+        if (uri != null) {
+            container.sensitiveKeyManager.runWhenUnlocked { performLocalBackup(uri) }
+        }
     }
 
     val localRestoreLauncher = rememberLauncherForActivityResult(
@@ -554,15 +556,17 @@ fun BackupRestoreScreen(
             showSnackbar("Google Drive action canceled")
             return@rememberLauncherForActivityResult
         }
-        runCatching {
-            Identity.getAuthorizationClient(activity).getAuthorizationResultFromIntent(data)
-        }.onSuccess(::handleDriveAuthorization)
-            .onFailure { error ->
-                pendingDriveAction = null
-                val message = (error as? ApiException)?.statusCode?.let { "Google authorization failed ($it)" }
-                    ?: "Google authorization failed: ${error.message ?: "unknown error"}"
-                showSnackbar(message)
-            }
+        container.sensitiveKeyManager.runWhenUnlocked {
+            runCatching {
+                Identity.getAuthorizationClient(activity).getAuthorizationResultFromIntent(data)
+            }.onSuccess(::handleDriveAuthorization)
+                .onFailure { error ->
+                    pendingDriveAction = null
+                    val message = (error as? ApiException)?.statusCode?.let { "Google authorization failed ($it)" }
+                        ?: "Google authorization failed: ${error.message ?: "unknown error"}"
+                    showSnackbar(message)
+                }
+        }
     }
 
     fun requestDriveAuthorization(action: BackupDriveAuthorizationAction) {

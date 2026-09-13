@@ -55,8 +55,6 @@ import com.daykit.navigation.RootScaffold
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,6 +74,16 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleShareIntent(intent)
+    }
+
+    override fun onDestroy() {
+        // A finished activity must never leave the decrypted master key alive in
+        // the application process. Configuration changes keep the same session.
+        if (!isChangingConfigurations) {
+            container.sensitiveKeyManager.lock()
+            container.sensitiveKeyManager.discardPendingUnlockActions()
+        }
+        super.onDestroy()
     }
 
     /**
@@ -181,14 +189,6 @@ private fun StorageRecoveryScreen(
     }
 }
 
-/**
- * How long the app may sit backgrounded before the sensitive key is wiped. A
- * brief grace period lets a rotation, a quick app-switch glance, or a returning
- * picker resume without a fresh PIN prompt, while a genuine departure still
- * locks the vault.
- */
-private const val LOCK_GRACE_MILLIS = 2_000L
-
 @Composable
 private fun DayKitApp(
     activity: FragmentActivity,
@@ -209,23 +209,18 @@ private fun DayKitApp(
     var biometricMessage by remember { mutableStateOf<String?>(null) }
     var biometricPreferenceLoaded by remember { mutableStateOf(false) }
     var biometricEnabled by remember { mutableStateOf<Boolean?>(null) }
+    var biometricAttemptedForLock by remember { mutableStateOf(false) }
+    var preserveContentForActivityResult by remember { mutableStateOf(false) }
     var screenshotProtection by remember { mutableStateOf(true) }
     var lockedApps by remember { mutableStateOf(emptyList<LockedApp>()) }
 
     DisposableEffect(lifecycleOwner) {
-        // ON_STOP fires not only when the user leaves the app, but also for a
-        // rotation, a config change, or any full-screen activity we launch
-        // ourselves (file picker, account chooser). Wiping the key on every one
-        // of those would break imports/exports/backups and re-prompt for the PIN
-        // constantly. So: skip the wipe entirely when we launched the activity
-        // ourselves, and otherwise wipe after a short grace period that is
-        // cancelled if we return to the foreground quickly.
-        var pendingLock: Job? = null
+        // ON_STOP fires when the user leaves, during rotation, and for external
+        // activities such as file pickers. Every non-configuration stop wipes
+        // the key; picker work waits behind the same unlock gate.
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    pendingLock?.cancel()
-                    pendingLock = null
                     container.sensitiveKeyManager.expectingActivityResult = false
                     permissions = AppLockPermissionChecker.check(context)
                     // Reflect any wipe that happened while backgrounded so the
@@ -233,28 +228,23 @@ private fun DayKitApp(
                     sensitiveUnlocked = container.sensitiveKeyManager.isUnlocked()
                 }
                 Lifecycle.Event.ON_STOP -> {
-                    if (container.sensitiveKeyManager.expectingActivityResult) {
-                        // We opened a picker/chooser; keep the key so its result
-                        // callback can encrypt/decrypt. Reset below on resume.
-                        return@LifecycleEventObserver
-                    }
-                    pendingLock?.cancel()
-                    pendingLock = scope.launch {
-                        delay(LOCK_GRACE_MILLIS)
-                        // Leaving the app wipes the in-memory sensitive key: the
-                        // vault, key store, and secure notes cannot be decrypted
-                        // again until the user re-enters their PIN.
-                        container.sensitiveKeyManager.lock()
-                        sensitiveUnlocked = false
-                    }
+                    if (activity.isChangingConfigurations) return@LifecycleEventObserver
+                    // Preserve the screen only to receive its pending result.
+                    // The key is always wiped, including while a picker is open.
+                    preserveContentForActivityResult =
+                        container.sensitiveKeyManager.expectingActivityResult
+                    container.sensitiveKeyManager.lock()
+                    sensitiveUnlocked = false
                 }
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            pendingLock?.cancel()
             lifecycleOwner.lifecycle.removeObserver(observer)
+            if (!activity.isChangingConfigurations) {
+                container.sensitiveKeyManager.lock()
+            }
         }
     }
 
@@ -307,16 +297,109 @@ private fun DayKitApp(
     }
 
     // The automatic Drive backup is triggered here — on unlock — and nowhere else. Key
-    // Store and Secure Notes are encrypted with the PIN-derived MSK, which only exists
-    // while unlocked, so there is no background equivalent. launchIfDue() is a cheap
+    // Store and Secure Notes are encrypted with the MSK, which only exists while
+    // unlocked, so there is no background equivalent. launchIfDue() is a cheap
     // no-op unless the Daily/Weekly interval has actually elapsed.
     //
     // It runs on the runner's own process-lifetime scope, NOT this coroutine: the MSK
-    // is wiped ~2s after backgrounding, which flips `sensitiveUnlocked` and would
+    // is wiped after backgrounding, which flips `sensitiveUnlocked` and would
     // cancel a composition-scoped upload mid-write, leaving a truncated file in Drive
     // that still counts as a backup for retention purposes.
     LaunchedEffect(sensitiveUnlocked) {
         if (sensitiveUnlocked) container.driveBackupRunner.launchIfDue()
+    }
+
+    fun tryBiometricUnlock() {
+        if (biometricEnabled != true || !biometricAuthenticator.canAuthenticate()) return
+        val cipher = container.biometricUnlockManager.unlockCipher()
+        if (cipher == null) {
+            unlockError = "Fingerprint changed or is unavailable. Unlock with your PIN to enable it again."
+            scope.launch {
+                container.secureSettingRepository.putBoolean(
+                    SecureSettingRepository.KEY_BIOMETRIC_ENABLED,
+                    false,
+                )
+            }
+            return
+        }
+        val unlockGeneration = container.sensitiveKeyManager.unlockGeneration()
+        biometricAuthenticator.authenticate(
+            cipher = cipher,
+            title = "Unlock DayKit",
+            subtitle = "Touch the fingerprint sensor",
+            onSuccess = { authenticatedCipher ->
+                if (container.biometricUnlockManager.completeUnlock(
+                        authenticatedCipher,
+                        container.sensitiveKeyManager,
+                        unlockGeneration,
+                    )
+                ) {
+                    unlockPin = ""
+                    unlockError = null
+                    sensitiveUnlocked = true
+                    container.sensitiveKeyManager.resumePendingUnlockActions()
+                } else {
+                    unlockError = "Fingerprint unlock failed. Use your master PIN."
+                }
+            },
+            onError = { unlockError = it },
+        )
+    }
+
+    LaunchedEffect(sensitiveUnlocked, biometricEnabled) {
+        if (sensitiveUnlocked) {
+            biometricAttemptedForLock = false
+        } else if (credentialReady && permissions.allGranted &&
+            biometricEnabled == true && !biometricAttemptedForLock
+        ) {
+            biometricAttemptedForLock = true
+            tryBiometricUnlock()
+        }
+    }
+
+    val unlockGate: @Composable () -> Unit = {
+        ToolUnlockScreen(
+            title = "Unlock DayKit",
+            subtitle = if (biometricEnabled == true) "Use fingerprint or enter your master PIN" else "Enter your master PIN",
+            pin = unlockPin,
+            error = unlockError,
+            pinLength = container.credentialRepository.pinLength(),
+            biometricEnabled = biometricEnabled == true &&
+                container.biometricUnlockManager.isEnrolled() &&
+                biometricAuthenticator.canAuthenticate(),
+            icon = Icons.Rounded.Lock,
+            onBack = { activity.finish() },
+            onPinChange = {
+                unlockPin = it.filter(Char::isDigit).take(12)
+                unlockError = null
+            },
+            onUnlock = {
+                scope.launch {
+                    val pin = unlockPin
+                    val result = withContext(Dispatchers.Default) {
+                        // The shared verifier enforces lockout before key derivation.
+                        val verifyResult = container.credentialRepository.verify(pin.toCharArray())
+                        if (verifyResult is PinVerifyResult.Success) {
+                            container.sensitiveKeyManager.unlock(pin.toCharArray())
+                        }
+                        verifyResult
+                    }
+                    if (result is PinVerifyResult.Success && container.sensitiveKeyManager.isUnlocked()) {
+                        unlockPin = ""
+                        unlockError = null
+                        sensitiveUnlocked = true
+                        container.sensitiveKeyManager.resumePendingUnlockActions()
+                    } else {
+                        unlockPin = ""
+                        unlockError = result.errorMessageOrNull() ?: "Wrong PIN"
+                    }
+                }
+            },
+            onBiometric = {
+                unlockError = null
+                tryBiometricUnlock()
+            },
+        )
     }
 
     when {
@@ -338,23 +421,43 @@ private fun DayKitApp(
 
         !biometricPreferenceLoaded -> StartupLoadingScreen()
 
+        // Onboarding may have been backgrounded after the PIN was created but
+        // before biometric enrollment. Restore the MSK before enrollment.
+        !sensitiveUnlocked && !preserveContentForActivityResult -> unlockGate()
+
         biometricEnabled == null -> BiometricSetupScreen(
             canUseBiometric = biometricAuthenticator.canAuthenticate(),
             message = biometricMessage,
             onEnable = {
-                biometricAuthenticator.authenticate(
-                    title = "Enable biometric",
-                    subtitle = "Confirm once to use biometric unlock",
-                    onSuccess = {
-                        scope.launch {
-                            container.secureSettingRepository.putBoolean(
-                                SecureSettingRepository.KEY_BIOMETRIC_ENABLED,
-                                true,
-                            )
-                        }
-                    },
-                    onError = { biometricMessage = it },
-                )
+                runCatching { container.biometricUnlockManager.enrollmentCipher() }
+                    .onSuccess { cipher ->
+                        biometricAuthenticator.authenticate(
+                            cipher = cipher,
+                            title = "Enable biometric",
+                            subtitle = "Confirm to protect your DayKit master key",
+                            onSuccess = { authenticatedCipher ->
+                                runCatching {
+                                    container.biometricUnlockManager.completeEnrollment(
+                                        authenticatedCipher,
+                                        container.sensitiveKeyManager,
+                                    )
+                                }.onSuccess {
+                                    scope.launch {
+                                        container.secureSettingRepository.putBoolean(
+                                            SecureSettingRepository.KEY_BIOMETRIC_ENABLED,
+                                            true,
+                                        )
+                                    }
+                                }.onFailure {
+                                    biometricMessage = "Could not protect the biometric key. Use your PIN."
+                                }
+                            },
+                            onError = { biometricMessage = it },
+                        )
+                    }
+                    .onFailure {
+                        biometricMessage = "Could not create a biometric key on this device"
+                    }
             },
             onSkip = {
                 scope.launch {
@@ -371,59 +474,24 @@ private fun DayKitApp(
             onRefresh = { permissions = AppLockPermissionChecker.check(context) },
         )
 
-        // Mandatory session unlock: derives the sensitive-data key from the PIN.
-        // Reached on every cold start and after the app returns from background.
-        !sensitiveUnlocked -> ToolUnlockScreen(
-            title = "Unlock DayKit",
-            subtitle = "Enter your master PIN",
-            pin = unlockPin,
-            error = unlockError,
-            pinLength = container.credentialRepository.pinLength(),
-            biometricEnabled = false,
-            icon = Icons.Rounded.Lock,
-            onBack = { activity.finish() },
-            onPinChange = {
-                unlockPin = it.filter(Char::isDigit).take(12)
-                unlockError = null
-            },
-            onUnlock = {
-                scope.launch {
-                    val pin = unlockPin
-                    val result = withContext(Dispatchers.Default) {
-                        // C1 lockout runs here; only then derive the key.
-                        val verifyResult = container.credentialRepository.verify(pin.toCharArray())
-                        if (verifyResult is PinVerifyResult.Success) {
-                            container.sensitiveKeyManager.unlock(pin.toCharArray())
-                        }
-                        verifyResult
+        else -> Box {
+            RootScaffold(
+                activity = activity,
+                container = container,
+                lockedCount = lockedApps.size,
+                onAppLockSelectionChanged = {
+                    permissions = AppLockPermissionChecker.check(context)
+                    if (permissions.allGranted) {
+                        AppMonitorService.start(context)
                     }
-                    when {
-                        result is PinVerifyResult.Success && container.sensitiveKeyManager.isUnlocked() -> {
-                            unlockPin = ""
-                            unlockError = null
-                            sensitiveUnlocked = true
-                        }
-                        else -> {
-                            unlockPin = ""
-                            unlockError = result.errorMessageOrNull() ?: "Wrong PIN"
-                        }
-                    }
+                },
+            )
+            if (!sensitiveUnlocked) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    unlockGate()
                 }
-            },
-            onBiometric = {},
-        )
-
-        else -> RootScaffold(
-            activity = activity,
-            container = container,
-            lockedCount = lockedApps.size,
-            onAppLockSelectionChanged = {
-                permissions = AppLockPermissionChecker.check(context)
-                if (permissions.allGranted) {
-                    AppMonitorService.start(context)
-                }
-            },
-        )
+            }
+        }
     }
 }
 

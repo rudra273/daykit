@@ -107,6 +107,7 @@ fun FileLockerScreen(
     val errors = rememberErrorReporter(snackbarHostState, scope)
     val selectedIds = remember { mutableStateListOf<String>() }
     var working by remember { mutableStateOf(false) }
+    var pendingExportIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var previewItem by remember { mutableStateOf<FileLockerPreviewItem?>(null) }
     // Non-null while the delete confirm is showing; holds the count being deleted.
     var confirmDeleteCount by remember { mutableStateOf<Int?>(null) }
@@ -135,23 +136,28 @@ fun FileLockerScreen(
 
     val exportFolderLauncher = rememberLauncherForActivityResult(DestinationFolderPickerContract()) { destinationUri ->
         if (destinationUri == null) {
+            pendingExportIds = emptySet()
             snack("Choose a destination folder to export the selected files.")
             return@rememberLauncherForActivityResult
         }
-        val selected = files.filter { selectedIds.contains(it.fileId) }
-        if (selected.isEmpty()) return@rememberLauncherForActivityResult
-        errors.launchGuarded(
-            failureMessage = "Export failed. The files are still in the vault.",
-            // Always clear the spinner — leaving it set would freeze the action bar.
-            onFailure = { working = false },
-        ) {
-            working = true
-            val exported = withContext(Dispatchers.IO) {
-                exportFiles(context, repository, selected, destinationUri)
+        val exportIds = pendingExportIds
+        pendingExportIds = emptySet()
+        container.sensitiveKeyManager.runWhenUnlocked {
+            if (exportIds.isNotEmpty()) {
+                errors.launchGuarded(
+                    failureMessage = "Export failed. The files are still in the vault.",
+                    onFailure = { working = false },
+                ) {
+                    working = true
+                    val exported = withContext(Dispatchers.IO) {
+                        val selected = repository.getFiles(exportIds)
+                        exportFiles(context, repository, selected, destinationUri)
+                    }
+                    selectedIds.clear()
+                    working = false
+                    snack("$exported file(s) exported. The originals remain protected in the vault.")
+                }
             }
-            selectedIds.clear()
-            working = false
-            snack("$exported file(s) exported. The originals remain protected in the vault.")
         }
     }
 
@@ -190,7 +196,9 @@ fun FileLockerScreen(
     }
 
     val pickMediaLauncher = rememberLauncherForActivityResult(HideableMediaPickerContract()) { uris ->
-        importUris(uris)
+        if (uris.isNotEmpty()) {
+            container.sensitiveKeyManager.runWhenUnlocked { importUris(uris) }
+        }
     }
 
     // Media shared into the app ("share to DayKit"): consume and import once.
@@ -213,6 +221,7 @@ fun FileLockerScreen(
                     onCancel = { selectedIds.clear() },
                     onExport = {
                         snack("Choose where to export the selected files.")
+                        pendingExportIds = selectedIds.toSet()
                         container.sensitiveKeyManager.expectingActivityResult = true
                         exportFolderLauncher.launch(Unit)
                     },

@@ -54,6 +54,12 @@ class VaultFileRepository(
                 if (error is SensitiveDataLockedException) emit(emptyList()) else throw error
             }
 
+    /** Reloads selected metadata after an external picker has required re-authentication. */
+    suspend fun getFiles(fileIds: Set<String>): List<VaultFile> =
+        dao.observeAllOnce()
+            .filter { it.fileId in fileIds }
+            .map { it.toVaultFile() }
+
     /**
      * Imports [uri] into the vault: streams source -> encrypt -> app-private
      * blob, records metadata, then deletes the original. Crash-safe: the DB row

@@ -170,7 +170,9 @@ fun SettingsScreen(
     LaunchedEffect(Unit) {
         container.secureSettingRepository
             .observeBoolean(SecureSettingRepository.KEY_BIOMETRIC_ENABLED)
-            .collect { enabled -> biometricEnabled = enabled ?: false }
+            .collect { enabled ->
+                biometricEnabled = enabled == true && container.biometricUnlockManager.isEnrolled()
+            }
     }
 
     LaunchedEffect(Unit) {
@@ -266,19 +268,35 @@ fun SettingsScreen(
                                         if (!biometricAuthenticator.canAuthenticate()) {
                                             biometricMessage = "Fingerprint is unavailable on this device"
                                         } else {
-                                            biometricAuthenticator.authenticate(
-                                                title = "Enable fingerprint",
-                                                subtitle = "Confirm once for DayKit tools",
-                                                onSuccess = {
-                                                    scope.launch {
-                                                        container.secureSettingRepository.putBoolean(
-                                                            SecureSettingRepository.KEY_BIOMETRIC_ENABLED,
-                                                            true,
-                                                        )
-                                                    }
-                                                },
-                                                onError = { biometricMessage = it },
-                                            )
+                                            runCatching {
+                                                container.biometricUnlockManager.enrollmentCipher()
+                                            }.onSuccess { cipher ->
+                                                biometricAuthenticator.authenticate(
+                                                    cipher = cipher,
+                                                    title = "Enable fingerprint",
+                                                    subtitle = "Confirm to protect your DayKit master key",
+                                                    onSuccess = { authenticatedCipher ->
+                                                        runCatching {
+                                                            container.biometricUnlockManager.completeEnrollment(
+                                                                authenticatedCipher,
+                                                                container.sensitiveKeyManager,
+                                                            )
+                                                        }.onSuccess {
+                                                            scope.launch {
+                                                                container.secureSettingRepository.putBoolean(
+                                                                    SecureSettingRepository.KEY_BIOMETRIC_ENABLED,
+                                                                    true,
+                                                                )
+                                                            }
+                                                        }.onFailure {
+                                                            biometricMessage = "Could not protect the biometric key"
+                                                        }
+                                                    },
+                                                    onError = { biometricMessage = it },
+                                                )
+                                            }.onFailure {
+                                                biometricMessage = "Could not create a biometric key on this device"
+                                            }
                                         }
                                     } else {
                                         biometricDisableError = null
@@ -469,6 +487,7 @@ fun SettingsScreen(
                         container.credentialRepository.verify(pin.toCharArray())
                     }
                     if (result is PinVerifyResult.Success) {
+                        container.biometricUnlockManager.clear()
                         container.secureSettingRepository.putBoolean(
                             SecureSettingRepository.KEY_BIOMETRIC_ENABLED,
                             false,
