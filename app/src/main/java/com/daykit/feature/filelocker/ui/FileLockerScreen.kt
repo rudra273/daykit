@@ -261,7 +261,7 @@ fun FileLockerScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            if (!selectionMode) {
+            if (!selectionMode && files.isNotEmpty()) {
                 AppExtendedFab(
                     icon = Icons.Rounded.Lock,
                     text = if (working) "Working…" else "Add files",
@@ -282,7 +282,7 @@ fun FileLockerScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = Spacing.md, end = Spacing.md,
-                    top = innerPadding.calculateTopPadding() + Spacing.sm, bottom = Spacing.xxl + 72.dp,
+                    top = innerPadding.calculateTopPadding() + Spacing.md, bottom = Spacing.xxl + 72.dp,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -297,23 +297,25 @@ fun FileLockerScreen(
                             )
                             Spacer(Modifier.height(Spacing.md))
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                            StatTile(
-                                label = "Protected files",
-                                value = "${files.size}",
-                                icon = Icons.Rounded.Shield,
-                                accent = MaterialTheme.extendedColors.accents.purple,
-                                modifier = Modifier.weight(1f),
-                            )
-                            StatTile(
-                                label = "Total size",
-                                value = totalBytes.toReadableSize(),
-                                icon = Icons.Rounded.FolderOpen,
-                                accent = MaterialTheme.extendedColors.accents.blue,
-                                modifier = Modifier.weight(1f),
-                            )
+                        if (files.isNotEmpty()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                                StatTile(
+                                    label = "Protected files",
+                                    value = "${files.size}",
+                                    icon = Icons.Rounded.Shield,
+                                    accent = MaterialTheme.extendedColors.accents.purple,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                StatTile(
+                                    label = "Total size",
+                                    value = totalBytes.toReadableSize(),
+                                    icon = Icons.Rounded.FolderOpen,
+                                    accent = MaterialTheme.extendedColors.accents.blue,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            Spacer(Modifier.height(Spacing.sm))
                         }
-                        Spacer(Modifier.height(Spacing.sm))
                         SecurityInfo()
                         Spacer(Modifier.height(Spacing.md))
                     }
@@ -324,7 +326,14 @@ fun FileLockerScreen(
                         EmptyState(
                             icon = Icons.Rounded.Shield,
                             title = "No protected files",
-                            description = "Tap \"Add files\" to encrypt photos and videos into your vault.",
+                            description = "Encrypt photos and videos so they stay protected in your vault.",
+                            actionText = "Add files",
+                            onAction = {
+                                if (!working) {
+                                    container.sensitiveKeyManager.expectingActivityResult = true
+                                    pickMediaLauncher.launch(Unit)
+                                }
+                            },
                             modifier = Modifier.padding(top = Spacing.lg),
                         )
                     }
@@ -648,7 +657,8 @@ private suspend fun exportFiles(
 }
 
 private fun Long.toReadableSize(): String {
-    if (this <= 0L) return "Unknown size"
+    if (this == 0L) return "0 B"
+    if (this < 0L) return "Unknown size"
     val kb = this / 1024.0
     if (kb < 1024) return "${kb.toInt()} KB"
     val mb = kb / 1024.0

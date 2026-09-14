@@ -50,7 +50,7 @@ fun AppearanceScreen(onBack: () -> Unit) {
             modifier = Modifier.padding(
                 start = Spacing.lg,
                 end = Spacing.lg,
-                top = Spacing.sm,
+                top = Spacing.xs,
             ),
         ) {
             SectionHeader("Theme")

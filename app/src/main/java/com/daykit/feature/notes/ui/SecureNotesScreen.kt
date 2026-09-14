@@ -196,7 +196,7 @@ fun SecureNotesScreen(
                     contentPadding = PaddingValues(
                         start = Spacing.lg,
                         end = Spacing.lg,
-                        top = innerPadding.calculateTopPadding() + Spacing.sm,
+                        top = innerPadding.calculateTopPadding() + Spacing.md,
                         bottom = Spacing.xxl + 72.dp,
                     ),
                     modifier = Modifier.fillMaxSize(),

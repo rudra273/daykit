@@ -88,6 +88,7 @@ fun AppListRow(
 fun SectionHeader(
     text: String,
     modifier: Modifier = Modifier,
+    topPadding: Dp = Spacing.sm,
 ) {
     Text(
         text = text,
@@ -96,7 +97,7 @@ fun SectionHeader(
         // No start inset: callers already pad their content region, so the label
         // aligns flush with the cards' left edge instead of double-indenting.
         // More space above than below so it hugs its group.
-        modifier = modifier.padding(end = Spacing.lg, top = Spacing.md, bottom = Spacing.xs),
+        modifier = modifier.padding(end = Spacing.lg, top = topPadding, bottom = Spacing.xs),
     )
 }
 

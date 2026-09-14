@@ -409,11 +409,15 @@ private fun HabitHome(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = { AppTopBar(title = "Habits", onBack = onBack) },
         floatingActionButton = {
-            AppFab(
-                icon = Icons.Rounded.Add,
-                contentDescription = "Add habit",
-                onClick = onAdd,
-            )
+            val emptyBuildState = dashboard?.buildHabits?.isEmpty() == true &&
+                selectedTab in setOf(HabitTab.CheckIn, HabitTab.Habits)
+            if (!emptyBuildState) {
+                AppFab(
+                    icon = Icons.Rounded.Add,
+                    contentDescription = "Add habit",
+                    onClick = onAdd,
+                )
+            }
         },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -431,7 +435,7 @@ private fun HabitHome(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        top = innerPadding.calculateTopPadding() + Spacing.sm,
+                        top = innerPadding.calculateTopPadding() + Spacing.md,
                         start = Spacing.lg,
                         end = Spacing.lg,
                         bottom = innerPadding.calculateBottomPadding() + 96.dp,
@@ -512,14 +516,6 @@ private fun androidx.compose.foundation.lazy.LazyListScope.checkInItems(
     onLog: (Habit) -> Unit,
     onAdd: () -> Unit,
 ) {
-    item(key = "quote") { QuoteCard(dashboard = dashboard) }
-    item(key = "datestrip") {
-        DateStrip(
-            dashboard = dashboard,
-            selectedDate = selectedDate,
-            onSelectDate = onSelectDate,
-        )
-    }
     if (dashboard.buildHabits.isEmpty()) {
         item(key = "empty") {
             AppCard(modifier = Modifier.fillMaxWidth()) {
@@ -533,6 +529,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.checkInItems(
             }
         }
     } else {
+        item(key = "quote") { QuoteCard(dashboard = dashboard) }
+        item(key = "datestrip") {
+            DateStrip(
+                dashboard = dashboard,
+                selectedDate = selectedDate,
+                onSelectDate = onSelectDate,
+            )
+        }
         items(dashboard.buildHabits, key = { it.habitId }) { habit ->
             DailyHabitRow(
                 habit = habit,
@@ -572,7 +576,7 @@ private fun DateStrip(
     onSelectDate: (LocalDate) -> Unit,
 ) {
     val today = dashboard.today
-    val days = remember(today) { (6 downTo 0).map { today.minusDays(it.toLong()) } }
+    val days = remember(today) { (0..6).map { today.minusDays(it.toLong()) } }
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         modifier = Modifier.fillMaxWidth(),

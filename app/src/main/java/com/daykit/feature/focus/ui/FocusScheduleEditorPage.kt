@@ -106,7 +106,7 @@ fun FocusScheduleEditorPage(
                 contentPadding = PaddingValues(
                     start = Spacing.lg,
                     end = Spacing.lg,
-                    top = Spacing.sm,
+                    top = Spacing.xs,
                     bottom = Spacing.lg,
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),

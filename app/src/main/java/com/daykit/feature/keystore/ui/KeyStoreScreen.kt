@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -139,7 +140,7 @@ fun KeyStoreScreen(
     }
 
     val grouped = remember(filteredEntries) {
-        filteredEntries.groupBy { it.label.ifBlank { "Other" } }
+        filteredEntries.groupBy { it.label.ifBlank { "Unlabeled" } }
             .toSortedMap()
     }
 
@@ -171,7 +172,7 @@ fun KeyStoreScreen(
             contentPadding = PaddingValues(
                 start = Spacing.lg,
                 end = Spacing.lg,
-                top = innerPadding.calculateTopPadding() + Spacing.sm,
+                top = innerPadding.calculateTopPadding() + Spacing.md,
                 bottom = Spacing.xxl + 72.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -182,6 +183,13 @@ fun KeyStoreScreen(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
+                        item(key = "all-labels") {
+                            FilterChipButton(
+                                text = "All",
+                                selected = selectedLabel == null,
+                                onClick = { selectedLabel = null },
+                            )
+                        }
                         items(uniqueLabels) { lbl ->
                             val isSelected = selectedLabel == lbl
                             FilterChipButton(
@@ -228,7 +236,7 @@ fun KeyStoreScreen(
                                     onClick = { actionEntry = entry },
                                     onCopy = {
                                         clipboard.setText(AnnotatedString(entry.value))
-                                        scope.launch { snackbarHostState.showSnackbar("Copied") }
+                                        scope.launch { snackbarHostState.showSnackbar("${entry.name} value copied") }
                                     },
                                 )
                                 if (index < groupEntries.lastIndex) {
@@ -582,6 +590,7 @@ private fun KeyFormSheet(
                     }
                     androidx.compose.foundation.layout.FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                     ) {
                         FilterChipButton("Uppercase", useUppercase) {
                             if (!useUppercase || useLowercase || useNumbers || useSymbols) useUppercase = !useUppercase
@@ -596,6 +605,7 @@ private fun KeyFormSheet(
                             if (!useSymbols || useUppercase || useLowercase || useNumbers) useSymbols = !useSymbols
                         }
                     }
+                    Spacer(Modifier.height(Spacing.md))
                     PrimaryButton(
                         text = "Use generated password",
                         modifier = Modifier.fillMaxWidth(),

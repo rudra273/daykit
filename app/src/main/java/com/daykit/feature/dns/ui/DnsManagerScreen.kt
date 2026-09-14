@@ -140,7 +140,7 @@ fun DnsManagerScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = Spacing.lg, end = Spacing.lg,
-                    top = Spacing.sm,
+                    top = Spacing.md,
                     bottom = Spacing.xxl,
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),

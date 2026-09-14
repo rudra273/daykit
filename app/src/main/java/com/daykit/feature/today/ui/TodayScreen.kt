@@ -41,6 +41,7 @@ import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
@@ -87,7 +88,7 @@ fun TodayScreen(
     val allEmpty = buildHabits.isEmpty() && pending.isEmpty() && monthSummary == null
 
     Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "Today · $dateLabel")
+        AppTopBar(title = "Today", subtitle = dateLabel)
         if (allEmpty && habitDashboard != null) {
             EmptyState(
                 icon = Icons.Rounded.TrackChanges,
@@ -103,7 +104,7 @@ fun TodayScreen(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg, top = Spacing.sm,
+                start = Spacing.lg, end = Spacing.lg, top = Spacing.xs,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.lg,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -118,7 +119,13 @@ fun TodayScreen(
                 )
             }
             if (buildHabits.isEmpty()) {
-                item { HintCard("No habits yet — build one to start tracking.") }
+                item {
+                    HintCard(
+                        text = "No habits yet — build one to start tracking.",
+                        actionText = "Add habit",
+                        onAction = { onOpenTool(Routes.TOOL_HABITS) },
+                    )
+                }
             } else {
                 items(buildHabits, key = { it.habitId }) { habit ->
                     val completed = habitDashboard?.logFor(habit.habitId)?.completed == true
@@ -153,7 +160,13 @@ fun TodayScreen(
             }
             val shownReminders = pending.take(4)
             if (shownReminders.isEmpty()) {
-                item { HintCard("Nothing scheduled. You're all caught up.") }
+                item {
+                    HintCard(
+                        text = "Nothing scheduled. You're all caught up.",
+                        actionText = "Add reminder",
+                        onAction = { onOpenTool(Routes.TOOL_REMINDERS) },
+                    )
+                }
             } else {
                 items(shownReminders, key = { it.reminderId }) { reminder ->
                     ReminderTodayRow(
@@ -202,11 +215,19 @@ fun TodayScreen(
                                 color = MaterialTheme.extendedColors.textMuted,
                             )
                         } else {
-                            Text(
-                                "No monthly limit set",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.extendedColors.textMuted,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "No monthly limit set",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.extendedColors.textMuted,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    "Set limit",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                         }
                     }
                 }
@@ -227,19 +248,16 @@ private fun SectionRow(title: String, trailing: String?, onSeeAll: () -> Unit) {
                 modifier = Modifier.padding(end = Spacing.sm),
             )
         }
-        Text(
-            "See all",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(end = Spacing.lg),
-        )
+        AppTextButton(text = "See all", onClick = onSeeAll)
     }
 }
 
 @Composable
-private fun HintCard(text: String) {
-    AppCard {
+private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
+    AppCard(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.extendedColors.textMuted)
+        Spacer(Modifier.height(Spacing.sm))
+        Text(actionText, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
     }
 }
 

@@ -273,7 +273,11 @@ fun EditorScreen(
                             }
                         }
                         Text(
-                            text = if (isDirty) "Unsaved changes" else "Saved",
+                            text = when {
+                                isDirty -> "Unsaved changes"
+                                fileUri == null -> "New document"
+                                else -> "Saved locally"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.extendedColors.textMuted,
                         )
@@ -297,7 +301,12 @@ fun EditorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(horizontal = Spacing.lg)
+                    .padding(
+                        start = Spacing.lg,
+                        end = Spacing.lg,
+                        top = Spacing.md,
+                        bottom = Spacing.md,
+                    )
                     .imePadding()
                     .verticalScroll(rememberScrollState()),
             ) {

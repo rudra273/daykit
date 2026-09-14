@@ -219,13 +219,13 @@ fun SettingsScreen(
             contentPadding = PaddingValues(
                 start = Spacing.lg,
                 end = Spacing.lg,
-                top = Spacing.sm,
+                top = 0.dp,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xl,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             // ---- Data ----
-            item { SectionHeader("Data") }
+            item { SectionHeader("Data", topPadding = 0.dp) }
             item {
                 AppCard(contentPadding = PaddingValues(0.dp)) {
                     AppListRow(
@@ -373,12 +373,13 @@ fun SettingsScreen(
                 }
             }
 
-            // ---- Appearance ----
-            item { SectionHeader("Appearance") }
+            // ---- Preferences ----
+            item { SectionHeader("Preferences") }
             item {
                 AppCard(contentPadding = PaddingValues(0.dp)) {
                     AppListRow(
                         headline = "Appearance",
+                        supporting = "Theme and display preferences",
                         leadingIcon = Icons.Rounded.Palette,
                         leadingAccent = accents.orange,
                         trailing = { NavChevron() },

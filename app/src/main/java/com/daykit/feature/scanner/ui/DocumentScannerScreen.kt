@@ -131,8 +131,16 @@ fun DocumentScannerScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Box(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(Spacing.lg),
-            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(
+                    start = Spacing.lg,
+                    end = Spacing.lg,
+                    top = Spacing.md,
+                    bottom = Spacing.lg,
+                ),
+            contentAlignment = Alignment.TopCenter,
         ) {
             AppCard(modifier = Modifier.fillMaxWidth()) {
                 Column(

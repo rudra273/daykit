@@ -128,7 +128,9 @@ fun ReminderScreen(
         topBar = { Column { AppTopBar(title = "Reminders", onBack = onBack); ReminderPermissionNotice() } },
         snackbarHost = { SnackbarHost(errors.host) },
         floatingActionButton = {
-            AppFab(icon = Icons.Rounded.Add, contentDescription = "Add reminder", onClick = { addOpen = true })
+            if (reminders?.isNotEmpty() == true) {
+                AppFab(icon = Icons.Rounded.Add, contentDescription = "Add reminder", onClick = { addOpen = true })
+            }
         },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
@@ -138,6 +140,7 @@ fun ReminderScreen(
                     reminders = current,
                     listState = listState,
                     onComplete = ::complete,
+                    onAdd = { addOpen = true },
                     onLongPress = {
                         actionReminder = it
                         actionHistory = emptyList()
@@ -242,6 +245,7 @@ private fun ReminderContent(
     reminders: List<Reminder>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onComplete: (Reminder) -> Unit,
+    onAdd: () -> Unit,
     onLongPress: (Reminder) -> Unit,
 ) {
     if (reminders.isEmpty()) {
@@ -249,7 +253,9 @@ private fun ReminderContent(
             EmptyState(
                 icon = Icons.Rounded.NotificationsActive,
                 title = "No reminders yet",
-                description = "Tap + to add one. Notifications stay until you complete them.",
+                description = "Create a reminder that stays visible until you complete it.",
+                actionText = "Add reminder",
+                onAction = onAdd,
                 modifier = Modifier.padding(top = Spacing.xxl),
             )
         }
@@ -266,20 +272,15 @@ private fun ReminderContent(
     val overdue = active.filter { it.scheduledAtMillis < now }
     val today = active.filter { it.scheduledAtMillis in now until startOfTomorrow }
     val upcoming = active.filter { it.scheduledAtMillis >= startOfTomorrow }
-    val next = active.firstOrNull()
-
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = Spacing.lg, end = Spacing.lg,
-            top = Spacing.sm, bottom = Spacing.xxl + 72.dp,
+            top = Spacing.md, bottom = Spacing.xxl + 72.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        if (next != null) {
-            item { UpNextCard(reminder = next, onComplete = { onComplete(next) }) }
-        }
         section("Overdue", overdue, accentDanger = true, onComplete, onLongPress)
         section("Today", today, accentDanger = false, onComplete, onLongPress)
         section("Upcoming", upcoming, accentDanger = false, onComplete, onLongPress)
@@ -430,7 +431,8 @@ private fun ReminderRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = (if (reminder.paused) "Paused · " else "") + reminder.scheduledAtMillis.toAbsoluteText() +
+                    text = (if (reminder.paused) "Paused · " else "") +
+                        "${relativeText(reminder.scheduledAtMillis)} · ${reminder.scheduledAtMillis.toAbsoluteText()}" +
                         (reminder.recurrence?.let { "\n${it.describe()}" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (accentDanger) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.textMuted,
@@ -537,13 +539,15 @@ private fun ReminderFormSheet(
     val canSave = title.trim().isNotBlank() && scheduledAtMillis != null && scheduledAtMillis > System.currentTimeMillis()
 
     AppBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg)) {
+        Column(
+            modifier = Modifier.padding(horizontal = Spacing.xl).padding(bottom = Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
             Text(
                 text = heading,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(Modifier.height(Spacing.lg))
             AppTextField(
                 value = title,
                 onValueChange = { title = it.take(80) },
@@ -551,7 +555,11 @@ private fun ReminderFormSheet(
                 placeholder = "What should we remind you about?",
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
-            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = "When",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.extendedColors.textMuted,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 SecondaryButton(
                     text = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
@@ -566,9 +574,15 @@ private fun ReminderFormSheet(
                     onClick = { timeOpen = true },
                 )
             }
-            Spacer(Modifier.height(Spacing.md))
-            Text("Repeat", style = MaterialTheme.typography.titleSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Text(
+                text = "Repeat",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.extendedColors.textMuted,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
                 FilterChipButton(text = "Once", selected = frequency == null, onClick = { frequency = null })
                 ReminderFrequency.entries.forEach { option ->
                     FilterChipButton(text = option.displayName(),
@@ -576,6 +590,7 @@ private fun ReminderFormSheet(
                 }
             }
             if (frequency != null) {
+                Spacer(Modifier.height(Spacing.xs))
                 AppTextField(value = intervalText, onValueChange = { intervalText = it.filter(Char::isDigit).take(3) },
                     label = "Repeat every ${frequency!!.intervalUnit()} (1–999)",
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
@@ -593,13 +608,16 @@ private fun ReminderFormSheet(
                 }
                 scheduledAtMillis?.let { Text("Next: ${it.toAbsoluteText()}", style = MaterialTheme.typography.bodySmall) }
             }
-            Spacer(Modifier.height(Spacing.md))
             Text(
-                text = if (canSave) "Notification stays until you tap complete." else "Choose a valid repeat rule and future date and time.",
+                text = when {
+                    title.trim().isBlank() -> "Enter what you want to remember."
+                    recurrence == null && frequency != null -> "Choose a valid repeat rule."
+                    scheduledAtMillis == null || scheduledAtMillis <= System.currentTimeMillis() -> "Choose a future date and time."
+                    else -> "Notification stays until you tap complete."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.extendedColors.textMuted,
             )
-            Spacer(Modifier.height(Spacing.lg))
             PrimaryButton(
                 text = confirmText,
                 modifier = Modifier.fillMaxWidth(),

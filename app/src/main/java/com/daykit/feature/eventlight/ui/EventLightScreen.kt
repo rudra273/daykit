@@ -83,7 +83,7 @@ fun EventLightScreen(onBack: () -> Unit) {
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.sm),
+                .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md),
         ) {
             if (!overlayGranted) {
                 AppCard(modifier = Modifier.fillMaxWidth()) {

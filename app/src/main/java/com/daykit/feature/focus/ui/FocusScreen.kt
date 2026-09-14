@@ -203,6 +203,7 @@ private fun FocusHome(
     val blockedPackages = remember(focusBlocks) { focusBlocks.map { it.packageName }.toSet() }
     val sortedBlocks = remember(focusBlocks) { focusBlocks.sortedBy { it.lockUntilMillis } }
     val groupsById = remember(groups) { groups.associateBy { it.groupId } }
+    val isFirstRun = groups.isEmpty() && schedules.isEmpty() && activeSessions.isEmpty() && sortedBlocks.isEmpty()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -223,7 +224,7 @@ private fun FocusHome(
             contentPadding = PaddingValues(
                 start = Spacing.lg,
                 end = Spacing.lg,
-                top = innerPadding.calculateTopPadding() + Spacing.sm,
+                top = innerPadding.calculateTopPadding() + Spacing.md,
                 // FAB clearance, as every other tool screen does.
                 bottom = Spacing.xxl + 72.dp,
             ),
@@ -258,11 +259,19 @@ private fun FocusHome(
                 }
             }
 
-            // No create action: a session is only ever started by a schedule
-            // firing or by blocking apps below, never from here.
-            item(key = "header-session") { FocusSectionHeader("Session") }
+            if (isFirstRun) {
+                item(key = "getting-started") {
+                    FocusGettingStarted(onCreateGroup = { onEdit(FocusEditor.Group(null)) })
+                }
+            }
 
-            if (activeSessions.isEmpty() && sortedBlocks.isEmpty()) {
+            if (!isFirstRun) {
+                // No create action: a session is only ever started by a schedule
+                // firing or by blocking apps below, never from here.
+                item(key = "header-session") { FocusSectionHeader("Session") }
+            }
+
+            if (!isFirstRun && activeSessions.isEmpty() && sortedBlocks.isEmpty()) {
                 item(key = "empty-session") {
                     FocusSectionEmpty("Nothing is blocked right now.")
                 }
@@ -339,14 +348,16 @@ private fun FocusHome(
                 }
             }
 
-            item(key = "header-groups") {
-                FocusSectionHeader(
-                    title = "Groups",
-                    actionText = "Create",
-                    onAction = { onEdit(FocusEditor.Group(null)) },
-                )
+            if (!isFirstRun) {
+                item(key = "header-groups") {
+                    FocusSectionHeader(
+                        title = "Groups",
+                        actionText = "Create group",
+                        onAction = { onEdit(FocusEditor.Group(null)) },
+                    )
+                }
             }
-            if (groups.isEmpty()) {
+            if (!isFirstRun && groups.isEmpty()) {
                 item(key = "empty-groups") {
                     FocusSectionEmpty("Group the apps that distract you, then block them together.")
                 }
@@ -359,20 +370,20 @@ private fun FocusHome(
                 )
             }
 
-            item(key = "header-schedules") {
-                FocusSectionHeader(
-                    title = "Schedules",
-                    // A schedule blocks a group, so there is nothing to schedule
-                    // until one exists; the placeholder below says so.
-                    actionText = if (groups.isNotEmpty()) "Create" else null,
-                    onAction = if (groups.isNotEmpty()) {
-                        { onEdit(FocusEditor.Schedule(null)) }
-                    } else {
-                        null
-                    },
-                )
+            if (!isFirstRun) {
+                item(key = "header-schedules") {
+                    FocusSectionHeader(
+                        title = "Schedules",
+                        actionText = if (groups.isNotEmpty()) "Create schedule" else null,
+                        onAction = if (groups.isNotEmpty()) {
+                            { onEdit(FocusEditor.Schedule(null)) }
+                        } else {
+                            null
+                        },
+                    )
+                }
             }
-            if (schedules.isEmpty()) {
+            if (!isFirstRun && schedules.isEmpty()) {
                 item(key = "empty-schedules") {
                     FocusSectionEmpty(
                         if (groups.isEmpty()) {
@@ -615,6 +626,21 @@ private fun FocusSectionEmpty(text: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.extendedColors.textMuted,
         )
+    }
+}
+
+@Composable
+private fun FocusGettingStarted(onCreateGroup: () -> Unit) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Text("Block distractions", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            "Create a group of apps you want to avoid, then start a session whenever you need it.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.extendedColors.textMuted,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        PrimaryButton(text = "Create group", onClick = onCreateGroup)
     }
 }
 

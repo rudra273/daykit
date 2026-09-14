@@ -461,7 +461,7 @@ private fun ExpenseMainList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = Spacing.lg, end = Spacing.lg,
-            top = Spacing.sm, bottom = Spacing.xxl + 72.dp,
+            top = Spacing.md, bottom = Spacing.xxl + 72.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
@@ -496,14 +496,16 @@ private fun ExpenseMainList(
                 }
             }
         }
-        item {
-            SpendChartCard(
-                mode = chartMode,
-                onModeChange = onChartModeChange,
-                selectedMonth = selectedMonth,
-                monthEntries = summary.entries,
-                allEntries = allEntries,
-            )
+        if (summary.entries.isNotEmpty()) {
+            item {
+                SpendChartCard(
+                    mode = chartMode,
+                    onModeChange = onChartModeChange,
+                    selectedMonth = selectedMonth,
+                    monthEntries = summary.entries,
+                    allEntries = allEntries,
+                )
+            }
         }
 
         if (todaysBills.isNotEmpty()) {
@@ -519,7 +521,7 @@ private fun ExpenseMainList(
                 EmptyState(
                     icon = Icons.Rounded.ReceiptLong,
                     title = "No expenses this month",
-                    description = "Tap + to add your first expense.",
+                    description = "Add an expense to see your monthly totals and spending chart.",
                 )
             }
         } else {
@@ -558,11 +560,18 @@ private fun HeroSummaryCard(
 ) {
     val isOverLimit = summary.limitMinor > 0L && summary.totalMinor > summary.limitMinor
     AppCard {
-        Text(
-            "Spent this month",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.extendedColors.textMuted,
-        )
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Spent this month",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.extendedColors.textMuted,
+                modifier = Modifier.weight(1f),
+            )
+            AppTextButton(
+                text = if (summary.limitMinor > 0L) "Edit limit" else "Set limit",
+                onClick = onSetLimit,
+            )
+        }
         Spacer(Modifier.height(Spacing.xs))
         Text(
             Money.format(summary.totalMinor),
@@ -593,11 +602,6 @@ private fun HeroSummaryCard(
             )
         }
         Spacer(Modifier.height(Spacing.sm))
-        AppTextButton(
-            text = if (summary.limitMinor > 0L) "Edit limit" else "Set limit",
-            onClick = onSetLimit,
-        )
-        Spacer(Modifier.height(Spacing.sm))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -610,7 +614,7 @@ private fun HeroSummaryCard(
                 modifier = Modifier.weight(1f),
             )
             com.daykit.core.designsystem.components.StatTile(
-                label = "Daily",
+                label = "Other expenses",
                 value = Money.format(summary.dailyTotalMinor),
                 icon = Icons.Rounded.ReceiptLong,
                 accent = MaterialTheme.extendedColors.accents.teal,

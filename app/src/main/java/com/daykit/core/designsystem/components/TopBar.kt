@@ -46,7 +46,7 @@ import com.daykit.core.designsystem.extendedColors
  * ([showDivider]) appears when content scrolls beneath it.
  */
 /** Standard header height, excluding the status-bar inset. Every screen uses this via [AppTopBar]. */
-val AppTopBarHeight = 52.dp
+val AppTopBarHeight = 48.dp
 
 @Composable
 fun AppTopBar(
@@ -70,12 +70,12 @@ fun AppTopBar(
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .height(AppTopBarHeight)
-                .padding(horizontal = Spacing.md),
+                .padding(horizontal = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (onBack != null) {
                 AppBackButton(onClick = onBack)
-                Spacer(Modifier.width(Spacing.sm))
+                Spacer(Modifier.width(Spacing.xs))
             }
             if (titleContent != null) {
                 Box(modifier = Modifier.weight(1f)) { titleContent() }
@@ -223,7 +223,7 @@ fun AppBackButton(
     ) {
         FilledIconButton(
             onClick = onClick,
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier.size(32.dp),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = MaterialTheme.extendedColors.inputField,

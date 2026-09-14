@@ -54,6 +54,7 @@ import com.daykit.navigation.Routes
 private data class ToolTile(
     val route: String,
     val name: String,
+    val description: String,
     val icon: ImageVector,
     val accent: @Composable () -> Color,
     val keywords: List<String>,
@@ -74,33 +75,33 @@ fun HomeScreen(
     val accents = MaterialTheme.extendedColors.accents
 
     val security = listOf(
-        ToolTile(Routes.TOOL_APPLOCK, "App Lock", Icons.Rounded.Lock, { accents.blue },
+        ToolTile(Routes.TOOL_APPLOCK, "App Lock", "Protect selected apps", Icons.Rounded.Lock, { accents.blue },
             listOf("app lock", "lock")),
-        ToolTile(Routes.TOOL_KEYSTORE, "Key Store", Icons.Rounded.VpnKey, { accents.indigo },
+        ToolTile(Routes.TOOL_KEYSTORE, "Key Store", "Store private values", Icons.Rounded.VpnKey, { accents.indigo },
             listOf("key store", "password", "vault")),
-        ToolTile(Routes.TOOL_NOTES, "Notes", Icons.Rounded.Notes, { accents.teal },
+        ToolTile(Routes.TOOL_NOTES, "Notes", "Keep private notes", Icons.Rounded.Notes, { accents.teal },
             listOf("notes", "secure notes")),
-        ToolTile(Routes.TOOL_FILEVAULT, "File Vault", Icons.Rounded.Folder, { accents.purple },
+        ToolTile(Routes.TOOL_FILEVAULT, "File Vault", "Protect photos & videos", Icons.Rounded.Folder, { accents.purple },
             listOf("file vault", "file locker", "hide files", "images", "videos")),
     )
     val productivity = listOf(
-        ToolTile(Routes.TOOL_HABITS, "Habits", Icons.Rounded.TrackChanges, { accents.green },
+        ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TrackChanges, { accents.green },
             listOf("habit", "habits")),
-        ToolTile(Routes.TOOL_REMINDERS, "Reminders", Icons.Rounded.NotificationsActive, { accents.orange },
+        ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
             listOf("reminder", "notification", "alarm")),
-        ToolTile(Routes.TOOL_EXPENSES, "Expenses", Icons.Rounded.Payments, { accents.pink },
+        ToolTile(Routes.TOOL_EXPENSES, "Expenses", "Track monthly spending", Icons.Rounded.Payments, { accents.pink },
             listOf("expenses", "budget", "money")),
-        ToolTile(Routes.TOOL_FOCUS, "Focus", Icons.Rounded.Timer, { accents.red },
+        ToolTile(Routes.TOOL_FOCUS, "Focus", "Block distractions", Icons.Rounded.Timer, { accents.red },
             listOf("focus", "focus block", "block app", "distraction", "screen time")),
     )
     val other = listOf(
-        ToolTile(Routes.TOOL_EDITOR, "Editor", Icons.Rounded.EditNote, { accents.yellow },
+        ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.yellow },
             listOf("editor", "document", "text", "pdf")),
-        ToolTile(Routes.TOOL_SCANNER, "Document Scanner", Icons.Rounded.DocumentScanner, { accents.blue },
+        ToolTile(Routes.TOOL_SCANNER, "Document Scanner", "Scan documents", Icons.Rounded.DocumentScanner, { accents.blue },
             listOf("scanner", "scan document", "document", "camera", "pdf")),
-        ToolTile(Routes.TOOL_DNS, "DNS Manager", Icons.Rounded.Dns, { accents.red },
+        ToolTile(Routes.TOOL_DNS, "DNS Manager", "Set up Private DNS", Icons.Rounded.Dns, { accents.red },
             listOf("dns", "ad block", "private dns")),
-        ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", Icons.Rounded.FlashOn, { accents.yellow },
+        ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", "Light for video calls", Icons.Rounded.FlashOn, { accents.yellow },
             listOf("event light", "ring light", "video call light", "night light", "border light")),
     )
 
@@ -130,8 +131,8 @@ fun HomeScreen(
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg, top = Spacing.sm,
-                bottom = bottomBarPadding.calculateBottomPadding() + Spacing.lg,
+                start = Spacing.lg, end = Spacing.lg, top = 0.dp,
+                bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xxl,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -146,9 +147,14 @@ fun HomeScreen(
                     )
                 }
             }
-            toolSection("Security", fSecurity, onOpenTool)
-            toolSection("Productivity", fProductivity, onOpenTool)
-            toolSection("Other", fOther, onOpenTool)
+            toolSection("Security", fSecurity, onOpenTool, firstSection = true)
+            toolSection("Productivity", fProductivity, onOpenTool, firstSection = fSecurity.isEmpty())
+            toolSection(
+                "Utilities",
+                fOther,
+                onOpenTool,
+                firstSection = fSecurity.isEmpty() && fProductivity.isEmpty(),
+            )
         }
     }
 }
@@ -157,9 +163,12 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.toolSection(
     title: String,
     tiles: List<ToolTile>,
     onOpenTool: (String) -> Unit,
+    firstSection: Boolean = false,
 ) {
     if (tiles.isEmpty()) return
-    item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(title) }
+    item(span = { GridItemSpan(maxLineSpan) }) {
+        SectionHeader(title, topPadding = if (firstSection) 0.dp else Spacing.sm)
+    }
     items(tiles, key = { it.route }) { tile ->
         ToolCard(tile = tile, onClick = { onOpenTool(tile.route) })
     }
@@ -169,15 +178,22 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.toolSection(
 private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
     AppCard(
         onClick = onClick,
-        contentPadding = PaddingValues(Spacing.lg),
+        contentPadding = PaddingValues(Spacing.md),
     ) {
-        AccentIconTile(icon = tile.icon, accent = tile.accent(), size = 42.dp, iconSize = 23.dp)
-        // Taller cards: fixed gap between icon and title gives the card its height.
-        Spacer(Modifier.height(Spacing.xl))
+        AccentIconTile(icon = tile.icon, accent = tile.accent(), size = 36.dp, iconSize = 20.dp)
+        Spacer(Modifier.height(Spacing.xs))
         Text(
             text = tile.name,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = tile.description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.extendedColors.textMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

@@ -204,16 +204,14 @@ fun AppLockScreen(
                     contentPadding = PaddingValues(
                         start = Spacing.lg,
                         end = Spacing.lg,
-                        top = innerPadding.calculateTopPadding() + Spacing.sm,
+                        top = innerPadding.calculateTopPadding() + Spacing.md,
                         bottom = Spacing.xxl,
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     item(key = "tabs") {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = Spacing.xs),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
                             FilterChipButton(
@@ -233,7 +231,6 @@ fun AppLockScreen(
                             )
                         }
                     }
-
                     when (selectedTab) {
                         AppLockTab.Locked -> {
                             if (lockedVisibleApps.isEmpty()) {
@@ -409,10 +406,10 @@ private fun AppLockAppRow(
     onStartFocus: () -> Unit,
 ) {
     val focusActive = focusRemainingMillis != null
-    val supporting = when {
+    val supporting: String? = when {
         lockDisabled -> "Protected by Samsung"
         focusActive -> "Focus block · ${formatFocusRemaining(focusRemainingMillis!!)} left"
-        else -> app.packageName
+        else -> null
     }
     AppListRow(
         headline = app.label,
@@ -437,7 +434,7 @@ private fun AppLockAppRow(
                     IconButton(onClick = onStartFocus) {
                         Icon(
                             imageVector = Icons.Rounded.Timer,
-                            contentDescription = "Set focus block timer",
+                            contentDescription = "Start a focus block",
                             tint = MaterialTheme.extendedColors.textMuted,
                         )
                     }
