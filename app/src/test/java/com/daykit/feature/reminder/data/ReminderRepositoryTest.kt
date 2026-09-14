@@ -24,6 +24,31 @@ class ReminderRepositoryTest {
         }
         override suspend fun deleteOccurrences(reminderId: String) { history.removeAll { it.reminderId == reminderId } }
     }
+    @Test fun staleWidgetCannotSkipAnotherOccurrenceOrCompleteRescheduledReminder() = runBlocking {
+        val repo = ReminderRepository(FakeDao(), clock = { 1L })
+        val r = repo.addReminder("Daily", day, ReminderRecurrence(ReminderFrequency.DAILY, zoneId = "UTC", anchorMillis = day))
+        repo.markComplete(r.reminderId, expectedOccurrenceMillis = day)
+        assertEquals(2 * day, repo.getReminder(r.reminderId)!!.scheduledAtMillis)
+        repo.markComplete(r.reminderId, expectedOccurrenceMillis = day)
+        assertEquals(2 * day, repo.getReminder(r.reminderId)!!.scheduledAtMillis)
+        val once = repo.addReminder("Once", day)
+        repo.updateReminder(once.reminderId, "Later", 3 * day)
+        repo.markComplete(once.reminderId, expectedOccurrenceMillis = day)
+        assertFalse(repo.getReminder(once.reminderId)!!.completed)
+    }
+
+    @Test fun widgetCompletesDisplayedPendingOccurrenceWithoutSkippingNext() = runBlocking {
+        var now = 1L
+        val repo = ReminderRepository(FakeDao(), clock = { now })
+        val r = repo.addReminder("Daily", day, ReminderRecurrence(ReminderFrequency.DAILY, zoneId = "UTC", anchorMillis = day))
+        now = day
+        repo.fireDue(r.reminderId) {}
+        repo.markComplete(r.reminderId, expectedOccurrenceMillis = day)
+        assertNull(repo.getReminder(r.reminderId)!!.pendingOccurrenceMillis)
+        assertEquals(2 * day, repo.getReminder(r.reminderId)!!.scheduledAtMillis)
+        assertEquals(ReminderOccurrenceAction.COMPLETED, repo.getOccurrenceHistory(r.reminderId).single().action)
+    }
+
     private val day = 86_400_000L
 
     @Test fun backupRoundTripPreservesRecurrenceAndIsIdempotent() = runBlocking {

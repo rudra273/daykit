@@ -7,7 +7,6 @@ import android.widget.RemoteViewsService
 import com.daykit.DayKitApplication
 import com.daykit.R
 import com.daykit.feature.habit.data.Habit
-import com.daykit.feature.habit.data.HabitGoalType
 import com.daykit.feature.habit.data.HabitLog
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -33,6 +32,7 @@ private class HabitRemoteViewsFactory(
             dashboard.buildHabits.map { habit ->
                 val log = dashboard.logFor(habit.habitId)
                 HabitWidgetRow(
+                    date = dashboard.today.toString(),
                     habit = habit,
                     log = log,
                     completed = isHabitComplete(habit, log),
@@ -52,6 +52,7 @@ private class HabitRemoteViewsFactory(
         val row = rows.getOrNull(position)
             ?: return RemoteViews(context.packageName, R.layout.widget_habit_row)
         val fillInIntent = Intent().apply {
+            putExtra(HabitCheckInWidgetProvider.EXTRA_DATE, row.date)
             putExtra(HabitCheckInWidgetProvider.EXTRA_HABIT_ID, row.habit.habitId)
             putExtra(HabitCheckInWidgetProvider.EXTRA_COMPLETED, !row.completed)
         }
@@ -64,6 +65,9 @@ private class HabitRemoteViewsFactory(
             )
             setTextViewText(R.id.widget_habit_name, row.habit.name)
             setTextViewText(R.id.widget_habit_progress, "${row.progressPercent}%")
+            setContentDescription(R.id.widget_habit_row, context.getString(
+                if (row.completed) R.string.widget_habit_uncheck else R.string.widget_habit_check,
+                row.habit.name, row.progressPercent))
             setOnClickFillInIntent(R.id.widget_habit_row, fillInIntent)
         }
     }
@@ -78,34 +82,9 @@ private class HabitRemoteViewsFactory(
 }
 
 private data class HabitWidgetRow(
+    val date: String,
     val habit: Habit,
     val log: HabitLog?,
     val completed: Boolean,
     val progressPercent: Int,
 )
-
-private fun habitProgress(habit: Habit, log: HabitLog?): Float {
-    if (log == null) return 0f
-    return when (habit.goalType) {
-        HabitGoalType.Time -> if (habit.targetMinutes <= 0) {
-            if (log.completed) 1f else 0f
-        } else {
-            log.minutes.toFloat() / habit.targetMinutes
-        }
-        HabitGoalType.Count -> if (habit.targetCount <= 0) {
-            if (log.completed) 1f else 0f
-        } else {
-            log.progressCount.toFloat() / habit.targetCount
-        }
-        HabitGoalType.Check -> if (log.completed) 1f else 0f
-    }.coerceIn(0f, 1f)
-}
-
-private fun isHabitComplete(habit: Habit, log: HabitLog?): Boolean {
-    if (log == null) return false
-    return when (habit.goalType) {
-        HabitGoalType.Time -> if (habit.targetMinutes <= 0) log.minutes > 0 || log.completed else log.minutes >= habit.targetMinutes
-        HabitGoalType.Count -> if (habit.targetCount <= 0) log.progressCount > 0 || log.completed else log.progressCount >= habit.targetCount
-        HabitGoalType.Check -> log.completed
-    }
-}

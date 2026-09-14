@@ -14,7 +14,12 @@ internal fun updateHabitWidgets(context: Context) {
     val appWidgetManager = AppWidgetManager.getInstance(context)
     val ids = appWidgetManager.getAppWidgetIds(ComponentName(context, HabitCheckInWidgetProvider::class.java))
     if (ids.isNotEmpty()) {
-        appWidgetManager.notifyAppWidgetViewDataChanged(ids, com.daykit.R.id.widget_habit_list)
         HabitCheckInWidgetProvider.updateWidgets(context, appWidgetManager, ids)
     }
+}
+
+internal fun updateReminderWidgets(context: Context) {
+    val manager = AppWidgetManager.getInstance(context)
+    val ids = manager.getAppWidgetIds(ComponentName(context, ReminderWidgetProvider::class.java))
+    ReminderWidgetProvider.updateWidgets(context, manager, ids)
 }

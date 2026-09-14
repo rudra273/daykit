@@ -2,4 +2,25 @@
     <string name="app_name">DayKit</string>
     <string name="widget_expense_description">Quick add daily expenses from your home screen.</string>
     <string name="widget_habit_description">Check in active habits from your home screen.</string>
+    <string name="widget_expenses_title">Expenses</string>
+    <string name="widget_expenses_subtitle">Quick add</string>
+    <string name="widget_add_expense">Add expense</string>
+    <string name="widget_habits_title">Today’s habits</string>
+    <string name="widget_open_daykit">Open DayKit</string>
+    <string name="widget_habits_empty">No active build habits.
+Open DayKit to add one.</string>
+    <string name="widget_habit_check">%1$s, %2$d percent complete. Tap to complete.</string>
+    <string name="widget_habit_uncheck">%1$s, %2$d percent complete. Tap to reset progress.</string>
+    <string name="widget_add_symbol" translatable="false">+</string>
+    <string name="widget_reminders_title">Reminders</string>
+    <string name="widget_reminders_description">Upcoming and overdue reminders with complete and snooze actions.</string>
+    <string name="widget_reminders_empty">All clear.
+Open DayKit to add a reminder.</string>
+    <string name="widget_reminders_error">Could not load reminders. Tap the heading to open DayKit.</string>
+    <string name="widget_reminder_complete">Complete</string>
+    <string name="widget_reminder_skip">Skip next</string>
+    <string name="widget_reminder_snooze">Snooze 10 min</string>
+    <string name="widget_reminder_snoozed">Snoozed · %1$s</string>
+    <string name="widget_reminder_overdue">Overdue · %1$s</string>
+    <string name="widget_reminder_upcoming">Upcoming · %1$s</string>
 </resources>

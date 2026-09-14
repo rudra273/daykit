@@ -20,6 +20,20 @@ class DayKitApplication : Application() {
         container = AppContainer(this)
         AppLockSessionManager.clearAll()
         warmUp()
+        applicationScope.launch {
+            runCatching {
+                container.reminderRepository.observeReminders().collect {
+                    com.daykit.feature.widget.updateReminderWidgets(this@DayKitApplication)
+                }
+            }.onFailure { Log.w(TAG, "Could not refresh reminder widgets", it) }
+        }
+        applicationScope.launch {
+            runCatching {
+                container.habitRepository.observeDashboard().collect {
+                    com.daykit.feature.widget.updateHabitWidgets(this@DayKitApplication)
+                }
+            }.onFailure { Log.w(TAG, "Could not refresh habit widgets", it) }
+        }
     }
 
     /**

@@ -37,13 +37,14 @@ class ReminderRepository(
     }
 
     /** A notification acknowledges only the occurrence it displayed. UI completion skips the next one if none has fired. */
-    suspend fun markComplete(reminderId: String, occurrenceMillis: Long? = null) = mutex.withLock {
+    suspend fun markComplete(reminderId: String, occurrenceMillis: Long? = null, expectedOccurrenceMillis: Long? = null) = mutex.withLock {
         val entity = dao.getReminder(reminderId) ?: return@withLock
         val current = entity.toDomain()
         if (current.completed || current.paused) return@withLock
         if (occurrenceMillis != null && current.pendingOccurrenceMillis != occurrenceMillis) return@withLock
         val now = clock()
         val occurrence = current.pendingOccurrenceMillis ?: current.scheduledAtMillis
+        if (expectedOccurrenceMillis != null && expectedOccurrenceMillis != occurrence) return@withLock
         val next = if (current.pendingOccurrenceMillis != null && current.scheduledAtMillis > current.pendingOccurrenceMillis) {
             current.scheduledAtMillis
         } else current.recurrence?.nextAfter(maxOf(now, current.scheduledAtMillis))

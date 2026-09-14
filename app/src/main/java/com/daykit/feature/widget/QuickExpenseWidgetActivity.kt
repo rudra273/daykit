@@ -21,12 +21,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.lifecycleScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import com.daykit.DayKitApplication
 import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.designsystem.Spacing
@@ -36,9 +38,10 @@ import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.extendedColors
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import kotlin.math.roundToLong
 
 class QuickExpenseWidgetActivity : FragmentActivity() {
+    private var saving by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -48,11 +51,14 @@ class QuickExpenseWidgetActivity : FragmentActivity() {
         val repository = (application as DayKitApplication).container.expenseRepository
         setContent {
             DayKitTheme {
-                val scope = rememberCoroutineScope()
                 QuickExpenseWidgetContent(
-                    onDismiss = { finish() },
+                    saving = saving,
+                    onDismiss = { if (!saving) finish() },
                     onSave = { name, amountMinor, category, note ->
-                        scope.launch {
+                        if (saving) return@QuickExpenseWidgetContent
+                        saving = true
+                        setFinishOnTouchOutside(false)
+                        lifecycleScope.launch {
                             runCatching {
                                 repository.addDailyExpense(
                                     expenseDate = LocalDate.now().toString(),
@@ -66,6 +72,8 @@ class QuickExpenseWidgetActivity : FragmentActivity() {
                                 updateExpenseWidgets(this@QuickExpenseWidgetActivity)
                                 finish()
                             }.onFailure {
+                                saving = false
+                                setFinishOnTouchOutside(true)
                                 Toast.makeText(
                                     this@QuickExpenseWidgetActivity,
                                     it.message ?: "Could not add expense",
@@ -82,20 +90,23 @@ class QuickExpenseWidgetActivity : FragmentActivity() {
 
 @Composable
 private fun QuickExpenseWidgetContent(
+    saving: Boolean,
     onDismiss: () -> Unit,
     onSave: (String, Long, String, String) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(WIDGET_EXPENSE_CATEGORIES.first()) }
-    var note by remember { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var amount by rememberSaveable { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf(WIDGET_EXPENSE_CATEGORIES.first()) }
+    var note by rememberSaveable { mutableStateOf("") }
     val amountMinor = amount.toWidgetMinorOrNull()
-    val canSave = name.isNotBlank() && amountMinor != null && amountMinor > 0L
+    val canSave = !saving && name.isNotBlank() && amountMinor != null && amountMinor > 0L
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.extendedColors.card, MaterialTheme.shapes.large)
+            .imePadding()
+            .verticalScroll(rememberScrollState())
             .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -116,10 +127,10 @@ private fun QuickExpenseWidgetContent(
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
             AppTextButton(text = "Cancel", modifier = Modifier.weight(1f), color = MaterialTheme.extendedColors.textMuted, onClick = onDismiss)
             PrimaryButton(
-                text = "Save",
+                text = if (saving) "Saving…" else "Save expense",
                 enabled = canSave,
                 modifier = Modifier.weight(1f),
-                onClick = { onSave(name, amountMinor ?: 0L, category, note) },
+                onClick = { onSave(name.trim(), amountMinor ?: 0L, category, note.trim()) },
             )
         }
     }
@@ -130,7 +141,7 @@ private fun WidgetCategoryPicker(
     category: String,
     onCategoryChange: (String) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     Column {
         Column(
             modifier = Modifier
@@ -158,21 +169,6 @@ private fun WidgetCategoryPicker(
             }
         }
     }
-}
-
-private fun String.cleanWidgetAmountInput(): String {
-    val filtered = filter { it.isDigit() || it == '.' }
-    val firstDot = filtered.indexOf('.')
-    return if (firstDot == -1) {
-        filtered.take(9)
-    } else {
-        filtered.take(firstDot + 1) + filtered.drop(firstDot + 1).filter(Char::isDigit).take(2)
-    }
-}
-
-private fun String.toWidgetMinorOrNull(): Long? {
-    val value = toDoubleOrNull() ?: return null
-    return (value * 100.0).roundToLong()
 }
 
 private val WIDGET_EXPENSE_CATEGORIES = listOf(

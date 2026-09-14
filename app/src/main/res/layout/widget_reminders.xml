@@ -1,44 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical">
-
     <TextView
-        android:id="@+id/widget_title"
+        android:id="@+id/widget_reminder_title"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:text="@string/widget_reminders_title"
+        android:contentDescription="@string/widget_open_daykit"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="@string/widget_habits_title"
-        android:minHeight="48dp"
-        android:gravity="center_vertical"
-        android:contentDescription="@string/widget_open_daykit"
         android:textColor="@color/text_primary"
-        android:textSize="15sp"
+        android:textSize="16sp"
         android:textStyle="bold" />
-
     <ListView
-        android:id="@+id/widget_habit_list"
+        android:id="@+id/widget_reminder_list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="4dp"
         android:layout_weight="1"
-        android:cacheColorHint="@android:color/transparent"
-        android:divider="@android:color/transparent"
-        android:dividerHeight="2dp"
+        android:divider="@color/widget_stroke"
+        android:dividerHeight="1dp"
         android:scrollbars="none" />
-
     <TextView
-        android:id="@+id/widget_empty"
+        android:id="@+id/widget_reminder_empty"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="4dp"
         android:layout_weight="1"
         android:gravity="center"
-        android:text="@string/widget_habits_empty"
+        android:text="@string/widget_reminders_empty"
         android:textColor="@color/text_muted"
-        android:textSize="12sp" />
+        android:textSize="14sp" />
 </LinearLayout>
