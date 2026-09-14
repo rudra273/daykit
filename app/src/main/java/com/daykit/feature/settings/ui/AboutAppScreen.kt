@@ -54,7 +54,7 @@ fun AboutAppScreen(
             AboutSection(
                 title = "What DayKit Does",
                 body = listOf(
-                    "DayKit is a private utility app for securing app access, storing sensitive notes and keys, tracking expenses and habits, managing reminders, choosing DNS shortcuts, editing text files, and hiding selected media files from normal gallery views.",
+                    "DayKit is a private utility app for securing app access, storing sensitive notes and keys, tracking expenses and habits, managing reminders, choosing DNS shortcuts, editing text files, scanning documents into PDFs, and hiding selected media files from normal gallery views.",
                     "The app is designed around local-first storage. Most data stays on the device unless the user creates an encrypted backup or connects Google Drive backup.",
                 ),
             )
@@ -100,12 +100,13 @@ fun AboutAppScreen(
                 ),
             )
             AboutSection(
-                title = "Expenses, Habits, Reminders, DNS, And Editor",
+                title = "Daily Tools And Document Scanner",
                 body = listOf(
                     "Expenses and Habits are stored locally and can optionally be included in encrypted backups.",
                     "Reminders are stored locally for app scheduling and notification behavior, but they are not currently included in backup files.",
                     "DNS Manager opens Android private DNS settings and does not operate a DNS server or collect DNS traffic.",
                     "Editor creates user-directed text files and temporary share files only when the user chooses to save or share.",
+                    "Document Scanner lets the user capture or import multiple pages, crop, rotate, and enhance them, then save the finished scan as a PDF.",
                 ),
             )
             Spacer(Modifier.height(Spacing.xl))
@@ -129,7 +130,7 @@ private fun AboutHero() {
         )
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            "Version 1.0",
+            "Version 1.0.5",
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodySmall,
         )

@@ -410,16 +410,6 @@ fun SettingsScreen(
                 }
             }
 
-            item {
-                Text(
-                    text = "DayKit",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.extendedColors.textMuted,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = Spacing.md),
-                )
-            }
         }
     }
 
