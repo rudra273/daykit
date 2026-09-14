@@ -172,7 +172,8 @@ fun KeyStoreScreen(
             contentPadding = PaddingValues(
                 start = Spacing.lg,
                 end = Spacing.lg,
-                top = innerPadding.calculateTopPadding() + Spacing.md,
+                top = innerPadding.calculateTopPadding() +
+                    if (uniqueLabels.isEmpty() && entries?.isNotEmpty() == true) 10.dp else Spacing.md,
                 bottom = Spacing.xxl + 72.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -221,7 +222,12 @@ fun KeyStoreScreen(
             } else {
                 grouped.forEach { (group, groupEntries) ->
                     item(key = "section-$group") {
-                        SectionHeader(text = group)
+                        SectionHeader(
+                            text = group,
+                            topPadding = if (
+                                uniqueLabels.isEmpty() && group == grouped.keys.firstOrNull()
+                            ) 0.dp else Spacing.sm,
+                        )
                     }
                     // One card per label group rather than per entry: the per-row card
                     // border + 8dp gap was most of each row's height.

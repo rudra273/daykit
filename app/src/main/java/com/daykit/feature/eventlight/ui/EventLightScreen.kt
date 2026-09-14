@@ -83,7 +83,11 @@ fun EventLightScreen(onBack: () -> Unit) {
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md),
+                .padding(
+                    start = Spacing.lg,
+                    end = Spacing.lg,
+                    top = if (overlayGranted) 10.dp else Spacing.md,
+                ),
         ) {
             if (!overlayGranted) {
                 AppCard(modifier = Modifier.fillMaxWidth()) {
@@ -123,7 +127,7 @@ fun EventLightScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(Spacing.md))
             }
 
-            SectionHeader("Event Light")
+            SectionHeader("Event Light", topPadding = if (overlayGranted) 0.dp else Spacing.sm)
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 AppListRow(
                     headline = "Show border",

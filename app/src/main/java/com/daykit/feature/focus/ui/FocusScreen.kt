@@ -224,7 +224,9 @@ private fun FocusHome(
             contentPadding = PaddingValues(
                 start = Spacing.lg,
                 end = Spacing.lg,
-                top = innerPadding.calculateTopPadding() + Spacing.md,
+                top = innerPadding.calculateTopPadding() + if (
+                    !isFirstRun && hasUsageAccess && (canScheduleExact || schedules.isEmpty())
+                ) 10.dp else Spacing.md,
                 // FAB clearance, as every other tool screen does.
                 bottom = Spacing.xxl + 72.dp,
             ),
@@ -268,7 +270,14 @@ private fun FocusHome(
             if (!isFirstRun) {
                 // No create action: a session is only ever started by a schedule
                 // firing or by blocking apps below, never from here.
-                item(key = "header-session") { FocusSectionHeader("Session") }
+                item(key = "header-session") {
+                    FocusSectionHeader(
+                        title = "Session",
+                        topPadding = if (
+                            hasUsageAccess && (canScheduleExact || schedules.isEmpty())
+                        ) 0.dp else Spacing.sm,
+                    )
+                }
             }
 
             if (!isFirstRun && activeSessions.isEmpty() && sortedBlocks.isEmpty()) {
@@ -602,12 +611,13 @@ private fun FocusSectionHeader(
     title: String,
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
+    topPadding: androidx.compose.ui.unit.Dp = Spacing.sm,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SectionHeader(text = title, modifier = Modifier.weight(1f))
+        SectionHeader(text = title, modifier = Modifier.weight(1f), topPadding = topPadding)
         if (actionText != null && onAction != null) {
             AppTextButton(text = actionText, onClick = onAction)
         }

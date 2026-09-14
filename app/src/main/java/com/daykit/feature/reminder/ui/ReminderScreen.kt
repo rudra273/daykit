@@ -277,21 +277,38 @@ private fun ReminderContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = Spacing.lg, end = Spacing.lg,
-            top = Spacing.md, bottom = Spacing.xxl + 72.dp,
+            top = 10.dp, bottom = Spacing.xxl + 72.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        section("Overdue", overdue, accentDanger = true, onComplete, onLongPress)
-        section("Today", today, accentDanger = false, onComplete, onLongPress)
-        section("Upcoming", upcoming, accentDanger = false, onComplete, onLongPress)
-        section("Paused", paused, accentDanger = false, onComplete, onLongPress)
+        section("Overdue", overdue, accentDanger = true, first = true, onComplete, onLongPress)
+        section("Today", today, accentDanger = false, first = overdue.isEmpty(), onComplete, onLongPress)
+        section(
+            "Upcoming",
+            upcoming,
+            accentDanger = false,
+            first = overdue.isEmpty() && today.isEmpty(),
+            onComplete,
+            onLongPress,
+        )
+        section(
+            "Paused",
+            paused,
+            accentDanger = false,
+            first = overdue.isEmpty() && today.isEmpty() && upcoming.isEmpty(),
+            onComplete,
+            onLongPress,
+        )
         if (completed.isNotEmpty()) {
             item {
                 Text(
                     text = "Completed",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.extendedColors.textMuted,
-                    modifier = Modifier.padding(top = Spacing.sm, start = Spacing.xs),
+                    modifier = Modifier.padding(
+                        top = if (active.isEmpty() && paused.isEmpty()) 0.dp else Spacing.sm,
+                        start = Spacing.xs,
+                    ),
                 )
             }
             items(completed, key = { it.reminderId }) { r ->
@@ -305,12 +322,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
     title: String,
     reminders: List<Reminder>,
     accentDanger: Boolean,
+    first: Boolean,
     onComplete: (Reminder) -> Unit,
     onLongPress: (Reminder) -> Unit,
 ) {
     if (reminders.isEmpty()) return
     item(key = "header-$title") {
-        SectionHeaderRow(title = title, count = reminders.size, danger = accentDanger)
+        SectionHeaderRow(
+            title = title,
+            count = reminders.size,
+            danger = accentDanger,
+            topPadding = if (first) 0.dp else Spacing.sm,
+        )
     }
     items(reminders, key = { it.reminderId }) { r ->
         ReminderRow(reminder = r, accentDanger = accentDanger, onComplete = { onComplete(r) }, onLongPress = { onLongPress(r) })
@@ -318,9 +341,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
 }
 
 @Composable
-private fun SectionHeaderRow(title: String, count: Int, danger: Boolean) {
+private fun SectionHeaderRow(
+    title: String,
+    count: Int,
+    danger: Boolean,
+    topPadding: androidx.compose.ui.unit.Dp,
+) {
     Row(
-        modifier = Modifier.padding(top = Spacing.sm, start = Spacing.xs),
+        modifier = Modifier.padding(top = topPadding, start = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

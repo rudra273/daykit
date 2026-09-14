@@ -282,7 +282,9 @@ fun FileLockerScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = Spacing.md, end = Spacing.md,
-                    top = innerPadding.calculateTopPadding() + Spacing.md, bottom = Spacing.xxl + 72.dp,
+                    top = innerPadding.calculateTopPadding() +
+                        if (selectionMode) 10.dp else Spacing.md,
+                    bottom = Spacing.xxl + 72.dp,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),

@@ -304,7 +304,7 @@ fun EditorScreen(
                     .padding(
                         start = Spacing.lg,
                         end = Spacing.lg,
-                        top = Spacing.md,
+                        top = 10.dp,
                         bottom = Spacing.md,
                     )
                     .imePadding()
