@@ -108,4 +108,4 @@ app-created backup files) for the optional backup feature.
 - [ ] Data safety form completed per section 2.
 - [ ] Permission declarations submitted per section 1 (expect manual review for
       exact alarms + special-use FGS + usage access).
-- [ ] `versionCode` / `versionName` bumped as intended (currently 1 / "1.0").
+- [ ] `versionCode` / `versionName` bumped as intended (currently 6 / "1.0.5").
