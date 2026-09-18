@@ -109,6 +109,22 @@ fun AboutAppScreen(
                     "Document Scanner lets the user capture or import multiple pages, crop, rotate, and enhance them, then save the finished scan as a PDF.",
                 ),
             )
+            AboutSection(
+                title = "Dayflow",
+                body = listOf(
+                    "Dayflow combines focused work sessions, journaling, and mood tracking in one local-first daily view.",
+                    "Focus sessions can be tracked with the Dayflow timer, while journal entries and mood history help you review how each day went.",
+                    "Dayflow data is stored locally and included in encrypted backups.",
+                ),
+            )
+            AboutSection(
+                title = "Device Manager",
+                body = listOf(
+                    "Device Manager gives you a quick view of device storage, memory, battery, and system details from one place.",
+                    "It can also help identify large files so you can review storage usage without sending device information outside the app.",
+                    "Device Manager reads device information locally and does not upload it.",
+                ),
+            )
             Spacer(Modifier.height(Spacing.xl))
         }
     }
@@ -130,7 +146,7 @@ private fun AboutHero() {
         )
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            "Version 1.0.5",
+            "Version 1.0.6",
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodySmall,
         )
