@@ -3,6 +3,7 @@ package com.daykit.feature.home.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,10 +39,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.unit.dp
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
@@ -49,6 +54,7 @@ import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.SearchAppTopBar
+import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.navigation.Routes
@@ -119,23 +125,14 @@ fun HomeScreen(
 
     BackHandler(enabled = searchActive) { searchActive = false; query = "" }
 
-    Column(Modifier.fillMaxSize()) {
-        SearchAppTopBar(
-            title = "DayKit",
-            query = query,
-            onQueryChange = { query = it },
-            searchActive = searchActive,
-            onSearchActiveChange = { searchActive = it; if (!it) query = "" },
-            searchPlaceholder = "Search tools",
-            // Borderless at rest; the hairline appears only once content scrolls under it.
-            showDivider = gridState.canScrollBackward,
-        )
+    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight
+    Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg, top = 0.dp,
+                start = Spacing.lg, end = Spacing.lg, top = headerHeight,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xxl,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -160,6 +157,16 @@ fun HomeScreen(
                 firstSection = fSecurity.isEmpty() && fProductivity.isEmpty(),
             )
         }
+        SearchAppTopBar(
+            title = "DayKit",
+            query = query,
+            onQueryChange = { query = it },
+            searchActive = searchActive,
+            onSearchActiveChange = { searchActive = it; if (!it) query = "" },
+            searchPlaceholder = "Search tools",
+            showDivider = gridState.canScrollBackward,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 }
 
@@ -181,10 +188,12 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.toolSection(
 @Composable
 private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
     val reservedDescriptionHeight = with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() }
+    val verticalSpace = (reservedDescriptionHeight + Spacing.xs) / 2
     AppCard(
         onClick = onClick,
         contentPadding = PaddingValues(Spacing.md),
     ) {
+        Spacer(Modifier.height(verticalSpace))
         AccentIconTile(icon = tile.icon, accent = tile.accent(), size = 36.dp, iconSize = 20.dp)
         Spacer(Modifier.height(Spacing.xs))
         Text(
@@ -194,8 +203,7 @@ private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(Spacing.xs))
-        // Reserve the removed description's line so the existing card height stays intact.
-        Spacer(Modifier.height(reservedDescriptionHeight))
+        // Split the former description space around the icon/title group.
+        Spacer(Modifier.height(verticalSpace))
     }
 }

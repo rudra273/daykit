@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +43,7 @@ import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
@@ -86,13 +90,13 @@ fun TodayScreen(
     val now = System.currentTimeMillis()
     val pending = reminders.filter { !it.completed && !it.paused }.sortedBy { it.scheduledAtMillis }
 
-    Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "Today", subtitle = dateLabel)
+    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight
+    Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg, top = Spacing.xs,
+                start = Spacing.lg, end = Spacing.lg, top = headerHeight + Spacing.xs,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.lg,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -234,6 +238,12 @@ fun TodayScreen(
                 }
             }
         }
+        AppTopBar(
+            title = "Today",
+            subtitle = dateLabel,
+            showDivider = listState.canScrollBackward,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 }
 

@@ -5,24 +5,33 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -37,6 +46,7 @@ import androidx.navigation.compose.rememberNavController
 import com.daykit.AppContainer
 import androidx.fragment.app.FragmentActivity
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.designsystem.components.glassChromeBrush
 
 /**
  * Root of the in-app UI (after the onboarding gates). Hosts the NavHost and the
@@ -62,13 +72,28 @@ fun RootScaffold(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            // Shown instantly on tabs, hidden instantly on tool screens — no slide animation.
-            if (onTopLevel) {
+    val density = LocalDensity.current
+    val navigationInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    var bottomBarHeight by remember { mutableStateOf(60.dp + navigationInset) }
+
+    Box(Modifier.fillMaxSize()) {
+        DayKitNavHost(
+            navController = navController,
+            activity = activity,
+            container = container,
+            lockedCount = lockedCount,
+            onAppLockSelectionChanged = onAppLockSelectionChanged,
+            bottomBarPadding = PaddingValues(bottom = bottomBarHeight),
+        )
+        if (onTopLevel) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().heightIn(min = 60.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .onSizeChanged { bottomBarHeight = with(density) { it.height.toDp() } }
+                        .background(glassChromeBrush(bottomBar = true))
+                        .navigationBarsPadding()
+                        .heightIn(min = 60.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TopLevelDestination.entries.forEach { dest ->
@@ -111,17 +136,5 @@ fun RootScaffold(
                     }
                 }
             }
-        },
-    ) { innerPadding ->
-        Box(Modifier.fillMaxSize()) {
-            DayKitNavHost(
-                navController = navController,
-                activity = activity,
-                container = container,
-                lockedCount = lockedCount,
-                onAppLockSelectionChanged = onAppLockSelectionChanged,
-                bottomBarPadding = innerPadding,
-            )
         }
-    }
 }

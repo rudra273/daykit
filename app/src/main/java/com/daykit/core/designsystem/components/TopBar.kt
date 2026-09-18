@@ -1,6 +1,7 @@
 package com.daykit.core.designsystem.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
@@ -38,9 +41,7 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.extendedColors
 
 /**
- * App top bar. Opaque page-[background] fill (same gray as the screen) so the header
- * blends in rather than reading as a separate panel; an optional hairline divider
- * ([showDivider]) appears when content scrolls beneath it.
+ * App top bar with a translucent scrim for content that scrolls beneath it.
  */
 /** Standard header height, excluding the status-bar inset. Every screen uses this via [AppTopBar]. */
 val AppTopBarHeight = 48.dp
@@ -58,9 +59,9 @@ fun AppTopBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            // Same gray as the page so the header blends into the screen rather
-            // than reading as a separate white panel; only cards are white.
-            .background(MaterialTheme.colorScheme.background),
+            .background(glassChromeBrush())
+            // Keep scrolled content visible without allowing taps through the header.
+            .pointerInput(Unit) { detectTapGestures { } },
     ) {
         Row(
             modifier = Modifier
@@ -106,7 +107,7 @@ fun AppTopBar(
             actions()
         }
         if (showDivider) {
-            RowDivider(modifier = Modifier.align(Alignment.BottomCenter), startIndent = 0.dp)
+            RowDivider(modifier = Modifier.align(Alignment.BottomCenter).alpha(0.22f), startIndent = 0.dp)
         }
     }
 }

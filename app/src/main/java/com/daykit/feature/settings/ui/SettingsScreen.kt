@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,6 +68,7 @@ import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.RowDivider
@@ -200,8 +204,8 @@ fun SettingsScreen(
     val accents = MaterialTheme.extendedColors.accents
     val listState = rememberLazyListState()
 
-    Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "Settings", showDivider = listState.canScrollBackward)
+    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight
+    Box(Modifier.fillMaxSize()) {
 
         if (!settingsLoaded) {
             Box(
@@ -210,6 +214,7 @@ fun SettingsScreen(
             ) {
                 LoadingIndicator()
             }
+            AppTopBar(title = "Settings", modifier = Modifier.align(Alignment.TopCenter))
             return
         }
 
@@ -219,7 +224,7 @@ fun SettingsScreen(
             contentPadding = PaddingValues(
                 start = Spacing.lg,
                 end = Spacing.lg,
-                top = 0.dp,
+                top = headerHeight,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xl,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -411,6 +416,11 @@ fun SettingsScreen(
             }
 
         }
+        AppTopBar(
+            title = "Settings",
+            showDivider = listState.canScrollBackward,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 
     // ---- Change PIN sheet ----
