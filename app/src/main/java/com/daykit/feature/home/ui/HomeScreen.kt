@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
@@ -86,22 +87,22 @@ fun HomeScreen(
             listOf("file vault", "file locker", "hide files", "images", "videos")),
     )
     val productivity = listOf(
-        ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TrackChanges, { accents.green },
-            listOf("habit", "habits")),
-        ToolTile(Routes.TOOL_EXPENSES, "Expenses", "Track monthly spending", Icons.Rounded.Payments, { accents.pink },
-            listOf("expenses", "budget", "money")),
-        ToolTile(Routes.TOOL_FOCUS, "Focus", "Block distractions", Icons.Rounded.Timer, { accents.red },
-            listOf("focus", "focus block", "block app", "distraction", "screen time")),
         ToolTile(Routes.TOOL_DAYFLOW, "Dayflow", "Pomodoro, journal & mood", Icons.Rounded.AutoAwesome, { accents.indigo },
             listOf("dayflow", "pomodoro", "journal", "mood", "timer")),
+        ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TrackChanges, { accents.green },
+            listOf("habit", "habits")),
+        ToolTile(Routes.TOOL_FOCUS, "Focus", "Block distractions", Icons.Rounded.Timer, { accents.red },
+            listOf("focus", "focus block", "block app", "distraction", "screen time")),
+        ToolTile(Routes.TOOL_EXPENSES, "Expenses", "Track monthly spending", Icons.Rounded.Payments, { accents.pink },
+            listOf("expenses", "budget", "money")),
     )
     val other = listOf(
         ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
             listOf("reminder", "notification", "alarm")),
-        ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.yellow },
-            listOf("editor", "document", "text", "pdf")),
         ToolTile(Routes.TOOL_SCANNER, "Document Scanner", "Scan documents", Icons.Rounded.DocumentScanner, { accents.blue },
             listOf("scanner", "scan document", "document", "camera", "pdf")),
+        ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.yellow },
+            listOf("editor", "document", "text", "pdf")),
         ToolTile(Routes.TOOL_DNS, "DNS Manager", "Set up Private DNS", Icons.Rounded.Dns, { accents.red },
             listOf("dns", "ad block", "private dns")),
         ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", "Light for video calls", Icons.Rounded.FlashOn, { accents.yellow },
@@ -179,6 +180,7 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.toolSection(
 
 @Composable
 private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
+    val reservedDescriptionHeight = with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() }
     AppCard(
         onClick = onClick,
         contentPadding = PaddingValues(Spacing.md),
@@ -193,12 +195,7 @@ private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(Spacing.xs))
-        Text(
-            text = tile.description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.extendedColors.textMuted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // Reserve the removed description's line so the existing card height stays intact.
+        Spacer(Modifier.height(reservedDescriptionHeight))
     }
 }

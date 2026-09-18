@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.PictureAsPdf
@@ -41,8 +43,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
-import com.daykit.core.designsystem.components.AccentIconTile
-import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.extendedColors
@@ -137,41 +137,41 @@ fun DocumentScannerScreen(
                 .padding(
                     start = Spacing.lg,
                     end = Spacing.lg,
-                    top = Spacing.md,
+                    top = Spacing.xxl,
                     bottom = Spacing.lg,
                 ),
             contentAlignment = Alignment.TopCenter,
         ) {
-            AppCard(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    AccentIconTile(
-                        icon = Icons.Rounded.DocumentScanner,
-                        accent = MaterialTheme.extendedColors.accents.blue,
-                        size = 64.dp,
-                        iconSize = 34.dp,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.sm),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                    Icon(
+                        Icons.Rounded.DocumentScanner,
+                        contentDescription = null,
+                        tint = MaterialTheme.extendedColors.accents.blue,
+                        modifier = Modifier.size(48.dp),
                     )
                     Spacer(Modifier.height(Spacing.lg))
                     Text("Scan documents", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(Spacing.sm))
+                    Spacer(Modifier.height(Spacing.xs))
                     Text(
                         "Capture up to 20 pages or import them from your gallery. Crop, rotate, and enhance pages before saving one PDF.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.extendedColors.textMuted,
                         textAlign = TextAlign.Center,
                     )
-                    Spacer(Modifier.height(Spacing.xl))
+                    Spacer(Modifier.height(Spacing.lg))
                     PrimaryButton(
                         text = if (scannerStarting) "Opening scanner…" else "Scan document",
                         enabled = !scannerStarting,
-                        modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, null, Modifier.size(18.dp)) },
                         onClick = ::startScan,
                     )
-                }
             }
         }
     }

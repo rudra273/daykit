@@ -4,6 +4,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Today
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /** Route constants for the NavHost. All destinations are parameter-less. */
@@ -37,10 +40,11 @@ enum class TopLevelDestination(
     val route: String,
     val label: String,
     val icon: ImageVector,
+    val inactiveIcon: ImageVector,
 ) {
-    HOME(Routes.HOME, "Home", Icons.Rounded.GridView),
-    TODAY(Routes.TODAY, "Today", Icons.Rounded.Today),
-    SETTINGS(Routes.SETTINGS, "Settings", Icons.Rounded.Settings),
+    HOME(Routes.HOME, "Home", Icons.Rounded.GridView, Icons.Outlined.GridView),
+    TODAY(Routes.TODAY, "Today", Icons.Rounded.Today, Icons.Outlined.Today),
+    SETTINGS(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
 }
 
 val TOP_LEVEL_ROUTES: Set<String> = TopLevelDestination.entries.map { it.route }.toSet()

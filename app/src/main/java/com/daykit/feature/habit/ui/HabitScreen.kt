@@ -518,15 +518,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.checkInItems(
 ) {
     if (dashboard.buildHabits.isEmpty()) {
         item(key = "empty") {
-            AppCard(modifier = Modifier.fillMaxWidth()) {
-                EmptyState(
-                    icon = Icons.Rounded.Flag,
-                    title = "No habits yet",
-                    description = "Add coding, gym, reading, math, building, or anything you want to repeat.",
-                    actionText = "Add Habit",
-                    onAction = onAdd,
-                )
-            }
+            EmptyState(
+                modifier = Modifier.padding(top = Spacing.xxl),
+                icon = Icons.Rounded.Flag,
+                title = "No habits yet",
+                description = "Add coding, gym, reading, math, building, or anything you want to repeat.",
+                actionText = "Add Habit",
+                onAction = onAdd,
+            )
         }
     } else {
         item(key = "quote") { QuoteCard(dashboard = dashboard) }
@@ -730,15 +729,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.habitsItems(
 ) {
     if (dashboard.buildHabits.isEmpty()) {
         item(key = "empty") {
-            AppCard(modifier = Modifier.fillMaxWidth()) {
-                EmptyState(
-                    icon = Icons.Rounded.Flag,
-                    title = "No habits yet",
-                    description = "Add coding, gym, reading, math, building, or anything you want to repeat.",
-                    actionText = "Add Habit",
-                    onAction = onAdd,
-                )
-            }
+            EmptyState(
+                modifier = Modifier.padding(top = Spacing.xxl),
+                icon = Icons.Rounded.Flag,
+                title = "No habits yet",
+                description = "Add coding, gym, reading, math, building, or anything you want to repeat.",
+                actionText = "Add Habit",
+                onAction = onAdd,
+            )
         }
     } else {
         item(key = "add") {
@@ -846,13 +844,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.progressItems(
 
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             if (dashboard.buildHabits.isEmpty()) {
-                AppCard(modifier = Modifier.fillMaxWidth()) {
-                    EmptyState(
-                        icon = Icons.Rounded.Flag,
-                        title = "No progress yet",
-                        description = "Add a habit and check in — your stats, charts, and streaks show up here.",
-                    )
-                }
+                EmptyState(
+                    modifier = Modifier.padding(top = Spacing.xxl),
+                    icon = Icons.Rounded.Flag,
+                    title = "No progress yet",
+                    description = "Add a habit and check in — your stats, charts, and streaks show up here.",
+                )
             } else {
                 ProgressStatsRow(dashboard = dashboard, window = window, index = index)
                 PeriodControlCard(
@@ -1541,15 +1538,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.quitItems(
 ) {
     if (dashboard.quitHabits.isEmpty()) {
         item(key = "empty") {
-            AppCard(modifier = Modifier.fillMaxWidth()) {
-                EmptyState(
-                    icon = Icons.Rounded.EventBusy,
-                    title = "Leave a bad habit",
-                    description = "Track clean days for smoking, porn, junk food, alcohol, or any loop you want to break.",
-                    actionText = "Quit Habit",
-                    onAction = onAdd,
-                )
-            }
+            EmptyState(
+                modifier = Modifier.padding(top = Spacing.xxl),
+                icon = Icons.Rounded.EventBusy,
+                title = "Leave a bad habit",
+                description = "Track clean days for smoking, porn, junk food, alcohol, or any loop you want to break.",
+                actionText = "Quit Habit",
+                onAction = onAdd,
+            )
         }
     } else {
         items(dashboard.quitHabits, key = { it.habitId }) { habit ->

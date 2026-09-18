@@ -140,7 +140,7 @@ fun EmptyState(
             tint = MaterialTheme.extendedColors.textMuted,
             modifier = Modifier.size(48.dp),
         )
-        Spacer(Modifier.height(Spacing.md))
+        Spacer(Modifier.height(Spacing.lg))
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,

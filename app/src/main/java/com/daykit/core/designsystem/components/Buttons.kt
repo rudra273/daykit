@@ -19,10 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.extendedColors
 
-private val ButtonHeight = 40.dp
+private val ButtonHeight = 36.dp
+
+@Composable
+private fun compactButtonHeight() = ButtonHeight * LocalDensity.current.fontScale.coerceAtLeast(1f)
 
 @Composable
 fun PrimaryButton(
@@ -36,21 +40,21 @@ fun PrimaryButton(
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.height(ButtonHeight),
+        modifier = modifier.height(compactButtonHeight()),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = MaterialTheme.extendedColors.actionFill,
+            contentColor = MaterialTheme.extendedColors.onActionFill,
             disabledContainerColor = MaterialTheme.extendedColors.inputField,
             disabledContentColor = MaterialTheme.extendedColors.textMuted,
         ),
-        contentPadding = PaddingValues(horizontal = 20.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
         if (loading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = MaterialTheme.extendedColors.onActionFill,
             )
         } else {
             leadingIcon?.let {
@@ -73,7 +77,7 @@ fun SecondaryButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(ButtonHeight),
+        modifier = modifier.height(compactButtonHeight()),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.extendedColors.inputField,
@@ -81,7 +85,7 @@ fun SecondaryButton(
             disabledContainerColor = MaterialTheme.extendedColors.inputField,
             disabledContentColor = MaterialTheme.extendedColors.textMuted,
         ),
-        contentPadding = PaddingValues(horizontal = 20.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
         leadingIcon?.let {
             it()
@@ -104,7 +108,7 @@ fun DestructiveButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(ButtonHeight),
+        modifier = modifier.height(compactButtonHeight()),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
@@ -112,7 +116,7 @@ fun DestructiveButton(
             disabledContainerColor = MaterialTheme.extendedColors.inputField,
             disabledContentColor = MaterialTheme.extendedColors.textMuted,
         ),
-        contentPadding = PaddingValues(horizontal = 20.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge)
     }
@@ -142,8 +146,8 @@ fun AppFab(
         onClick = onClick,
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
+        containerColor = MaterialTheme.extendedColors.actionFill,
+        contentColor = MaterialTheme.extendedColors.onActionFill,
     ) {
         Icon(icon, contentDescription = contentDescription)
     }
@@ -161,8 +165,8 @@ fun AppExtendedFab(
         onClick = onClick,
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
+        containerColor = MaterialTheme.extendedColors.actionFill,
+        contentColor = MaterialTheme.extendedColors.onActionFill,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))

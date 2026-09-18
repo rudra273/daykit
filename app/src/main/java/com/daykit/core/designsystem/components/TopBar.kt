@@ -13,15 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -208,33 +205,18 @@ fun SearchAppTopBar(
     }
 }
 
-/**
- * Back affordance: a 34dp circle centred in a 48dp touch target. The visual size stays
- * compact so the header reads right; only the hit area grows to the Material minimum.
- */
+/** Plain back arrow with a full 48dp touch target. */
 @Composable
 fun AppBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier.size(MinTouchTarget),
-        contentAlignment = Alignment.Center,
-    ) {
-        FilledIconButton(
-            onClick = onClick,
-            modifier = Modifier.size(32.dp),
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.extendedColors.inputField,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-        ) {
-            Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
-                modifier = Modifier.size(18.dp),
-            )
-        }
+    IconButton(onClick = onClick, modifier = modifier.size(MinTouchTarget)) {
+        Icon(
+            Icons.AutoMirrored.Rounded.ArrowBack,
+            contentDescription = "Back",
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(24.dp),
+        )
     }
 }

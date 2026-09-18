@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * "Meta Classic" palette — Facebook production colors.
- * Light = pure white + #1877F2. Dark = charcoal #18191A + #2D88FF.
+ * Light = white cards + #1877F2. Dark = charcoal #18191A with softer blue accents.
  *
  * Raw tokens are private; screens consume [androidx.compose.material3.MaterialTheme.colorScheme]
  * and the semantic [ExtendedColors] layer via [extendedColors].
@@ -38,22 +38,23 @@ private val LightInputField = Color(0xFFF0F2F5)
 // endregion
 
 // region Dark raw tokens
-private val DarkPrimary = Color(0xFF2D88FF)
+private val DarkPrimary = Color(0xFF75AFFF)
 private val DarkPrimaryContainer = Color(0xFF1E3A5F)
 private val DarkOnPrimaryContainer = Color(0xFF9BC4FF)
 private val DarkBackground = Color(0xFF18191A)
-private val DarkSurface = Color(0xFF242526)
-private val DarkSurfaceVariant = Color(0xFF3A3B3C)
-private val DarkText = Color(0xFFE4E6EB)
+private val DarkSurface = Color(0xFF252729)
+private val DarkSurfaceVariant = Color(0xFF303236)
+private val DarkText = Color(0xFFE7E9ED)
 private val DarkMuted = Color(0xFFB0B3B8)
 private val DarkOutline = Color(0xFF55575A)
-private val DarkDivider = Color(0xFF3E4042)
+private val DarkDivider = Color(0xFF34373B)
 private val DarkError = Color(0xFFF02849)
 private val DarkSuccess = Color(0xFF45BD62)
 private val DarkWarning = Color(0xFFF7B928)
-private val DarkCard = Color(0xFF242526)
-private val DarkElevated = Color(0xFF3A3B3C)
-private val DarkInputField = Color(0xFF3A3B3C)
+private val DarkCard = Color(0xFF252729)
+private val DarkElevated = Color(0xFF303236)
+private val DarkInputField = Color(0xFF303236)
+private val DarkActionFill = Color(0xFF216BD6)
 // endregion
 
 val DayKitLightColorScheme = lightColorScheme(
@@ -94,7 +95,7 @@ val DayKitLightColorScheme = lightColorScheme(
 
 val DayKitDarkColorScheme = darkColorScheme(
     primary = DarkPrimary,
-    onPrimary = Color(0xFFFFFFFF),
+    onPrimary = Color(0xFF10213A),
     primaryContainer = DarkPrimaryContainer,
     onPrimaryContainer = DarkOnPrimaryContainer,
     secondary = DarkMuted,
@@ -117,9 +118,9 @@ val DayKitDarkColorScheme = darkColorScheme(
     onSurfaceVariant = DarkMuted,
     surfaceContainerLowest = Color(0xFF18191A),
     surfaceContainerLow = Color(0xFF1E1F20),
-    surfaceContainer = Color(0xFF242526),
-    surfaceContainerHigh = Color(0xFF303132),
-    surfaceContainerHighest = Color(0xFF3A3B3C),
+    surfaceContainer = DarkCard,
+    surfaceContainerHigh = DarkElevated,
+    surfaceContainerHighest = Color(0xFF393C40),
     outline = DarkOutline,
     outlineVariant = DarkDivider,
     inverseSurface = Color(0xFFE4E6EB),
@@ -158,20 +159,20 @@ private val LightAccentColors = AccentColors(
 )
 
 private val DarkAccentColors = AccentColors(
-    blue = Color(0xFF2D88FF),
+    blue = Color(0xFF75AFFF),
     teal = Color(0xFF2ABBA7),
     green = Color(0xFF45BD62),
-    red = Color(0xFFF02849),
+    red = Color(0xFFFF7085),
     orange = Color(0xFFFF8A3D),
     yellow = Color(0xFFF7B928),
-    purple = Color(0xFF9360F7),
+    purple = Color(0xFFB28AFF),
     pink = Color(0xFFF35BC7),
-    indigo = Color(0xFF6C6CFF),
+    indigo = Color(0xFFA0A0FF),
 )
 
 /**
  * Semantic color layer beyond the M3 [androidx.compose.material3.ColorScheme].
- * [card] is the opaque fill for the top bar and bottom navigation bar.
+ * [card] is the opaque card fill; [actionFill] keeps white action text legible.
  */
 @Immutable
 data class ExtendedColors(
@@ -187,6 +188,8 @@ data class ExtendedColors(
     val divider: Color,
     val textMuted: Color,
     val inputField: Color,
+    val actionFill: Color,
+    val onActionFill: Color,
     val isDark: Boolean,
     val accents: AccentColors,
 )
@@ -204,6 +207,8 @@ val LightExtendedColors = ExtendedColors(
     divider = LightDivider,
     textMuted = LightMuted,
     inputField = LightInputField,
+    actionFill = Color(0xFF176FE5),
+    onActionFill = Color.White,
     isDark = false,
     accents = LightAccentColors,
 )
@@ -221,6 +226,8 @@ val DarkExtendedColors = ExtendedColors(
     divider = DarkDivider,
     textMuted = DarkMuted,
     inputField = DarkInputField,
+    actionFill = DarkActionFill,
+    onActionFill = Color.White,
     isDark = true,
     accents = DarkAccentColors,
 )
@@ -231,4 +238,4 @@ val LocalExtendedColors = staticCompositionLocalOf { LightExtendedColors }
 @Composable
 @ReadOnlyComposable
 fun Color.asAccentContainer(): Color =
-    copy(alpha = if (LocalExtendedColors.current.isDark) 0.20f else 0.12f)
+    copy(alpha = if (LocalExtendedColors.current.isDark) 0.14f else 0.12f)
