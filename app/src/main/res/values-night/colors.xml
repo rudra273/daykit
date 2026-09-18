@@ -12,9 +12,7 @@
     <color name="danger">#FFF02849</color>
 
     <!-- Widget surfaces -->
-    <color name="widget_glass_top">#ED2B2D31</color>
-    <color name="widget_glass_bottom">#DE222428</color>
-    <color name="widget_glass_stroke">#55FFFFFF</color>
+    <color name="widget_container">#F51B1D1E</color>
     <color name="widget_stroke">#665A5D62</color>
     <color name="widget_button">#FF216BD6</color>
     <color name="widget_button_muted">#B03A3D42</color>

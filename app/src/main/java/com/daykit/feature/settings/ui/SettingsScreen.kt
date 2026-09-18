@@ -384,7 +384,6 @@ fun SettingsScreen(
                 AppCard(contentPadding = PaddingValues(0.dp)) {
                     AppListRow(
                         headline = "Appearance",
-                        supporting = "Theme and display preferences",
                         leadingIcon = Icons.Rounded.Palette,
                         leadingAccent = accents.orange,
                         trailing = { NavChevron() },
