@@ -7,6 +7,10 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
 import android.os.SystemClock
 import android.util.Log
 import android.view.View
@@ -27,7 +31,7 @@ class DayflowWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action !in setOf(ACTION_START, ACTION_BREAK, ACTION_PAUSE, ACTION_RESUME,
-                ACTION_STOP, ACTION_FINISH, Intent.ACTION_BOOT_COMPLETED,
+                ACTION_STOP, ACTION_FINISH, ACTION_TICK, Intent.ACTION_BOOT_COMPLETED,
                 Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED)) return
         val result = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
@@ -56,6 +60,8 @@ class DayflowWidgetProvider : AppWidgetProvider() {
         private const val ACTION_RESUME = "com.daykit.widget.DAYFLOW_RESUME"
         private const val ACTION_STOP = "com.daykit.widget.DAYFLOW_STOP"
         private const val ACTION_FINISH = "com.daykit.widget.DAYFLOW_FINISH"
+        private const val ACTION_TICK = "com.daykit.widget.DAYFLOW_TICK"
+        private const val TICK_INTERVAL_MILLIS = 60_000L
 
         private fun action(context: Context, name: String): PendingIntent = PendingIntent.getBroadcast(
             context, name.hashCode(), Intent(context, DayflowWidgetProvider::class.java).apply {
@@ -81,7 +87,8 @@ class DayflowWidgetProvider : AppWidgetProvider() {
             val ids = manager.getAppWidgetIds(ComponentName(context, DayflowWidgetProvider::class.java))
             val alarm = context.getSystemService(AlarmManager::class.java)
             alarm.cancel(action(context, ACTION_FINISH))
-            if (session?.state == "running") {
+            alarm.cancel(action(context, ACTION_TICK))
+            if (session?.state == "running" && ids.isNotEmpty()) {
                 if (alarm.canScheduleExactAlarms()) {
                     alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, session.endAtMillis,
                         action(context, ACTION_FINISH))
@@ -89,22 +96,36 @@ class DayflowWidgetProvider : AppWidgetProvider() {
                     alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, session.endAtMillis,
                         action(context, ACTION_FINISH))
                 }
+                if (session.endAtMillis - System.currentTimeMillis() > TICK_INTERVAL_MILLIS) {
+                    alarm.set(AlarmManager.ELAPSED_REALTIME,
+                        SystemClock.elapsedRealtime() + TICK_INTERVAL_MILLIS,
+                        action(context, ACTION_TICK))
+                }
             }
+            val duration = if (session?.kind == "break") 5 * 60_000L else 25 * 60_000L
+            val remaining = when (session?.state) {
+                "paused" -> session.remainingMillis
+                "running" -> (session.endAtMillis - System.currentTimeMillis()).coerceAtLeast(0)
+                else -> duration
+            }
+            val ring = progressRing(context, (remaining.toFloat() / duration).coerceIn(0f, 1f))
             ids.forEach { id ->
                 val views = RemoteViews(context.packageName, R.layout.widget_dayflow)
+                views.setImageViewBitmap(R.id.dayflow_widget_ring, ring)
                 views.setTextViewText(R.id.dayflow_widget_title,
                     if (session?.kind == "break") "Break" else "Pomodoro")
                 if (session == null) {
                     views.setViewVisibility(R.id.dayflow_widget_timer, View.GONE)
+                    views.setViewVisibility(R.id.dayflow_widget_ready_time, View.VISIBLE)
+                    views.setTextViewText(R.id.dayflow_widget_ready_time, "25:00")
                     views.setTextViewText(R.id.dayflow_widget_status, "Ready to focus")
                     views.setTextViewText(R.id.dayflow_widget_primary, "Start 25m")
                     views.setTextViewText(R.id.dayflow_widget_secondary, "Break 5m")
                     views.setOnClickPendingIntent(R.id.dayflow_widget_primary, action(context, ACTION_START))
                     views.setOnClickPendingIntent(R.id.dayflow_widget_secondary, action(context, ACTION_BREAK))
                 } else {
-                    val remaining = if (session.state == "paused") session.remainingMillis else
-                        (session.endAtMillis - System.currentTimeMillis()).coerceAtLeast(0)
                     views.setViewVisibility(R.id.dayflow_widget_timer, View.VISIBLE)
+                    views.setViewVisibility(R.id.dayflow_widget_ready_time, View.GONE)
                     views.setChronometer(R.id.dayflow_widget_timer,
                         SystemClock.elapsedRealtime() + remaining, null, session.state == "running")
                     views.setChronometerCountDown(R.id.dayflow_widget_timer, true)
@@ -119,6 +140,27 @@ class DayflowWidgetProvider : AppWidgetProvider() {
                 }
                 manager.updateAppWidget(id, views)
             }
+        }
+
+        private fun progressRing(context: Context, progress: Float): Bitmap {
+            val density = context.resources.displayMetrics.density
+            val pixels = (112 * density).toInt().coerceAtLeast(1)
+            val stroke = 8 * density
+            val bounds = RectF(stroke / 2, stroke / 2, pixels - stroke / 2, pixels - stroke / 2)
+            val bitmap = Bitmap.createBitmap(pixels, pixels, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = stroke
+                strokeCap = Paint.Cap.ROUND
+                color = context.getColor(R.color.divider)
+            }
+            canvas.drawArc(bounds, 0f, 360f, false, paint)
+            if (progress > 0f) {
+                paint.color = context.getColor(R.color.brand_primary)
+                canvas.drawArc(bounds, -90f, progress * 360f, false, paint)
+            }
+            return bitmap
         }
     }
 }

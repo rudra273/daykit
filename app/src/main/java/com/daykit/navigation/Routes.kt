@@ -28,6 +28,7 @@ object Routes {
     const val TOOL_SCANNER = "tool/scanner"
     const val TOOL_DNS = "tool/dns"
     const val TOOL_EVENTLIGHT = "tool/eventlight"
+    const val TOOL_DEVICE_MANAGER = "tool/device_manager"
 
     const val SETTINGS_BACKUP = "settings/backup"
     const val SETTINGS_APPEARANCE = "settings/appearance"

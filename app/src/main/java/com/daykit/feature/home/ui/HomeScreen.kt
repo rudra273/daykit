@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material.icons.rounded.Notes
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -103,6 +104,8 @@ fun HomeScreen(
             listOf("expenses", "budget", "money")),
     )
     val other = listOf(
+        ToolTile(Routes.TOOL_DEVICE_MANAGER, "Device Manager", "Usage, storage & battery", Icons.Rounded.PhoneAndroid, { accents.teal },
+            listOf("device manager", "usage", "storage", "battery", "largest files", "apps")),
         ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
             listOf("reminder", "notification", "alarm")),
         ToolTile(Routes.TOOL_SCANNER, "Document Scanner", "Scan documents", Icons.Rounded.DocumentScanner, { accents.blue },

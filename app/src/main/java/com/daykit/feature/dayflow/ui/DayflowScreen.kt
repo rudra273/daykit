@@ -1,10 +1,16 @@
 package com.daykit.feature.dayflow.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +33,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -148,14 +157,7 @@ fun DayflowScreen(container: AppContainer, onBack: () -> Unit) {
             item {
                 SectionHeader("Pomodoro")
                 AppCard(Modifier.fillMaxWidth()) {
-                    Text(
-                        when (active?.state) {
-                            "running" -> "${active.kind.replaceFirstChar { it.uppercase() }} · ${remaining(active, now)}"
-                            "paused" -> "Paused · ${remaining(active, now)}"
-                            else -> "Ready for a focus session?"
-                        },
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
+                    PomodoroClock(active, now)
                     Text("$focusedMinutesToday min focused today · $todayCount completed",
                         style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -199,6 +201,48 @@ fun DayflowScreen(container: AppContainer, onBack: () -> Unit) {
                 }
             }
             error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+        }
+    }
+}
+
+@Composable
+private fun PomodoroClock(session: PomodoroSessionEntity?, now: Long) {
+    val duration = if (session?.kind == "break") 5 * 60_000L else 25 * 60_000L
+    val remainingMillis = when (session?.state) {
+        "paused" -> session.remainingMillis
+        "running" -> (session.endAtMillis - now).coerceAtLeast(0)
+        else -> duration
+    }
+    val progress = (remainingMillis.toFloat() / duration).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(progress, tween(1_000), label = "Pomodoro progress")
+    val accent = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.surfaceVariant
+
+    Box(Modifier.fillMaxWidth().padding(vertical = Spacing.sm), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(188.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val stroke = 12.dp.toPx()
+                val inset = stroke / 2
+                val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
+                val arcTopLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+                drawArc(track, -90f, 360f, false, arcTopLeft, arcSize,
+                    style = Stroke(stroke, cap = StrokeCap.Round))
+                if (animatedProgress > 0f) drawArc(accent, -90f, animatedProgress * 360f, false,
+                    arcTopLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            }
+            Column(Modifier.wrapContentSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(when (session?.state) {
+                    "paused" -> "PAUSED"
+                    "running" -> if (session.kind == "break") "BREAK" else "FOCUS"
+                    else -> "READY"
+                }, style = MaterialTheme.typography.labelMedium, color = accent)
+                Text(session?.let { remaining(it, now) } ?: "25:00",
+                    style = MaterialTheme.typography.displayMedium)
+                Text(if (session == null) "Time to focus" else if (session.kind == "break")
+                    "Take a breath" else "Stay with it",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

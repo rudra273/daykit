@@ -54,6 +54,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +71,9 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBackButton
@@ -87,6 +93,12 @@ import com.daykit.feature.notes.data.SecureNote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private sealed interface NoteEditorState {
     data object Add : NoteEditorState
@@ -440,6 +452,46 @@ private fun NoteEditorPage(
     var images by remember(editingNote?.noteId) {
         mutableStateOf<List<com.daykit.feature.notes.data.SecureNoteImage>>(emptyList())
     }
+    val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val saveMutex = remember(editingNote?.noteId) { Mutex() }
+    var lastSaved by remember(editingNote?.noteId) {
+        mutableStateOf(Triple(title, content, selectedLabels))
+    }
+
+    suspend fun saveChanges() = withContext(NonCancellable) { saveMutex.withLock {
+        val snapshot = Triple(title, content, selectedLabels)
+        if (snapshot == lastSaved) return@withLock
+        val cleanTitle = title.ifBlank { "Untitled" }
+        val cleanContent = content.ifBlank { " " }
+        val labels = selectedLabels.sorted().joinToString(", ")
+        if (persistedNoteId == null && title.isBlank() && content.isBlank() && selectedLabels.isEmpty()) return@withLock
+        val id = persistedNoteId
+        if (id == null) persistedNoteId = repository.addNote(cleanTitle, cleanContent, labels)
+        else repository.updateNote(id, cleanTitle, cleanContent, labels)
+        lastSaved = snapshot
+    } }
+
+    // Save during editing as Android may stop the activity without a back press.
+    LaunchedEffect(title, content, selectedLabels) {
+        delay(250)
+        try { saveChanges() } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { errors.show("Couldn't autosave this note.") }
+    }
+    val latestSave by rememberUpdatedState<suspend () -> Unit>({ saveChanges() })
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    try { latestSave() } catch (e: Exception) {
+                        android.util.Log.e("DayKit", "Saving note on pause failed", e)
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(editingNote?.noteId) {
         val id = editingNote?.noteId ?: return@LaunchedEffect
@@ -489,15 +541,7 @@ private fun NoteEditorPage(
         // On failure the editor deliberately stays open with the text intact — closing
         // here would silently discard whatever the user just wrote.
         errors.launchGuarded("Couldn't save this note. Your text is still here.") {
-            val existing = persistedNoteId
-            if (existing != null) {
-                // Note already persisted (e.g. images attached) — update text/labels.
-                if (title.isNotBlank() || content.isNotBlank() || images.isNotEmpty()) {
-                    repository.updateNote(existing, cleanTitleFor(), cleanContentFor(), labelsString())
-                }
-            } else if (title.isNotBlank() || content.isNotBlank()) {
-                repository.addNote(cleanTitleFor(), cleanContentFor(), labelsString())
-            }
+            saveChanges()
             onClose()
         }
     }
