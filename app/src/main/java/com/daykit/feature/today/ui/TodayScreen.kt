@@ -241,7 +241,6 @@ fun TodayScreen(
         AppTopBar(
             title = "Today",
             subtitle = dateLabel,
-            showDivider = listState.canScrollBackward,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }

@@ -31,7 +31,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
@@ -52,7 +51,6 @@ fun AppTopBar(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
-    showDivider: Boolean = true,
     titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
@@ -106,9 +104,6 @@ fun AppTopBar(
             }
             actions()
         }
-        if (showDivider) {
-            RowDivider(modifier = Modifier.align(Alignment.BottomCenter).alpha(0.22f), startIndent = 0.dp)
-        }
     }
 }
 
@@ -131,7 +126,6 @@ fun SearchAppTopBar(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     searchPlaceholder: String = "Search",
-    showDivider: Boolean = true,
     titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
@@ -144,7 +138,6 @@ fun SearchAppTopBar(
             modifier = modifier,
             title = title,
             onBack = onBack,
-            showDivider = true,
             titleContent = {
                 BasicTextField(
                     value = query,
@@ -190,7 +183,6 @@ fun SearchAppTopBar(
             modifier = modifier,
             title = title,
             onBack = onBack,
-            showDivider = showDivider,
             titleContent = titleContent,
             actions = {
                 IconButton(onClick = { onSearchActiveChange(true) }) {

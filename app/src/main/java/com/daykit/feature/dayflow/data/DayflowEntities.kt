@@ -9,6 +9,7 @@ data class DayflowDayEntity(
     val journal: String = "",
     val mood: String = "",
     val updatedAtMillis: Long = 0,
+    val journalTitle: String = "",
 )
 
 @Entity(tableName = "dayflow_sessions")

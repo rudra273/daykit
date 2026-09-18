@@ -417,7 +417,6 @@ fun SettingsScreen(
         }
         AppTopBar(
             title = "Settings",
-            showDivider = listState.canScrollBackward,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -31,20 +30,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppCard
-import com.daykit.core.designsystem.components.AppTopBar
-import com.daykit.core.designsystem.components.SectionHeader
-import com.daykit.feature.dayflow.data.DayflowDayEntity
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val moodChoices = listOf("😄", "🙂", "😐", "😟", "😢")
 private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
-private val entryFormatter = DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.getDefault())
 
 @Composable
-fun MoodHistoryScreen(container: AppContainer, onBack: () -> Unit) {
+fun MoodHistoryScreen(container: AppContainer) {
     val history by container.dayflowRepository.observeMoodHistory()
         .collectAsStateWithLifecycle(initialValue = emptyList())
     var monthKey by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
@@ -59,7 +53,6 @@ fun MoodHistoryScreen(container: AppContainer, onBack: () -> Unit) {
         (1..month.lengthOfMonth()).map(month::atDay)
 
     Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "Mood history", onBack = onBack)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(Spacing.lg),
@@ -105,40 +98,6 @@ fun MoodHistoryScreen(container: AppContainer, onBack: () -> Unit) {
                                 }
                             }
                             repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
-                        }
-                    }
-                }
-            }
-            item {
-                SectionHeader("Month at a glance")
-                AppCard(Modifier.fillMaxWidth()) {
-                    Text("${entries.size} ${if (entries.size == 1) "check-in" else "check-ins"}",
-                        style = MaterialTheme.typography.titleMedium)
-                    if (entries.isEmpty()) {
-                        Text("No mood check-ins this month yet.",
-                            style = MaterialTheme.typography.bodyMedium)
-                    } else {
-                        moodChoices.forEach { mood ->
-                            val count = entries.count { it.mood == mood }
-                            if (count > 0) {
-                                Text("$mood  $count ${if (count == 1) "day" else "days"}",
-                                    modifier = Modifier.padding(top = Spacing.xs),
-                                    style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                    }
-                }
-            }
-            if (entries.isNotEmpty()) {
-                item { SectionHeader("Check-ins") }
-                items(entries, key = DayflowDayEntity::date) { entry ->
-                    val date = LocalDate.parse(entry.date)
-                    AppCard(Modifier.fillMaxWidth()) {
-                        Row(Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text(date.format(entryFormatter), style = MaterialTheme.typography.bodyLarge)
-                            Text(entry.mood, style = MaterialTheme.typography.headlineSmall)
                         }
                     }
                 }

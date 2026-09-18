@@ -13,6 +13,9 @@ interface DayflowDao {
     @Query("SELECT * FROM dayflow_days WHERE mood != '' ORDER BY date DESC")
     fun observeMoodHistory(): Flow<List<DayflowDayEntity>>
 
+    @Query("SELECT * FROM dayflow_days WHERE journal != '' OR journalTitle != '' ORDER BY date DESC")
+    fun observeJournalHistory(): Flow<List<DayflowDayEntity>>
+
     @Query("SELECT * FROM dayflow_days WHERE date = :date LIMIT 1")
     suspend fun getDay(date: String): DayflowDayEntity?
 

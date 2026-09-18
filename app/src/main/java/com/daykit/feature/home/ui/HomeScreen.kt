@@ -164,7 +164,6 @@ fun HomeScreen(
             searchActive = searchActive,
             onSearchActiveChange = { searchActive = it; if (!it) query = "" },
             searchPlaceholder = "Search tools",
-            showDivider = gridState.canScrollBackward,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }

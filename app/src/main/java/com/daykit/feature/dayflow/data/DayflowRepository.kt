@@ -11,12 +11,14 @@ class DayflowRepository(private val dao: DayflowDao) {
 
     fun observeDay(date: LocalDate): Flow<DayflowDayEntity?> = dao.observeDay(date.toString())
     fun observeMoodHistory(): Flow<List<DayflowDayEntity>> = dao.observeMoodHistory()
+    fun observeJournalHistory(): Flow<List<DayflowDayEntity>> = dao.observeJournalHistory()
     fun observeSessions(): Flow<List<PomodoroSessionEntity>> = dao.observeSessions()
 
-    suspend fun saveJournal(date: LocalDate, text: String) = mutex.withLock {
+    suspend fun saveJournal(date: LocalDate, title: String, text: String) = mutex.withLock {
         val key = date.toString()
         dao.upsertDay((dao.getDay(key) ?: DayflowDayEntity(key)).copy(
-            journal = text, updatedAtMillis = System.currentTimeMillis()))
+            journalTitle = title.trim(), journal = text.trim(),
+            updatedAtMillis = System.currentTimeMillis()))
     }
 
     suspend fun saveMood(date: LocalDate, emoji: String) = mutex.withLock {

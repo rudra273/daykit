@@ -16,6 +16,7 @@ class DayflowBackupContributor(
         .put("days", JSONArray().also { rows ->
             repository.exportDays().forEach { day ->
                 rows.put(JSONObject().put("date", day.date).put("journal", day.journal)
+                    .put("journalTitle", day.journalTitle)
                     .put("mood", day.mood).put("updatedAtMillis", day.updatedAtMillis))
             }
         })
@@ -35,7 +36,8 @@ class DayflowBackupContributor(
         for (i in 0 until days.length()) {
             val row = days.getJSONObject(i)
             repository.importDay(DayflowDayEntity(row.getString("date"), row.optString("journal"),
-                row.optString("mood"), row.optLong("updatedAtMillis")))
+                row.optString("mood"), row.optLong("updatedAtMillis"),
+                row.optString("journalTitle")))
         }
         val sessions = payload.getJSONArray("sessions")
         for (i in 0 until sessions.length()) {

@@ -54,7 +54,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         DayflowDayEntity::class,
         PomodoroSessionEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -101,6 +101,11 @@ abstract class DayKitDatabase : RoomDatabase() {
                     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                         db.execSQL("CREATE TABLE IF NOT EXISTS dayflow_days (`date` TEXT NOT NULL, `journal` TEXT NOT NULL, `mood` TEXT NOT NULL, `updatedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`date`))")
                         db.execSQL("CREATE TABLE IF NOT EXISTS dayflow_sessions (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `startedAtMillis` INTEGER NOT NULL, `endAtMillis` INTEGER NOT NULL, `remainingMillis` INTEGER NOT NULL, `state` TEXT NOT NULL, `finishedAtMillis` INTEGER, PRIMARY KEY(`id`))")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(4, 5) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE dayflow_days ADD COLUMN journalTitle TEXT NOT NULL DEFAULT ''")
                     }
                 })
                 .build()

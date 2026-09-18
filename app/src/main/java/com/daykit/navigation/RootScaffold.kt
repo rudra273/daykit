@@ -91,7 +91,7 @@ fun RootScaffold(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .onSizeChanged { bottomBarHeight = with(density) { it.height.toDp() } }
-                        .background(glassChromeBrush(bottomBar = true))
+                        .background(glassChromeBrush())
                         .navigationBarsPadding()
                         .heightIn(min = 60.dp),
                     verticalAlignment = Alignment.CenterVertically,
