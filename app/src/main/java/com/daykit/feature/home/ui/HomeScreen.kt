@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material.icons.rounded.Notes
@@ -87,14 +88,16 @@ fun HomeScreen(
     val productivity = listOf(
         ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TrackChanges, { accents.green },
             listOf("habit", "habits")),
-        ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
-            listOf("reminder", "notification", "alarm")),
         ToolTile(Routes.TOOL_EXPENSES, "Expenses", "Track monthly spending", Icons.Rounded.Payments, { accents.pink },
             listOf("expenses", "budget", "money")),
         ToolTile(Routes.TOOL_FOCUS, "Focus", "Block distractions", Icons.Rounded.Timer, { accents.red },
             listOf("focus", "focus block", "block app", "distraction", "screen time")),
+        ToolTile(Routes.TOOL_DAYFLOW, "Dayflow", "Pomodoro, journal & mood", Icons.Rounded.AutoAwesome, { accents.indigo },
+            listOf("dayflow", "pomodoro", "journal", "mood", "timer")),
     )
     val other = listOf(
+        ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
+            listOf("reminder", "notification", "alarm")),
         ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.yellow },
             listOf("editor", "document", "text", "pdf")),
         ToolTile(Routes.TOOL_SCANNER, "Document Scanner", "Scan documents", Icons.Rounded.DocumentScanner, { accents.blue },

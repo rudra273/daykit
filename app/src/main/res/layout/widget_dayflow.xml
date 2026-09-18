@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="12dp">
+    <TextView android:id="@+id/dayflow_widget_title"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Pomodoro" android:textColor="@color/text_primary"
+        android:textSize="15sp" android:textStyle="bold" />
+    <Chronometer android:id="@+id/dayflow_widget_timer"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/text_primary" android:textSize="26sp"
+        android:visibility="gone" />
+    <TextView android:id="@+id/dayflow_widget_status"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Ready to focus" android:textColor="@color/text_muted"
+        android:textSize="12sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:orientation="horizontal">
+        <TextView android:id="@+id/dayflow_widget_primary"
+            android:layout_width="0dp" android:layout_height="40dp"
+            android:layout_weight="1" android:background="@drawable/widget_button_background"
+            android:gravity="center" android:text="Start 25m"
+            android:textColor="@color/on_brand_primary" />
+        <TextView android:id="@+id/dayflow_widget_secondary"
+            android:layout_width="0dp" android:layout_height="40dp" android:layout_marginStart="8dp"
+            android:layout_weight="1" android:background="@drawable/widget_button_background"
+            android:gravity="center" android:text="Break 5m"
+            android:textColor="@color/on_brand_primary" />
+    </LinearLayout>
+</LinearLayout>

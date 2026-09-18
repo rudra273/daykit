@@ -704,7 +704,7 @@ fun BackupRestoreScreen(
 
                 SectionHeader(text = "What's included")
                 Text(
-                    "Key Store, Secure Notes, and Focus are always included. All optional utilities below are off by default and apply to local, manual Drive, and automatic backups.",
+                    "Key Store, Secure Notes, Focus, and Dayflow are always included. All optional utilities below are off by default and apply to local, manual Drive, and automatic backups.",
                     color = MaterialTheme.extendedColors.textMuted,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(
@@ -920,6 +920,7 @@ private fun toolDisplayName(toolKey: String): String = when (toolKey) {
     BackupToolKeys.HABITS -> "Habits"
     BackupToolKeys.VAULT -> "File Vault"
     BackupToolKeys.FOCUS -> "Focus"
+    BackupToolKeys.DAYFLOW -> "Dayflow"
     BackupToolKeys.REMINDERS -> "Reminders"
     BackupToolKeys.APP_LOCK -> "App Lock selections"
     BackupToolKeys.EVENT_LIGHT -> "Event Light"

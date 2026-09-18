@@ -28,6 +28,9 @@ import com.daykit.feature.notes.data.SecureNoteImageEntity
 import com.daykit.feature.reminder.data.ReminderDao
 import com.daykit.feature.reminder.data.ReminderEntity
 import com.daykit.feature.reminder.data.ReminderOccurrenceEntity
+import com.daykit.feature.dayflow.data.DayflowDao
+import com.daykit.feature.dayflow.data.DayflowDayEntity
+import com.daykit.feature.dayflow.data.PomodoroSessionEntity
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
@@ -48,8 +51,10 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         VaultFileEntity::class,
         FocusGroupEntity::class,
         FocusScheduleEntity::class,
+        DayflowDayEntity::class,
+        PomodoroSessionEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -63,6 +68,7 @@ abstract class DayKitDatabase : RoomDatabase() {
     abstract fun vaultFileDao(): VaultFileDao
     abstract fun focusGroupDao(): FocusGroupDao
     abstract fun focusScheduleDao(): FocusScheduleDao
+    abstract fun dayflowDao(): DayflowDao
 
     companion object {
         fun create(
@@ -89,6 +95,12 @@ abstract class DayKitDatabase : RoomDatabase() {
                         db.execSQL("ALTER TABLE reminders ADD COLUMN snoozedUntilMillis INTEGER")
                         db.execSQL("CREATE TABLE IF NOT EXISTS reminder_occurrences (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderId` TEXT NOT NULL, `occurrenceMillis` INTEGER NOT NULL, `action` TEXT NOT NULL, `actionAtMillis` INTEGER NOT NULL)")
                         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_reminder_occurrences_reminderId_occurrenceMillis ON reminder_occurrences (`reminderId`, `occurrenceMillis`)")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(3, 4) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE IF NOT EXISTS dayflow_days (`date` TEXT NOT NULL, `journal` TEXT NOT NULL, `mood` TEXT NOT NULL, `updatedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`date`))")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS dayflow_sessions (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `startedAtMillis` INTEGER NOT NULL, `endAtMillis` INTEGER NOT NULL, `remainingMillis` INTEGER NOT NULL, `state` TEXT NOT NULL, `finishedAtMillis` INTEGER, PRIMARY KEY(`id`))")
                     }
                 })
                 .build()

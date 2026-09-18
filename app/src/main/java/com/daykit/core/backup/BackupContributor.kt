@@ -19,6 +19,7 @@ object BackupToolKeys {
     const val HABITS = "habits"
     const val VAULT = "vault_files"
     const val FOCUS = "focus_blocks"
+    const val DAYFLOW = "dayflow"
     const val REMINDERS = "reminders"
     const val APP_LOCK = "app_lock"
     const val EVENT_LIGHT = "event_light"
@@ -31,7 +32,8 @@ object BackupToolKeys {
  *
  * Every backup runs with the PIN-derived key held in memory, so Key Store and
  * Secure Notes are unconditional — they are the data a user is least able to
- * reconstruct. Expenses, Habits, and Vault files are opt-in and all default off;
+ * reconstruct. Dayflow's journal, mood, and sessions are included with them.
+ * Expenses, Habits, and Vault files are opt-in and all default off;
  * Vault has its own toggle because its file blobs can make a backup very large.
  *
  * Focus blocks are unconditional too, but for a different reason: they are a few
@@ -50,6 +52,7 @@ fun includedBackupToolKeys(
     add(BackupToolKeys.KEY_STORE)
     add(BackupToolKeys.NOTES)
     add(BackupToolKeys.FOCUS)
+    add(BackupToolKeys.DAYFLOW)
     if (includeVault) add(BackupToolKeys.VAULT)
     if (includeExpenses) add(BackupToolKeys.EXPENSES)
     if (includeHabits) add(BackupToolKeys.HABITS)

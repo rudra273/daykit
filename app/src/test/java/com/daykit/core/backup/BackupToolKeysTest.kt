@@ -30,7 +30,7 @@ class BackupToolKeysTest {
         )
 
         assertEquals(
-            setOf(BackupToolKeys.KEY_STORE, BackupToolKeys.NOTES, BackupToolKeys.FOCUS),
+            setOf(BackupToolKeys.KEY_STORE, BackupToolKeys.NOTES, BackupToolKeys.FOCUS, BackupToolKeys.DAYFLOW),
             keys,
         )
     }
@@ -67,6 +67,7 @@ class BackupToolKeysTest {
                 BackupToolKeys.KEY_STORE,
                 BackupToolKeys.NOTES,
                 BackupToolKeys.FOCUS,
+                BackupToolKeys.DAYFLOW,
                 BackupToolKeys.VAULT,
                 BackupToolKeys.EXPENSES,
                 BackupToolKeys.HABITS,

@@ -41,6 +41,8 @@ import com.daykit.feature.keystore.data.KeyStoreRepository
 import com.daykit.feature.notes.data.SecureNoteBackupContributor
 import com.daykit.feature.notes.data.SecureNoteRepository
 import com.daykit.feature.reminder.data.ReminderRepository
+import com.daykit.feature.dayflow.data.DayflowRepository
+import com.daykit.feature.dayflow.data.DayflowBackupContributor
 import java.io.File
 
 class AppContainer(context: Context) {
@@ -152,6 +154,10 @@ class AppContainer(context: Context) {
         })
     }
 
+    val dayflowRepository: DayflowRepository by lazy {
+        DayflowRepository(database.dayflowDao())
+    }
+
     val vaultFileRepository: VaultFileRepository by lazy {
         VaultFileRepository(
             context = appContext,
@@ -169,6 +175,9 @@ class AppContainer(context: Context) {
                 ExpenseBackupContributor(expenseRepository),
                 SecureNoteBackupContributor(secureNoteRepository),
                 HabitBackupContributor(habitRepository),
+                DayflowBackupContributor(dayflowRepository) {
+                    com.daykit.feature.widget.updateDayflowWidgets(appContext)
+                },
                 VaultBackupContributor(vaultFileRepository),
                 com.daykit.feature.reminder.data.ReminderBackupContributor(reminderRepository) {
                     reminderRepository.restoreAlarms { reminder ->

@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
-import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,7 +41,6 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.AppTextButton
-import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.util.Money
@@ -75,6 +73,8 @@ fun TodayScreen(
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val monthSummary by container.expenseRepository.observeMonth(monthKey)
         .collectAsStateWithLifecycle(initialValue = null)
+    val dayflowDay by container.dayflowRepository.observeDay(LocalDate.now())
+        .collectAsStateWithLifecycle(initialValue = null)
 
     val listState = rememberLazyListState()
 
@@ -85,21 +85,9 @@ fun TodayScreen(
     val buildHabits = habitDashboard?.buildHabits.orEmpty()
     val now = System.currentTimeMillis()
     val pending = reminders.filter { !it.completed && !it.paused }.sortedBy { it.scheduledAtMillis }
-    val allEmpty = buildHabits.isEmpty() && pending.isEmpty() && monthSummary == null
 
     Column(Modifier.fillMaxSize()) {
         AppTopBar(title = "Today", subtitle = dateLabel)
-        if (allEmpty && habitDashboard != null) {
-            EmptyState(
-                icon = Icons.Rounded.TrackChanges,
-                title = "Set up your day",
-                description = "Add habits, reminders, and expenses to see them here.",
-                actionText = "Open Habits",
-                onAction = { onOpenTool(Routes.TOOL_HABITS) },
-                modifier = Modifier.padding(top = Spacing.xxl),
-            )
-            return@Column
-        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -109,6 +97,19 @@ fun TodayScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
+            item {
+                SectionRow("Dayflow", null, onSeeAll = { onOpenTool(Routes.TOOL_DAYFLOW) })
+            }
+            item {
+                AppCard(onClick = { onOpenTool(Routes.TOOL_DAYFLOW) }) {
+                    Text(dayflowDay?.mood?.takeIf { it.isNotBlank() }?.let { "Mood today: $it" }
+                        ?: "How are you feeling today?",
+                        style = MaterialTheme.typography.titleMedium)
+                    Text(if (dayflowDay?.journal.isNullOrBlank()) "Plan your day and start a Pomodoro"
+                        else "Your journal entry is saved",
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+            }
             // ── Habits ──
             item {
                 val done = buildHabits.count { h -> habitDashboard?.logFor(h.habitId)?.completed == true }
