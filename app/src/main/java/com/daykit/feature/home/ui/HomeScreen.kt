@@ -188,14 +188,15 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.toolSection(
 @Composable
 private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
     val reservedDescriptionHeight = with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() }
-    val verticalSpace = (reservedDescriptionHeight + Spacing.xs) / 2
+    val iconTitleGap = Spacing.sm
+    val verticalSpace = reservedDescriptionHeight / 2
     AppCard(
         onClick = onClick,
         contentPadding = PaddingValues(Spacing.md),
     ) {
         Spacer(Modifier.height(verticalSpace))
         AccentIconTile(icon = tile.icon, accent = tile.accent(), size = 36.dp, iconSize = 20.dp)
-        Spacer(Modifier.height(Spacing.xs))
+        Spacer(Modifier.height(iconTitleGap))
         Text(
             text = tile.name,
             style = MaterialTheme.typography.titleMedium,
@@ -203,7 +204,7 @@ private fun ToolCard(tile: ToolTile, onClick: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        // Split the former description space around the icon/title group.
+        // Keep the card height while centering the slightly wider icon/title pair.
         Spacer(Modifier.height(verticalSpace))
     }
 }

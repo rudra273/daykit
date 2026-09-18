@@ -34,6 +34,7 @@ import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.feature.dayflow.data.PomodoroSessionEntity
+import com.daykit.feature.dayflow.data.focusedMinutesOn
 import com.daykit.feature.widget.updateDayflowWidgets
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -81,6 +82,7 @@ fun DayflowScreen(container: AppContainer, onBack: () -> Unit) {
     val todayCount = completed.count {
         Instant.ofEpochMilli(it.startedAtMillis).atZone(ZoneId.systemDefault()).toLocalDate() == today
     }
+    val focusedMinutesToday = focusedMinutesOn(sessions, today, now)
 
     fun runAction(action: suspend () -> Unit) {
         scope.launch {
@@ -117,7 +119,7 @@ fun DayflowScreen(container: AppContainer, onBack: () -> Unit) {
                         },
                         style = MaterialTheme.typography.headlineSmall,
                     )
-                    Text("$todayCount completed today · ${completed.size} total",
+                    Text("$focusedMinutesToday min focused today · $todayCount completed",
                         style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         modifier = Modifier.padding(top = Spacing.md)) {

@@ -10,8 +10,8 @@ import com.daykit.core.designsystem.extendedColors
 fun glassChromeBrush(bottomBar: Boolean = false): Brush {
     val base = MaterialTheme.colorScheme.background
     val dark = MaterialTheme.extendedColors.isDark
-    val nearContent = base.copy(alpha = if (dark) 0.76f else 0.72f)
-    val outerEdge = base.copy(alpha = if (dark) 0.94f else 0.92f)
+    val nearContent = base.copy(alpha = if (dark) 0.90f else 0.88f)
+    val outerEdge = base.copy(alpha = if (dark) 0.97f else 0.96f)
     return Brush.verticalGradient(
         if (bottomBar) listOf(nearContent, outerEdge) else listOf(outerEdge, nearContent),
     )

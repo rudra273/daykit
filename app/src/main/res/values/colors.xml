@@ -16,8 +16,10 @@
     <color name="danger">#FFE41E3F</color>
 
     <!-- Widget surfaces -->
-    <color name="widget_container">#FFFFFFFF</color>
-    <color name="widget_stroke">#FFE4E6EB</color>
-    <color name="widget_button">#FF1877F2</color>
-    <color name="widget_button_muted">#FFF0F2F5</color>
+    <color name="widget_glass_top">#F0FFFFFF</color>
+    <color name="widget_glass_bottom">#DCF3F6FA</color>
+    <color name="widget_glass_stroke">#CCFFFFFF</color>
+    <color name="widget_stroke">#80CED0D4</color>
+    <color name="widget_button">#FF176FE5</color>
+    <color name="widget_button_muted">#C9F0F2F5</color>
 </resources>

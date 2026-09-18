@@ -59,7 +59,10 @@ class DayflowRepository(private val dao: DayflowDao) {
 
     suspend fun stop(): PomodoroSessionEntity? = mutex.withLock {
         val current = normalize(dao.getActiveSession()) ?: return@withLock null
-        val updated = current.copy(state = "stopped", finishedAtMillis = System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        val remaining = if (current.state == "running")
+            (current.endAtMillis - now).coerceAtLeast(0) else current.remainingMillis
+        val updated = current.copy(state = "stopped", remainingMillis = remaining, finishedAtMillis = now)
         dao.upsertSession(updated)
         updated
     }

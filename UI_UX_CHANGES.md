@@ -43,6 +43,11 @@ This brief records the agreed UI pass and the supplied light and dark screenshot
 - Keep the home card dimensions by reserving the former description line as blank space inside each card.
 - Make the navigation content 60dp tall plus the system navigation inset; keep labels visible.
 - Make primary, secondary, and destructive buttons visually 36dp tall with smaller horizontal padding.
+- Center home card icons and titles vertically and increase their gap slightly without changing card dimensions.
+- Use a stronger glass tint on the header and footer.
+- Give all four home widgets a translucent gradient surface in light and dark themes.
+- Show focused minutes today in Dayflow, including partial work sessions.
+- Render every navigation destination on an opaque page surface to prevent screen overlap during a held back gesture.
 - Review Home, Today, Settings, Habits, Document Scanner, App Lock, and Dayflow in both themes, including enlarged text and disabled animations.
 
 ## Verification
