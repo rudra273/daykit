@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.daykit.feature.reminder.data.Reminder
+import com.daykit.feature.reminder.data.ReminderTiming
 
 /**
  * Schedules reminders with exact alarms via [AlarmManager] so they fire at the
@@ -21,7 +22,7 @@ class ReminderScheduler(
     fun schedule(reminder: Reminder) {
         cancel(reminder.reminderId)
         if (!reminder.completed && !reminder.paused && reminder.pendingOccurrenceMillis != reminder.scheduledAtMillis) {
-            scheduleAt(reminder.scheduledAtMillis, alarmPendingIntent(reminder.reminderId))
+            scheduleAt(ReminderTiming.alertAtMillis(reminder.scheduledAtMillis), alarmPendingIntent(reminder.reminderId))
         }
         val snoozeAt = reminder.snoozedUntilMillis
         if (!reminder.completed && !reminder.paused && reminder.pendingOccurrenceMillis != null && snoozeAt != null) {

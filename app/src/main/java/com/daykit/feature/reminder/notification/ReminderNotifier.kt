@@ -65,12 +65,23 @@ object ReminderNotifier {
                 .putExtra(ReminderActionReceiver.EXTRA_SNOOZE_DURATION, ReminderActionReceiver.TEN_MINUTES),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val dismissedPendingIntent = PendingIntent.getBroadcast(
+            appContext,
+            reminderId.hashCode() xor 0x34_00_7A,
+            Intent(appContext, ReminderActionReceiver::class.java)
+                .setAction(ReminderActionReceiver.ACTION_DISMISSED)
+                .setData(android.net.Uri.parse("daykit://reminder/$reminderId/$occurrenceMillis/dismissed"))
+                .putExtra(ReminderActionReceiver.EXTRA_OCCURRENCE, occurrenceMillis)
+                .putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
-            .setContentText("Tap Complete after you acknowledge this reminder.")
+            .setContentText(timeRemainingText(occurrenceMillis))
             .setContentIntent(openPendingIntent)
+            .setDeleteIntent(dismissedPendingIntent)
             .apply { if (alert) setFullScreenIntent(fullScreenPendingIntent, true) }
             .setSilent(!alert)
 
@@ -86,6 +97,18 @@ object ReminderNotifier {
 
     fun notificationId(reminderId: String): Int = reminderId.hashCode()
 
+    internal fun timeRemainingText(occurrenceMillis: Long, nowMillis: Long = System.currentTimeMillis()): String {
+        val remainingMillis = occurrenceMillis - nowMillis
+        if (remainingMillis > 0) {
+            val minutes = (remainingMillis + MILLIS_PER_MINUTE - 1) / MILLIS_PER_MINUTE
+            return "In $minutes ${if (minutes == 1L) "minute" else "minutes"}"
+        }
+        if (remainingMillis > -MILLIS_PER_MINUTE) return "Due now"
+
+        val overdueMinutes = ((-remainingMillis) + MILLIS_PER_MINUTE - 1) / MILLIS_PER_MINUTE
+        return "Overdue by $overdueMinutes ${if (overdueMinutes == 1L) "minute" else "minutes"}"
+    }
+
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -98,4 +121,6 @@ object ReminderNotifier {
         }
         manager.createNotificationChannel(channel)
     }
+
+    private const val MILLIS_PER_MINUTE = 60_000L
 }

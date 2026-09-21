@@ -110,8 +110,17 @@ class ReminderRepository(
         val entity = dao.getReminder(reminderId) ?: return@withLock
         val current = entity.toDomain()
         val now = clock()
-        if (current.completed || current.paused || current.scheduledAtMillis > now || current.pendingOccurrenceMillis == current.scheduledAtMillis) return@withLock
-        val next = current.recurrence?.nextAfter(now)
+        if (
+            current.completed || current.paused ||
+            !ReminderTiming.isReadyToAlert(current.scheduledAtMillis, now) ||
+            current.pendingOccurrenceMillis == current.scheduledAtMillis
+        ) return@withLock
+        // Move the series past the advance-notice window. This keeps daily (and
+        // other recurring) reminders armed for their following occurrence while
+        // avoiding a burst of immediately-due alarms for short intervals.
+        val next = current.recurrence?.nextAfter(
+            maxOf(current.scheduledAtMillis, now + ReminderTiming.ADVANCE_NOTICE_MILLIS),
+        )
         val updated = current.copy(scheduledAtMillis = next ?: current.scheduledAtMillis,
             pendingOccurrenceMillis = current.scheduledAtMillis, snoozedUntilMillis = null, updatedAtMillis = now)
         dao.upsertReminder(updated.toEntity().copy(id = entity.id))

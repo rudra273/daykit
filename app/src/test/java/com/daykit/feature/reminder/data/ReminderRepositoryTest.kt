@@ -51,6 +51,31 @@ class ReminderRepositoryTest {
 
     private val day = 86_400_000L
 
+    @Test fun alertsTenMinutesBeforeOneTimeAndDailyOccurrences() = runBlocking {
+        val dao = FakeDao()
+        var now = 1L
+        val repo = ReminderRepository(dao, clock = { now })
+        val once = repo.addReminder("Lunch", day)
+        val daily = repo.addReminder(
+            "Medication",
+            2 * day,
+            ReminderRecurrence(ReminderFrequency.DAILY, zoneId = "UTC", anchorMillis = 2 * day),
+        )
+
+        now = day - ReminderTiming.ADVANCE_NOTICE_MILLIS - 1
+        repo.fireDue(once.reminderId) { fail("One-time reminder fired too early") }
+        now++
+        var oneTimeAlerts = 0
+        repo.fireDue(once.reminderId) { oneTimeAlerts++ }
+        assertEquals(1, oneTimeAlerts)
+
+        now = 2 * day - ReminderTiming.ADVANCE_NOTICE_MILLIS
+        var dailyAlerts = 0
+        repo.fireDue(daily.reminderId) { dailyAlerts++ }
+        assertEquals(1, dailyAlerts)
+        assertEquals(3 * day, repo.getReminder(daily.reminderId)!!.scheduledAtMillis)
+    }
+
     @Test fun backupRoundTripPreservesRecurrenceAndIsIdempotent() = runBlocking {
         val original = ReminderRepository(FakeDao(), clock = { 1L })
         val r = original.addReminder("Daily", day, ReminderRecurrence(ReminderFrequency.DAILY, untilEpochDay = 20, zoneId = "UTC", anchorMillis = day))

@@ -641,7 +641,7 @@ private fun ReminderFormSheet(
                     title.trim().isBlank() -> "Enter what you want to remember."
                     recurrence == null && frequency != null -> "Choose a valid repeat rule."
                     scheduledAtMillis == null || scheduledAtMillis <= System.currentTimeMillis() -> "Choose a future date and time."
-                    else -> "Notification stays until you tap complete."
+                    else -> "Alerts 10 minutes before and stays until you tap complete."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.extendedColors.textMuted,
