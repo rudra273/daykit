@@ -59,7 +59,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-private val moods = listOf("😄", "🙂", "😐", "😟", "😢")
+private val moodRows = listOf(
+    listOf("😄", "🙂", "😐", "😟", "😢"),
+    listOf("🤩", "😤", "😡", "😨", "😴"),
+)
 
 @Composable
 fun DayflowScreen(container: AppContainer, onBack: () -> Unit) {
@@ -138,18 +141,24 @@ fun DayflowScreen(container: AppContainer, onBack: () -> Unit) {
         ) {
             item {
                 SectionHeader("Mood")
-                Row(Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween) {
-                    moods.forEach { mood ->
-                        val selected = day?.mood == mood
-                        androidx.compose.material3.TextButton(onClick = {
-                            runAction { container.dayflowRepository.saveMood(today, mood) }
-                        }, border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            )) {
-                            Text(mood, style = MaterialTheme.typography.headlineMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    moodRows.forEach { moods ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            moods.forEach { mood ->
+                                val selected = day?.mood == mood
+                                androidx.compose.material3.TextButton(onClick = {
+                                    runAction { container.dayflowRepository.saveMood(today, mood) }
+                                }, border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                        containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                    )) {
+                                    Text(mood, style = MaterialTheme.typography.headlineMedium)
+                                }
+                            }
                         }
                     }
                 }

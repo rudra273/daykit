@@ -498,10 +498,8 @@ private fun KeyFormSheet(
     val editKey = entry?.entryId ?: "new"
     var name by remember(editKey) { mutableStateOf(entry?.name ?: "") }
     var value by remember(editKey) { mutableStateOf(entry?.value ?: "") }
-    var confirmValue by remember(editKey) { mutableStateOf(entry?.value ?: "") }
     var label by remember(editKey) { mutableStateOf(entry?.label ?: "") }
     var valueVisible by remember(editKey) { mutableStateOf(false) }
-    var confirmVisible by remember(editKey) { mutableStateOf(false) }
     var generatorExpanded by remember(editKey) { mutableStateOf(false) }
     var generatedLength by remember(editKey) { mutableStateOf(20) }
     var useUppercase by remember(editKey) { mutableStateOf(true) }
@@ -509,8 +507,7 @@ private fun KeyFormSheet(
     var useNumbers by remember(editKey) { mutableStateOf(true) }
     var useSymbols by remember(editKey) { mutableStateOf(true) }
 
-    val mismatch = confirmValue.isNotEmpty() && value != confirmValue
-    val canSave = name.isNotBlank() && value.isNotBlank() && value == confirmValue
+    val canSave = name.isNotBlank() && value.isNotBlank()
     val noCaps = KeyboardOptions(capitalization = KeyboardCapitalization.None)
 
     AppBottomSheet(
@@ -546,24 +543,6 @@ private fun KeyFormSheet(
                         Icon(
                             if (valueVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                             contentDescription = if (valueVisible) "Hide" else "Show",
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                },
-            )
-            AppTextField(
-                value = confirmValue,
-                onValueChange = { confirmValue = it },
-                label = "Confirm value",
-                isError = mismatch,
-                supportingText = if (mismatch) "Values do not match" else null,
-                keyboardOptions = noCaps,
-                visualTransformation = if (confirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { confirmVisible = !confirmVisible }) {
-                        Icon(
-                            if (confirmVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            contentDescription = if (confirmVisible) "Hide" else "Show",
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -624,7 +603,6 @@ private fun KeyFormSheet(
                                 symbols = useSymbols,
                             ))
                             value = generated
-                            confirmValue = generated
                             valueVisible = true
                         },
                     )
