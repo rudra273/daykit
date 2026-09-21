@@ -187,6 +187,18 @@ private fun FocusHome(
             .filterNot { it.packageName == context.packageName }
     }
 
+    // Seed a useful starter group without guessing from display names. The
+    // repository leaves the group alone once created, so it remains editable
+    // just like the custom groups the user creates from this screen.
+    LaunchedEffect(installedApps) {
+        installedApps ?: return@LaunchedEffect
+        errors.launchGuarded("Couldn't add the Social group.") {
+            container.focusGroupRepository.ensureDefaultSocialGroup(
+                installedPackageNames = installedApps.orEmpty().map { it.packageName },
+            )
+        }
+    }
+
     // Keep the projection honest whenever definitions change while on screen.
     LaunchedEffect(groups, schedules) {
         errors.launchGuarded("Couldn't update your focus schedules.") {
