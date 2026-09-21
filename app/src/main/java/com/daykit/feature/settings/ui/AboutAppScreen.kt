@@ -146,7 +146,7 @@ private fun AboutHero() {
         )
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            "Version 1.0.6",
+            "Version 1.0.7",
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodySmall,
         )
