@@ -4,6 +4,7 @@ import android.app.usage.StorageStatsManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.storage.StorageManager
@@ -19,7 +20,13 @@ data class AppInsight(
     val bytes: Long?,
     val foregroundMillis7d: Long,
 )
-data class FileInsight(val name: String, val bytes: Long, val path: String)
+data class FileInsight(
+    val name: String,
+    val bytes: Long,
+    val path: String,
+    /** A document URI within the folder the user explicitly selected. */
+    val uri: Uri,
+)
 data class DeviceSnapshot(
     val usageAccess: Boolean,
     val leastUsed: List<AppInsight>,
@@ -113,7 +120,16 @@ object DeviceReader {
                         val type = cursor.getString(2)
                         val childPath = if (path.isEmpty()) name else "$path/$name"
                         if (type == DocumentsContract.Document.MIME_TYPE_DIR) pending.add(id to childPath)
-                        else if (!cursor.isNull(3)) found.add(FileInsight(name, cursor.getLong(3), childPath))
+                        else if (!cursor.isNull(3)) {
+                            found.add(
+                                FileInsight(
+                                    name = name,
+                                    bytes = cursor.getLong(3),
+                                    path = childPath,
+                                    uri = DocumentsContract.buildDocumentUriUsingTree(tree, id),
+                                ),
+                            )
+                        }
                     }
                 }
             }
