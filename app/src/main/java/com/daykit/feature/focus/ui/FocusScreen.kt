@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -439,17 +440,26 @@ private fun FocusHome(
             items(appLimits, key = { "limit-${it.packageName}" }) { limit ->
                 val app = appsByPackage[limit.packageName]
                 val usageMillis = todayUsage[limit.packageName] ?: 0L
+                val isExceeded = limit.enabled && usageMillis >= limit.dailyLimitMinutes * 60_000L
                 AppLimitRow(
                     limit = limit,
                     app = app,
                     usageMillis = usageMillis,
                     onToggle = { enabled ->
+                        if (isExceeded) {
+                            errors.show("Daily limit reached. Locked until midnight.")
+                            return@AppLimitRow
+                        }
                         errors.launchGuarded("Couldn't update limit.") {
                             container.focusAppLimitRepository.setEnabled(limit.packageName, enabled)
                             if (enabled) onMonitorNeeded()
                         }
                     },
                     onEdit = {
+                        if (isExceeded) {
+                            errors.show("Daily limit reached. Editing is locked until midnight.")
+                            return@AppLimitRow
+                        }
                         appLimitToEdit = limit
                         appLimitTargetApp = app ?: InstalledApp(limit.packageName, limit.packageName, null)
                     },
@@ -690,20 +700,42 @@ private fun AppLimitRow(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(
-                        text = if (isExceeded) {
-                            "Blocked until midnight"
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false),
+                    ) {
+                        if (isExceeded) {
+                            Icon(
+                                imageVector = Icons.Rounded.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.extendedColors.danger,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text(
+                                text = "Locked until midnight",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.extendedColors.danger,
+                            )
                         } else if (!limit.enabled) {
-                            "Paused · $limitFormatted/day"
+                            Text(
+                                text = "Paused · $limitFormatted/day",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.extendedColors.textMuted,
+                            )
                         } else {
                             val remainingMillis = (limitMillis - usageMillis).coerceAtLeast(0L)
-                            "${FocusUsageTracker.formatUsage(remainingMillis)} remaining today"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isExceeded) MaterialTheme.extendedColors.danger else MaterialTheme.extendedColors.textMuted,
-                    )
+                            Text(
+                                text = "${FocusUsageTracker.formatUsage(remainingMillis)} remaining today",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.extendedColors.textMuted,
+                            )
+                        }
+                    }
                     AppSwitch(
                         checked = limit.enabled,
+                        enabled = !isExceeded,
                         onCheckedChange = onToggle,
                     )
                 }

@@ -28,8 +28,14 @@ class FocusAppLimitRepository(
         dailyLimitMinutes: Int,
         enabled: Boolean = true,
     ) {
-        val now = System.currentTimeMillis()
         val existing = dao.getAppLimit(packageName)
+        if (existing != null && existing.enabled) {
+            val used = getTodayUsageMillis(packageName)
+            if (used >= existing.dailyLimitMinutes * 60_000L) {
+                throw IllegalStateException("Limit reached for today. Locked until midnight.")
+            }
+        }
+        val now = System.currentTimeMillis()
         val entity = FocusAppLimitEntity(
             id = existing?.id ?: 0L,
             packageName = packageName,
@@ -43,12 +49,26 @@ class FocusAppLimitRepository(
     }
 
     suspend fun setEnabled(packageName: String, enabled: Boolean) {
+        val limit = dao.getAppLimit(packageName) ?: return
+        if (!enabled && limit.enabled) {
+            val used = getTodayUsageMillis(packageName)
+            if (used >= limit.dailyLimitMinutes * 60_000L) {
+                throw IllegalStateException("Limit reached for today. Locked until midnight.")
+            }
+        }
         val now = System.currentTimeMillis()
         dao.setEnabled(packageName, enabled, now)
         syncCache()
     }
 
     suspend fun deleteAppLimit(packageName: String) {
+        val limit = dao.getAppLimit(packageName) ?: return
+        if (limit.enabled) {
+            val used = getTodayUsageMillis(packageName)
+            if (used >= limit.dailyLimitMinutes * 60_000L) {
+                throw IllegalStateException("Limit reached for today. Locked until midnight.")
+            }
+        }
         dao.deleteAppLimit(packageName)
         syncCache()
     }
