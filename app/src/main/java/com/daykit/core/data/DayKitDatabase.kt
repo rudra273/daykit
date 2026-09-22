@@ -9,6 +9,8 @@ import com.daykit.feature.applock.data.LockedAppEntity
 import com.daykit.feature.expense.data.ExpenseDao
 import com.daykit.feature.filelocker.data.VaultFileDao
 import com.daykit.feature.filelocker.data.VaultFileEntity
+import com.daykit.feature.focus.data.FocusAppLimitDao
+import com.daykit.feature.focus.data.FocusAppLimitEntity
 import com.daykit.feature.focus.data.FocusGroupDao
 import com.daykit.feature.focus.data.FocusGroupEntity
 import com.daykit.feature.focus.data.FocusScheduleDao
@@ -51,10 +53,11 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         VaultFileEntity::class,
         FocusGroupEntity::class,
         FocusScheduleEntity::class,
+        FocusAppLimitEntity::class,
         DayflowDayEntity::class,
         PomodoroSessionEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -68,6 +71,7 @@ abstract class DayKitDatabase : RoomDatabase() {
     abstract fun vaultFileDao(): VaultFileDao
     abstract fun focusGroupDao(): FocusGroupDao
     abstract fun focusScheduleDao(): FocusScheduleDao
+    abstract fun focusAppLimitDao(): FocusAppLimitDao
     abstract fun dayflowDao(): DayflowDao
 
     companion object {
@@ -106,6 +110,22 @@ abstract class DayKitDatabase : RoomDatabase() {
                 .addMigrations(object : androidx.room.migration.Migration(4, 5) {
                     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                         db.execSQL("ALTER TABLE dayflow_days ADD COLUMN journalTitle TEXT NOT NULL DEFAULT ''")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(5, 6) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL(
+                            "CREATE TABLE IF NOT EXISTS focus_app_limits (" +
+                                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                                "`packageName` TEXT NOT NULL, " +
+                                "`dailyLimitMinutes` INTEGER NOT NULL, " +
+                                "`enabled` INTEGER NOT NULL, " +
+                                "`createdAtMillis` INTEGER NOT NULL, " +
+                                "`updatedAtMillis` INTEGER NOT NULL)"
+                        )
+                        db.execSQL(
+                            "CREATE UNIQUE INDEX IF NOT EXISTS index_focus_app_limits_packageName ON focus_app_limits (`packageName`)"
+                        )
                     }
                 })
                 .build()

@@ -1,8 +1,10 @@
 package com.daykit.feature.focus.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.daykit.feature.focus.data.FocusAppLimit
+import com.daykit.feature.focus.data.FocusUsageTracker
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Lock
@@ -20,6 +26,7 @@ import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -147,11 +154,18 @@ private fun FocusHome(
     val focusBlocks by container.focusRepository
         .observeFocusBlocks()
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val appLimits by container.focusAppLimitRepository
+        .observeAppLimits()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
     var installedApps by remember { mutableStateOf<List<InstalledApp>?>(null) }
     var quickBlockApp by remember { mutableStateOf<InstalledApp?>(null) }
     var quickPickerOpen by remember { mutableStateOf(false) }
     var groupToBlock by remember { mutableStateOf<FocusGroup?>(null) }
+    var appLimitToEdit by remember { mutableStateOf<FocusAppLimit?>(null) }
+    var appLimitPickerOpen by remember { mutableStateOf(false) }
+    var appLimitTargetApp by remember { mutableStateOf<InstalledApp?>(null) }
+    var todayUsage by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
 
     // Granted outside this activity, so re-check on resume.
     var hasUsageAccess by remember { mutableStateOf(AppLockPermissionChecker.hasUsageAccess(context)) }
@@ -164,6 +178,7 @@ private fun FocusHome(
             if (event == Lifecycle.Event.ON_RESUME) {
                 hasUsageAccess = AppLockPermissionChecker.hasUsageAccess(context)
                 canScheduleExact = AppLockPermissionChecker.canScheduleExactAlarms(context)
+                todayUsage = container.focusAppLimitRepository.getTodayUsageMap()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -178,6 +193,7 @@ private fun FocusHome(
             nowMillis = System.currentTimeMillis()
             activeSessions = container.focusScheduleRepository.armedSchedules()
                 .filter { nowMillis in it.startMillis until it.endMillis }
+            todayUsage = container.focusAppLimitRepository.getTodayUsageMap()
             delay(1000L)
         }
     }
@@ -215,7 +231,14 @@ private fun FocusHome(
     val blockedPackages = remember(focusBlocks) { focusBlocks.map { it.packageName }.toSet() }
     val sortedBlocks = remember(focusBlocks) { focusBlocks.sortedBy { it.lockUntilMillis } }
     val groupsById = remember(groups) { groups.associateBy { it.groupId } }
-    val isFirstRun = groups.isEmpty() && schedules.isEmpty() && activeSessions.isEmpty() && sortedBlocks.isEmpty()
+    val activeLimitBlockedApps = remember(appLimits, todayUsage) {
+        appLimits.filter { limit ->
+            if (!limit.enabled) return@filter false
+            val used = todayUsage[limit.packageName] ?: 0L
+            used >= limit.dailyLimitMinutes * 60_000L
+        }
+    }
+    val isFirstRun = groups.isEmpty() && schedules.isEmpty() && activeSessions.isEmpty() && sortedBlocks.isEmpty() && appLimits.isEmpty()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -292,7 +315,7 @@ private fun FocusHome(
                 }
             }
 
-            if (!isFirstRun && activeSessions.isEmpty() && sortedBlocks.isEmpty()) {
+            if (!isFirstRun && activeSessions.isEmpty() && sortedBlocks.isEmpty() && activeLimitBlockedApps.isEmpty()) {
                 item(key = "empty-session") {
                     FocusSectionEmpty("Nothing is blocked right now.")
                 }
@@ -343,9 +366,39 @@ private fun FocusHome(
                 )
             }
 
-            if (groups.isNotEmpty() || schedules.isNotEmpty()) {
+            items(activeLimitBlockedApps, key = { "limit-blocked-${it.packageName}" }) { limit ->
+                val app = appsByPackage[limit.packageName]
+                val remainingToMidnight = (FocusUsageTracker.getEndOfDayMillis(nowMillis) - nowMillis).coerceAtLeast(0L)
+                AppListRow(
+                    headline = app?.label ?: limit.packageName,
+                    supporting = "Daily limit reached (${FocusUsageTracker.formatUsage(limit.dailyLimitMinutes * 60_000L)}) · Resets in ${formatFocusRemaining(remainingToMidnight)}",
+                    leading = {
+                        AppIconOrMonogram(
+                            icon = app?.icon,
+                            label = app?.label ?: limit.packageName,
+                            packageName = limit.packageName,
+                        )
+                    },
+                    trailing = {
+                        Text(
+                            text = "Blocked",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.extendedColors.danger,
+                        )
+                    },
+                )
+            }
+
+            if (groups.isNotEmpty() || schedules.isNotEmpty() || appLimits.isNotEmpty()) {
                 item(key = "stats") {
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        StatTile(
+                            label = "Limits",
+                            value = appLimits.count { it.enabled }.toString(),
+                            accent = MaterialTheme.extendedColors.accents.teal,
+                            modifier = Modifier.weight(1f),
+                        )
                         StatTile(
                             label = "Groups",
                             value = groups.size.toString(),
@@ -359,14 +412,48 @@ private fun FocusHome(
                             modifier = Modifier.weight(1f),
                         )
                         StatTile(
-                            label = "Blocked now",
-                            value = (activeSessions.sumOf { it.packageNames.size } + sortedBlocks.size)
+                            label = "Blocked",
+                            value = (activeSessions.sumOf { it.packageNames.size } + sortedBlocks.size + activeLimitBlockedApps.size)
                                 .toString(),
                             accent = MaterialTheme.extendedColors.accents.orange,
                             modifier = Modifier.weight(1f),
                         )
                     }
                 }
+            }
+
+            if (!isFirstRun) {
+                item(key = "header-limits") {
+                    FocusSectionHeader(
+                        title = "App limits",
+                        actionText = "Set limit",
+                        onAction = { appLimitPickerOpen = true },
+                    )
+                }
+            }
+            if (!isFirstRun && appLimits.isEmpty()) {
+                item(key = "empty-limits") {
+                    FocusSectionEmpty("Set daily time limits for distracting apps. Once reached, DayKit blocks them until midnight.")
+                }
+            }
+            items(appLimits, key = { "limit-${it.packageName}" }) { limit ->
+                val app = appsByPackage[limit.packageName]
+                val usageMillis = todayUsage[limit.packageName] ?: 0L
+                AppLimitRow(
+                    limit = limit,
+                    app = app,
+                    usageMillis = usageMillis,
+                    onToggle = { enabled ->
+                        errors.launchGuarded("Couldn't update limit.") {
+                            container.focusAppLimitRepository.setEnabled(limit.packageName, enabled)
+                            if (enabled) onMonitorNeeded()
+                        }
+                    },
+                    onEdit = {
+                        appLimitToEdit = limit
+                        appLimitTargetApp = app ?: InstalledApp(limit.packageName, limit.packageName, null)
+                    },
+                )
             }
 
             if (!isFirstRun) {
@@ -477,6 +564,151 @@ private fun FocusHome(
             },
             onDismiss = { groupToBlock = null },
         )
+    }
+
+    if (appLimitPickerOpen) {
+        val existingLimitPackages = remember(appLimits) { appLimits.map { it.packageName }.toSet() }
+        FocusAppPickerSheet(
+            apps = installedApps,
+            blockedPackages = existingLimitPackages,
+            onSelect = { app ->
+                appLimitPickerOpen = false
+                appLimitTargetApp = app
+                appLimitToEdit = null
+            },
+            onDismiss = { appLimitPickerOpen = false },
+        )
+    }
+
+    appLimitTargetApp?.let { app ->
+        FocusAppLimitSheet(
+            app = app,
+            existingLimit = appLimitToEdit,
+            onSave = { dailyLimitMinutes ->
+                val targetApp = app
+                appLimitTargetApp = null
+                appLimitToEdit = null
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                errors.launchGuarded("Couldn't save daily limit for ${targetApp.label}.") {
+                    container.focusAppLimitRepository.saveAppLimit(
+                        packageName = targetApp.packageName,
+                        dailyLimitMinutes = dailyLimitMinutes,
+                    )
+                    onMonitorNeeded()
+                }
+            },
+            onDelete = if (appLimitToEdit != null) {
+                {
+                    val targetApp = app
+                    appLimitTargetApp = null
+                    appLimitToEdit = null
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    errors.launchGuarded("Couldn't delete daily limit for ${targetApp.label}.") {
+                        container.focusAppLimitRepository.deleteAppLimit(targetApp.packageName)
+                    }
+                }
+            } else null,
+            onDismiss = {
+                appLimitTargetApp = null
+                appLimitToEdit = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun AppLimitRow(
+    limit: FocusAppLimit,
+    app: InstalledApp?,
+    usageMillis: Long,
+    onToggle: (Boolean) -> Unit,
+    onEdit: () -> Unit,
+) {
+    val limitMillis = limit.dailyLimitMinutes * 60_000L
+    val isExceeded = limit.enabled && usageMillis >= limitMillis
+    val progress = if (limitMillis > 0) (usageMillis.toFloat() / limitMillis).coerceIn(0f, 1f) else 0f
+    val limitFormatted = FocusUsageTracker.formatUsage(limitMillis)
+    val usedFormatted = FocusUsageTracker.formatUsage(usageMillis)
+
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEdit),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            AppIconOrMonogram(
+                icon = app?.icon,
+                label = app?.label ?: limit.packageName,
+                packageName = limit.packageName,
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = app?.label ?: limit.packageName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = if (isExceeded) "Limit reached" else "$usedFormatted / $limitFormatted",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (isExceeded) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (isExceeded) {
+                            MaterialTheme.extendedColors.danger
+                        } else if (!limit.enabled) {
+                            MaterialTheme.extendedColors.textMuted
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    )
+                }
+
+                Spacer(Modifier.height(Spacing.xs))
+
+                LinearProgressIndicator(
+                    progress = { if (limit.enabled) progress else 0f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = if (isExceeded) MaterialTheme.extendedColors.danger else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+
+                Spacer(Modifier.height(Spacing.xs))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = if (isExceeded) {
+                            "Blocked until midnight"
+                        } else if (!limit.enabled) {
+                            "Paused · $limitFormatted/day"
+                        } else {
+                            val remainingMillis = (limitMillis - usageMillis).coerceAtLeast(0L)
+                            "${FocusUsageTracker.formatUsage(remainingMillis)} remaining today"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isExceeded) MaterialTheme.extendedColors.danger else MaterialTheme.extendedColors.textMuted,
+                    )
+                    AppSwitch(
+                        checked = limit.enabled,
+                        onCheckedChange = onToggle,
+                    )
+                }
+            }
+        }
     }
 }
 

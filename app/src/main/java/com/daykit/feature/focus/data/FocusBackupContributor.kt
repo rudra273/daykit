@@ -26,6 +26,8 @@ class FocusBackupContributor(
     private val focusBlockStore: FocusBlockStore,
     private val groupDao: FocusGroupDao,
     private val scheduleDao: FocusScheduleDao,
+    private val appLimitDao: FocusAppLimitDao? = null,
+    private val appLimitCache: FocusAppLimitCache? = null,
     /** Re-project and re-arm after import; see [importJson]. */
     private val onImported: (suspend () -> Unit)? = null,
 ) : BackupContributor {
@@ -40,6 +42,18 @@ class FocusBackupContributor(
                         .put("packageName", block.packageName)
                         .put("label", block.label)
                         .put("lockUntilMillis", block.lockUntilMillis),
+                )
+            }
+        }
+        val appLimits = JSONArray().also { rows ->
+            appLimitDao?.getAppLimits()?.forEach { limit ->
+                rows.put(
+                    JSONObject()
+                        .put("packageName", limit.packageName)
+                        .put("dailyLimitMinutes", limit.dailyLimitMinutes)
+                        .put("enabled", limit.enabled)
+                        .put("createdAtMillis", limit.createdAtMillis)
+                        .put("updatedAtMillis", limit.updatedAtMillis),
                 )
             }
         }
@@ -79,6 +93,7 @@ class FocusBackupContributor(
             .put("blocks", blocks)
             .put("groups", groups)
             .put("schedules", schedules)
+            .put("appLimits", appLimits)
     }
 
     override suspend fun importJson(payload: JSONObject) {
@@ -145,6 +160,30 @@ class FocusBackupContributor(
                 }
             }
             focusBlockStore.mergeBlocks(blocks)
+        }
+
+        payload.optJSONArray("appLimits")?.let { rows ->
+            if (appLimitDao != null) {
+                for (index in 0 until rows.length()) {
+                    val row = rows.getJSONObject(index)
+                    val packageName = row.optString("packageName")
+                    if (packageName.isEmpty()) continue
+                    val now = System.currentTimeMillis()
+                    val existing = appLimitDao.getAppLimit(packageName)
+                    appLimitDao.upsertAppLimit(
+                        FocusAppLimitEntity(
+                            id = existing?.id ?: 0L,
+                            packageName = packageName,
+                            dailyLimitMinutes = row.optInt("dailyLimitMinutes", 30),
+                            enabled = row.optBoolean("enabled", true),
+                            createdAtMillis = row.optLong("createdAtMillis", now),
+                            updatedAtMillis = row.optLong("updatedAtMillis", now),
+                        ),
+                    )
+                }
+                val enabled = appLimitDao.getEnabledAppLimits()
+                appLimitCache?.putEnabledLimits(enabled.associate { it.packageName to it.dailyLimitMinutes })
+            }
         }
 
         // Restored schedules are inert until their next occurrence is projected

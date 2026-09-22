@@ -24,7 +24,9 @@ import com.daykit.core.session.AppLockSessionManager
 import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
 import com.daykit.feature.applock.domain.SettingsPackageResolver
 import com.daykit.feature.applock.ui.LockActivity
+import com.daykit.feature.focus.data.FocusAppLimitCache
 import com.daykit.feature.focus.data.FocusScheduleCache
+import com.daykit.feature.focus.data.FocusUsageTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,15 +44,23 @@ class AppMonitorService : Service() {
     // works before the encrypted DB is unlocked — same reason as
     // LockedPackageCache. Never swap this for the repository.
     private lateinit var focusScheduleCache: FocusScheduleCache
+    private lateinit var focusAppLimitCache: FocusAppLimitCache
     private lateinit var settingsPackage: String
     private var lockedPackages = emptySet<String>()
     // Package -> epoch-millis at which its strict timed lock ("focus block")
     // expires. While now < expiry the app is blocked regardless of PIN grants.
     @Volatile
     private var focusBlockedPackages = emptyMap<String, Long>()
+    @Volatile
+    private var enabledAppLimits = emptyMap<String, Int>()
     private var biometricEnabled = false
     private var lastForegroundPackage: String? = null
     private var activeActivityLockPackage: String? = null
+    private var activeForegroundStartedMillis = 0L
+    private var activeForegroundPackageForUsage: String? = null
+    private var cachedUsageToday = emptyMap<String, Long>()
+    private var lastUsageQueryMillis = 0L
+    private var cachedStartOfDayMillis = 0L
     // Adaptive polling: we only need the fast 250ms cadence for a short burst
     // right after a foreground change (to cover a locked app before the user
     // sees it). Once the foreground app is stable we back off to a ~1s cadence,
@@ -86,6 +96,7 @@ class AppMonitorService : Service() {
         val container = (application as DayKitApplication).container
         detector = ForegroundAppDetector(this)
         focusScheduleCache = container.focusScheduleCache
+        focusAppLimitCache = container.focusAppLimitCache
         settingsPackage = SettingsPackageResolver.resolve(this)
         overlayController = LockOverlayController(
             context = this,
@@ -98,7 +109,8 @@ class AppMonitorService : Service() {
                 // could open an app a scheduled session is blocking.
                 val sessionBlocked = focusScheduleCache.activeWindows(now)
                     .containsKey(packageName)
-                manuallyBlocked || sessionBlocked
+                val limitBlocked = isDailyLimitExceeded(packageName, now)
+                manuallyBlocked || sessionBlocked || limitBlocked
             },
         )
         // Seed synchronously from the prefs caches so there is no window where the
@@ -109,12 +121,14 @@ class AppMonitorService : Service() {
                 container.focusRepository.focusBlockUntil(pkg)?.let { pkg to it }
             }
             .toMap()
+        enabledAppLimits = focusAppLimitCache.getEnabledLimits()
         biometricEnabled = container.settingFlagCache
             .get(SecureSettingRepository.KEY_BIOMETRIC_ENABLED) == true
         screenInteractive = getSystemService(PowerManager::class.java)?.isInteractive != false
         registerSessionResetReceiver()
         observeLockedApps()
         observeFocusBlocks()
+        observeAppLimits()
         observeBiometricSetting()
         monitorForegroundApps()
     }
@@ -151,6 +165,40 @@ class AppMonitorService : Service() {
         activeActivityLockPackage = null
         activeActivityLockIsFocus = false
         lastForegroundPackage = null
+        activeForegroundStartedMillis = 0L
+        activeForegroundPackageForUsage = null
+    }
+
+    private fun observeAppLimits() {
+        val repository = (application as DayKitApplication).container.focusAppLimitRepository
+        scope.launch {
+            repository.observeAppLimits()
+                .catch { /* keep current cache */ }
+                .collect { limits ->
+                    enabledAppLimits = limits.filter { it.enabled }.associate { it.packageName to it.dailyLimitMinutes }
+                    focusAppLimitCache.putEnabledLimits(enabledAppLimits)
+                }
+        }
+    }
+
+    private fun getTodayUsageMillis(targetPackage: String, now: Long): Long {
+        val startOfDay = FocusUsageTracker.getStartOfDayMillis(now)
+        if (startOfDay != cachedStartOfDayMillis || now - lastUsageQueryMillis > USAGE_QUERY_INTERVAL_MILLIS) {
+            cachedStartOfDayMillis = startOfDay
+            cachedUsageToday = FocusUsageTracker.queryTodayUsageStats(this, now)
+            lastUsageQueryMillis = now
+        }
+        val baseUsage = cachedUsageToday[targetPackage] ?: 0L
+        val ongoingSession = if (activeForegroundPackageForUsage == targetPackage && activeForegroundStartedMillis > 0L) {
+            (now - activeForegroundStartedMillis).coerceAtLeast(0L)
+        } else 0L
+        return baseUsage + ongoingSession
+    }
+
+    private fun isDailyLimitExceeded(targetPackage: String, now: Long): Boolean {
+        val limitMinutes = enabledAppLimits[targetPackage] ?: return false
+        val usageMillis = getTodayUsageMillis(targetPackage, now)
+        return usageMillis >= limitMinutes * 60_000L
     }
 
     private fun observeLockedApps() {
@@ -218,11 +266,20 @@ class AppMonitorService : Service() {
                 }
 
                 if (foregroundPackage != lastForegroundPackage) {
+                    val now = System.currentTimeMillis()
+                    if (activeForegroundPackageForUsage != null && activeForegroundStartedMillis > 0L) {
+                        val sessionDuration = (now - activeForegroundStartedMillis).coerceAtLeast(0L)
+                        val oldPkg = activeForegroundPackageForUsage!!
+                        val currentBase = cachedUsageToday[oldPkg] ?: 0L
+                        cachedUsageToday = cachedUsageToday + (oldPkg to (currentBase + sessionDuration))
+                    }
+                    activeForegroundPackageForUsage = foregroundPackage
+                    activeForegroundStartedMillis = now
                     lastForegroundPackage = foregroundPackage
                     // A switch just happened — poll fast for a short burst so the
                     // lock covers the app immediately, then let the loop settle
                     // back to the idle cadence below.
-                    fastPollUntilMillis = System.currentTimeMillis() + FAST_POLL_DURATION_MILLIS
+                    fastPollUntilMillis = now + FAST_POLL_DURATION_MILLIS
                     if (foregroundPackage == packageName && activeActivityLockPackage != null) {
                         // Keep the active challenge in front without clearing the target session.
                     } else {
@@ -245,17 +302,25 @@ class AppMonitorService : Service() {
                 // repository, which would touch the encrypted DB and may be
                 // unavailable here. It also self-corrects if the end alarm was
                 // deferred by Doze, since the window simply stops matching.
+                val now = System.currentTimeMillis()
                 val sessionUntil = focusScheduleCache
                     .activeWindows()[foregroundPackage]
                     ?.endMillis
-                    ?.takeIf { it > System.currentTimeMillis() }
+                    ?.takeIf { it > now }
+
+                val limitExceeded = isDailyLimitExceeded(foregroundPackage, now)
+                val limitUntil = if (limitExceeded) {
+                    FocusUsageTracker.getEndOfDayMillis(now)
+                } else null
 
                 val focusBlockUntil = listOfNotNull(
                     focusBlockedPackages[foregroundPackage]
-                        ?.takeIf { it > System.currentTimeMillis() },
+                        ?.takeIf { it > now },
                     sessionUntil,
+                    limitUntil,
                 ).maxOrNull()
                 val focusBlocked = focusBlockUntil != null
+                val isDailyLimitBlock = focusBlockUntil != null && focusBlockUntil == limitUntil
 
                 // When a focus block expires, its countdown LockActivity finishes
                 // itself. Clear the activity dedup so that if the app is ALSO
@@ -291,7 +356,7 @@ class AppMonitorService : Service() {
                     )
 
                 if (shouldLock) {
-                    launchLockScreen(foregroundPackage, focusBlockUntil)
+                    launchLockScreen(foregroundPackage, focusBlockUntil, isDailyLimit = isDailyLimitBlock)
                 } else if (foregroundPackage !in lockedPackages && !focusBlocked) {
                     mainHandler.post { overlayController.dismiss() }
                 }
@@ -305,12 +370,16 @@ class AppMonitorService : Service() {
         }
     }
 
-    private fun launchLockScreen(packageName: String, focusBlockUntil: Long? = null) {
+    private fun launchLockScreen(
+        packageName: String,
+        focusBlockUntil: Long? = null,
+        isDailyLimit: Boolean = false,
+    ) {
         // A focus block shows a countdown, not a PIN/biometric challenge, so it
         // must go through the full-screen activity — the overlay is a PIN pad and
         // biometric cannot end a timer early.
         if (focusBlockUntil != null) {
-            mainHandler.post { launchActivityLockScreen(packageName, focusBlockUntil) }
+            mainHandler.post { launchActivityLockScreen(packageName, focusBlockUntil, isDailyLimit) }
             return
         }
         if (biometricEnabled) {
@@ -329,11 +398,15 @@ class AppMonitorService : Service() {
         mainHandler.post { launchActivityLockScreen(packageName) }
     }
 
-    private fun launchActivityLockScreen(packageName: String, focusBlockUntil: Long? = null) {
+    private fun launchActivityLockScreen(
+        packageName: String,
+        focusBlockUntil: Long? = null,
+        isDailyLimit: Boolean = false,
+    ) {
         if (activeActivityLockPackage == packageName) return
         activeActivityLockPackage = packageName
         activeActivityLockIsFocus = focusBlockUntil != null
-        val intent = LockActivity.intent(this, packageName, focusBlockUntil)
+        val intent = LockActivity.intent(this, packageName, focusBlockUntil, isDailyLimit)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         startActivity(intent)
     }
@@ -379,6 +452,7 @@ class AppMonitorService : Service() {
         private const val IDLE_POLL_INTERVAL_MILLIS = 1_000L
         private const val FAST_POLL_DURATION_MILLIS = 2_000L
         private const val SCREEN_OFF_POLL_INTERVAL_MILLIS = 1_500L
+        private const val USAGE_QUERY_INTERVAL_MILLIS = 30_000L
         private const val NOTIFICATION_CHANNEL_ID = "app_lock_monitor"
         private const val NOTIFICATION_ID = 1001
 

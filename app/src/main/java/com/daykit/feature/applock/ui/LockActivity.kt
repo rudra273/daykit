@@ -69,6 +69,9 @@ class LockActivity : FragmentActivity() {
     private val focusBlockUntil: Long
         get() = intent.getLongExtra(EXTRA_FOCUS_BLOCK_UNTIL, 0L)
 
+    private val isDailyLimit: Boolean
+        get() = intent.getBooleanExtra(EXTRA_IS_DAILY_LIMIT, false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -82,6 +85,7 @@ class LockActivity : FragmentActivity() {
                         appLabel = resolveLabel(lockedPackageName),
                         appIcon = resolveIcon(lockedPackageName),
                         lockUntilMillis = focusBlockUntil,
+                        isDailyLimit = isDailyLimit,
                         onExpired = { finish() },
                     )
                 } else {
@@ -94,11 +98,17 @@ class LockActivity : FragmentActivity() {
                         settings = container.secureSettingRepository,
                         onUnlocked = {
                             // Belt-and-suspenders: never let a PIN grant open an app
-                            // held by a manual block or a scheduled session.
+                            // held by a manual block, a scheduled session, or a daily usage limit.
                             val sessionBlocked = container.focusScheduleCache
                                 .activeWindows()
                                 .containsKey(lockedPackageName)
+                            val limitMinutes = container.focusAppLimitCache.getEnabledLimits()[lockedPackageName]
+                            val limitBlocked = limitMinutes != null &&
+                                com.daykit.feature.focus.data.FocusUsageTracker.queryTodayUsageStats(applicationContext)[lockedPackageName]?.let {
+                                    it >= limitMinutes * 60_000L
+                                } == true
                             if (!sessionBlocked &&
+                                !limitBlocked &&
                                 container.focusRepository.focusBlockUntil(lockedPackageName) == null
                             ) {
                                 AppLockSessionManager.allow(lockedPackageName)
@@ -125,11 +135,18 @@ class LockActivity : FragmentActivity() {
     companion object {
         private const val EXTRA_PACKAGE_NAME = "package_name"
         private const val EXTRA_FOCUS_BLOCK_UNTIL = "focus_block_until"
+        private const val EXTRA_IS_DAILY_LIMIT = "is_daily_limit"
 
-        fun intent(context: Context, packageName: String, focusBlockUntil: Long? = null): Intent {
+        fun intent(
+            context: Context,
+            packageName: String,
+            focusBlockUntil: Long? = null,
+            isDailyLimit: Boolean = false,
+        ): Intent {
             return Intent(context, LockActivity::class.java)
                 .putExtra(EXTRA_PACKAGE_NAME, packageName)
                 .putExtra(EXTRA_FOCUS_BLOCK_UNTIL, focusBlockUntil ?: 0L)
+                .putExtra(EXTRA_IS_DAILY_LIMIT, isDailyLimit)
         }
     }
 }
@@ -229,6 +246,7 @@ private fun FocusBlockScreen(
     appLabel: String,
     appIcon: Drawable?,
     lockUntilMillis: Long,
+    isDailyLimit: Boolean = false,
     onExpired: () -> Unit,
 ) {
     // Swallow back — the app must stay unreachable until the timer ends.
@@ -288,7 +306,7 @@ private fun FocusBlockScreen(
             )
             Spacer(Modifier.height(Spacing.xs))
             Text(
-                text = "Locked with a focus block",
+                text = if (isDailyLimit) "Daily usage limit reached" else "Locked with a focus block",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.extendedColors.textMuted,
                 textAlign = TextAlign.Center,
@@ -303,7 +321,11 @@ private fun FocusBlockScreen(
             )
             Spacer(Modifier.height(Spacing.sm))
             Text(
-                text = "You chose to block this app. It will unlock when the timer ends.",
+                text = if (isDailyLimit) {
+                    "You reached your daily limit for this app. It will unlock when it resets at midnight."
+                } else {
+                    "You chose to block this app. It will unlock when the timer ends."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.extendedColors.textMuted,
                 textAlign = TextAlign.Center,

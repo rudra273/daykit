@@ -20,6 +20,8 @@ import com.daykit.core.security.SensitiveKeyManager
 import com.daykit.core.security.SensitiveValueCipher
 import com.daykit.core.security.SessionValueCipher
 import com.daykit.feature.applock.data.AppLockRepository
+import com.daykit.feature.focus.data.FocusAppLimitCache
+import com.daykit.feature.focus.data.FocusAppLimitRepository
 import com.daykit.feature.focus.data.FocusBackupContributor
 import com.daykit.feature.focus.data.FocusBlockStore
 import com.daykit.feature.focus.data.FocusGroupRepository
@@ -64,6 +66,7 @@ class AppContainer(context: Context) {
     val lockedPackageCache = LockedPackageCache(appContext)
     val focusBlockStore = FocusBlockStore(appContext)
     val focusScheduleCache = FocusScheduleCache(appContext)
+    val focusAppLimitCache = FocusAppLimitCache(appContext)
     val settingFlagCache = SettingFlagCache(appContext)
 
     /**
@@ -101,6 +104,7 @@ class AppContainer(context: Context) {
         runCatching { lockedPackageCache.clear() }
         runCatching { focusBlockStore.clear() }
         runCatching { focusScheduleCache.clear() }
+        runCatching { focusAppLimitCache.clear() }
         runCatching { settingFlagCache.clear() }
         runCatching { File(appContext.filesDir, "vault").deleteRecursively() }
     }
@@ -126,6 +130,14 @@ class AppContainer(context: Context) {
             dao = database.focusScheduleDao(),
             groupDao = database.focusGroupDao(),
             cache = focusScheduleCache,
+        )
+    }
+
+    val focusAppLimitRepository: FocusAppLimitRepository by lazy {
+        FocusAppLimitRepository(
+            dao = database.focusAppLimitDao(),
+            cache = focusAppLimitCache,
+            context = appContext,
         )
     }
 
@@ -197,6 +209,8 @@ class AppContainer(context: Context) {
                     focusBlockStore = focusBlockStore,
                     groupDao = database.focusGroupDao(),
                     scheduleDao = database.focusScheduleDao(),
+                    appLimitDao = database.focusAppLimitDao(),
+                    appLimitCache = focusAppLimitCache,
                     onImported = {
                         val armed = focusScheduleRepository.reproject()
                         FocusScheduleScheduler(appContext).arm(armed)
