@@ -58,7 +58,10 @@ Both ciphers implement `ValueCipher` with the same `CipherPayload` shape, so a r
 
 Key invariants:
 
-- The MSK is a random 256-bit key **wrapped** by an Argon2id-derived key, so a PIN change re-wraps rather than re-encrypts data. The primary copy must remain PIN-wrapped. The optional biometric path may keep a second wrapped copy only through `BiometricUnlockManager`: its Android Keystore key requires a fresh strong biometric for every use and is invalidated by biometric enrollment changes. Never wrap the MSK with an always-available Keystore key.
+- The MSK is a random 256-bit key **wrapped** by an Argon2id-derived key, so a PIN change re-wraps rather than re-encrypts data. The primary copy must remain PIN-wrapped.
+- The Argon2id output (for both the MSK wrap and the `CredentialRepository` verifier) is then passed through `PinHardwareBinding`, an HMAC under a non-exportable Keystore key (StrongBox when available). This makes every PIN guess run on this device, so a 6-digit PIN can't be brute-forced offline. It hardens the PIN derivation; it is not a Keystore wrap of the MSK. Both stores carry a version (`wrap_version` / `pin_hash_version`): v1 is Argon2id only and upgrades to v2 on the next successful unlock/verify. Verification paths must never create the binding key (`createIfMissing = false`), or a lost key would silently derive different bytes.
+- The master credential is a numeric PIN or an alphanumeric password (`CredentialKind`, stored in `CredentialRepository`). Every entry surface must respect it: `LockChallengeContent` shows a pad or a password field, and `AppMonitorService` never uses the overlay for a password (it can't reliably take keyboard input). Use `CredentialRepository.sanitize` / `newCredentialError` for input rules.
+- The backup password lives in `BackupPasswordStore`, encrypted with `SessionValueCipher`, never in `SecureSettingRepository`. Backups contain Key Store and Notes plaintext, so a Keystore-only copy would let root read everything without the PIN. The optional biometric path may keep a second wrapped copy only through `BiometricUnlockManager`: its Android Keystore key requires a fresh strong biometric for every use and is invalidated by biometric enrollment changes. Never wrap the MSK with an always-available Keystore key.
 - `SessionValueCipher` reads the key fresh per call and throws `SensitiveDataLockedException` when locked. Repositories observing sensitive data must `.catch { if (it is SensitiveDataLockedException) emit(emptyList()) else throw it }` — the DB can re-query in the instant between the key being wiped and the unlock gate recomposing (see `KeyStoreRepository.observeEntries`).
 - The key is wiped immediately when the app is backgrounded, including when DayKit launches a picker, chooser, or permission screen. **Before launching an external activity, set `container.sensitiveKeyManager.expectingActivityResult = true`** so the current screen can receive its result behind the unlock gate. Any callback that needs the MSK must use `runWhenUnlocked`; its work resumes only after a fresh PIN or biometric unlock.
 - `MainActivity` and the lock activities set `FLAG_SECURE`; screenshot protection is a user setting that toggles it.
@@ -75,9 +78,11 @@ Non-secret plumbing lives in plain SharedPreferences mirrors so startup never bl
 
 ## Focus (`feature/focus/`)
 
+UI vocabulary: **Lock now** (one-off block), **Daily limit** (app limits), **Routine** (schedule), **App sets** (groups). Each mode has one icon + accent in `FocusMode` (`FocusModeVisuals.kt`); use it rather than picking colors ad hoc. Code names (`FocusGroup`, `FocusSchedule`) are unchanged.
+
 Three layers, and the split matters:
 
-- **One-off blocks** — `FocusBlockStore` (plain prefs) behind `FocusRepository`. Always Strict: no cancel API exists, and the typed-`LOCK` confirmation in `FocusBlockSheet` is there because the action is irreversible. Don't add a `stopBlock`.
+- **One-off blocks** — `FocusBlockStore` (plain prefs) behind `FocusRepository`. Always Strict: no cancel API exists, and the hold-to-lock button (`HoldToConfirmButton`, ~2s) in `FocusBlockSheet` is there because the action is irreversible. Don't add a `stopBlock`.
 - **Groups + schedules** — Room (`focus_groups`, `focus_schedules`) behind `FocusGroupRepository` / `FocusScheduleRepository`. Non-secret (package names the user picked), so they use the plain DAO path, **not** `SessionValueCipher` — enforcement has to act on them while the vault is locked.
 - **`FocusScheduleCache`** — a plain-prefs *projection* of the next occurrence of every enabled schedule, rewritten on every change. `AppMonitorService` and `FocusScheduleReceiver` read only this, never the repositories: the service seeds its blocked map synchronously in `onCreate`, and on a cold start SQLCipher may not be unlocked. Active windows are derived from the armed list, so a Doze-deferred end alarm can't strand an app.
 
@@ -91,7 +96,7 @@ All settings keys are `const val KEY_*` on `SecureSettingRepository.Companion` �
 
 ## Backup
 
-`BackupContributor` (`toolKey` + `schemaVersion` + JSON export/import) is the extension point; contributors are registered in the `backupService` block of `AppContainer`. `DayKitBackupService` wraps them into one password-encrypted payload (`PAYLOAD_VERSION`), and import silently skips a section whose `schemaVersion` doesn't match the current contributor — bump `schemaVersion` when you change a payload shape. Drive upload runs through `DriveBackupWorker` (WorkManager) scheduled by `DriveBackupScheduler`. Vault files are excluded from backup unless the user opts in.
+`BackupContributor` (`toolKey` + `schemaVersion` + JSON export/import) is the extension point; contributors are registered in the `backupService` block of `AppContainer`. `DayKitBackupService` wraps them into one password-encrypted payload (`PAYLOAD_VERSION`), and import silently skips a section whose `schemaVersion` doesn't match the current contributor — bump `schemaVersion` when you change a payload shape. Automatic Drive backup runs through `DriveBackupRunner.launchIfDue()`, called from `MainActivity` each time the app is unlocked. There is deliberately no background worker: Key Store and Secure Notes need the MSK, which exists only while unlocked. Vault files are excluded from backup unless the user opts in.
 
 ## Design system
 

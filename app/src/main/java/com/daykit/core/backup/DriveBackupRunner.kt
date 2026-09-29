@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class DriveBackupRunner(
     private val context: Context,
     private val settings: SecureSettingRepository,
+    private val backupPasswordStore: BackupPasswordStore,
     private val backupService: DayKitBackupService,
     private val sensitiveKeyManager: SensitiveKeyManager,
     private val driveClient: GoogleDriveBackupClient,
@@ -51,6 +52,10 @@ class DriveBackupRunner(
      */
     fun launchIfDue() {
         scope.launch {
+            // Retire any Keystore-only copy of the backup password now that the MSK
+            // is here, even when no backup is due or scheduled.
+            runCatching { backupPasswordStore.migrateLegacy() }
+                .onFailure { error -> Log.w(TAG, "Backup password migration failed", error) }
             runCatching { runIfDue() }
                 .onFailure { error -> Log.w(TAG, "Scheduled backup check failed", error) }
         }
@@ -81,7 +86,7 @@ class DriveBackupRunner(
         // Store and Secure Notes is worse than no backup at all.
         if (!sensitiveKeyManager.isUnlocked()) return Outcome.Locked
 
-        val password = settings.getString(SecureSettingRepository.KEY_BACKUP_PASSWORD)
+        val password = backupPasswordStore.get()
         if (password.isNullOrBlank()) return Outcome.NoPassword
 
         // "Has it been a day / a week since the last backup?" A manual backup writes

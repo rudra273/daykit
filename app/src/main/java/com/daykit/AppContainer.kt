@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.daykit.core.backup.BackupCrypto
+import com.daykit.core.backup.BackupPasswordStore
 import com.daykit.core.backup.DriveBackupRunner
 import com.daykit.core.backup.DayKitBackupService
 import com.daykit.core.backup.GoogleDriveBackupClient
@@ -16,6 +17,7 @@ import com.daykit.core.security.BiometricUnlockManager
 import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.KeyUnavailableException
 import com.daykit.core.security.PasswordHasher
+import com.daykit.core.security.PinHardwareBinding
 import com.daykit.core.security.SensitiveKeyManager
 import com.daykit.core.security.SensitiveValueCipher
 import com.daykit.core.security.SessionValueCipher
@@ -55,12 +57,14 @@ class AppContainer(context: Context) {
     val pendingVaultShares = MutableStateFlow<List<Uri>>(emptyList())
     val keyStoreCrypto = AndroidKeyStoreCrypto()
     val sensitiveValueCipher = SensitiveValueCipher(keyStoreCrypto)
-    val credentialRepository = CredentialRepository(appContext, PasswordHasher())
+    // Ties PIN derivations to this device so they can't be brute-forced elsewhere.
+    private val pinHardwareBinding = PinHardwareBinding()
+    val credentialRepository = CredentialRepository(appContext, PasswordHasher(), pinHardwareBinding)
 
     // Master key for the sensitive tools (vault, key store, secure notes). Its
     // primary wrapping key is PIN-derived; biometric unlock is an optional second
     // wrapper. The MSK is only in memory while unlocked.
-    val sensitiveKeyManager = SensitiveKeyManager(appContext, PasswordHasher())
+    val sensitiveKeyManager = SensitiveKeyManager(appContext, PasswordHasher(), pinHardwareBinding)
     val biometricUnlockManager = BiometricUnlockManager(appContext)
     val sessionValueCipher = SessionValueCipher(sensitiveKeyManager)
     val lockedPackageCache = LockedPackageCache(appContext)
@@ -101,6 +105,7 @@ class AppContainer(context: Context) {
         runCatching { sensitiveKeyManager.clearAll() }
         runCatching { biometricUnlockManager.clear() }
         runCatching { credentialRepository.clear() }
+        runCatching { pinHardwareBinding.clear() }
         runCatching { lockedPackageCache.clear() }
         runCatching { focusBlockStore.clear() }
         runCatching { focusScheduleCache.clear() }
@@ -220,6 +225,10 @@ class AppContainer(context: Context) {
         )
     }
 
+    val backupPasswordStore: BackupPasswordStore by lazy {
+        BackupPasswordStore(database.secureSettingDao(), sessionValueCipher, secureSettingRepository)
+    }
+
     val googleDriveBackupClient: GoogleDriveBackupClient by lazy {
         GoogleDriveBackupClient()
     }
@@ -236,6 +245,7 @@ class AppContainer(context: Context) {
         DriveBackupRunner(
             context = appContext,
             settings = secureSettingRepository,
+            backupPasswordStore = backupPasswordStore,
             backupService = backupService,
             sensitiveKeyManager = sensitiveKeyManager,
             driveClient = googleDriveBackupClient,

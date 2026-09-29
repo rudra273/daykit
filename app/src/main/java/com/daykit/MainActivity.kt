@@ -41,6 +41,8 @@ import com.daykit.core.permissions.AppLockPermissionState
 import com.daykit.core.security.BiometricAuthenticator
 import com.daykit.core.security.PinVerifyResult
 import com.daykit.core.security.errorMessageOrNull
+import com.daykit.core.security.label
+import com.daykit.core.security.unlockWithMasterPin
 import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.LoadingIndicator
@@ -358,31 +360,39 @@ private fun DayKitApp(
     }
 
     val unlockGate: @Composable () -> Unit = {
+        // Re-read each composition: a credential change in Settings switches it.
+        val credentialKind = container.credentialRepository.credentialKind()
         ToolUnlockScreen(
             title = "Unlock DayKit",
-            subtitle = if (biometricEnabled == true) "Use fingerprint or enter your master PIN" else "Enter your master PIN",
+            subtitle = if (biometricEnabled == true) {
+                "Use fingerprint or enter your master ${credentialKind.label}"
+            } else {
+                "Enter your master ${credentialKind.label}"
+            },
             pin = unlockPin,
             error = unlockError,
             pinLength = container.credentialRepository.pinLength(),
+            credentialKind = credentialKind,
             biometricEnabled = biometricEnabled == true &&
                 container.biometricUnlockManager.isEnrolled() &&
                 biometricAuthenticator.canAuthenticate(),
             icon = Icons.Rounded.Lock,
             onBack = { activity.finish() },
             onPinChange = {
-                unlockPin = it.filter(Char::isDigit).take(12)
+                unlockPin = it
                 unlockError = null
             },
             onUnlock = {
-                scope.launch {
-                    val pin = unlockPin
+                val pin = unlockPin
+                if (pin.isNotEmpty()) scope.launch {
                     val result = withContext(Dispatchers.Default) {
-                        // The shared verifier enforces lockout before key derivation.
-                        val verifyResult = container.credentialRepository.verify(pin.toCharArray())
-                        if (verifyResult is PinVerifyResult.Success) {
-                            container.sensitiveKeyManager.unlock(pin.toCharArray())
-                        }
-                        verifyResult
+                        // The shared verifier enforces lockout before key derivation,
+                        // and a verifier left stale by an interrupted PIN change heals.
+                        unlockWithMasterPin(
+                            container.credentialRepository,
+                            container.sensitiveKeyManager,
+                            pin,
+                        )
                     }
                     if (result is PinVerifyResult.Success && container.sensitiveKeyManager.isUnlocked()) {
                         unlockPin = ""
@@ -391,7 +401,8 @@ private fun DayKitApp(
                         container.sensitiveKeyManager.resumePendingUnlockActions()
                     } else {
                         unlockPin = ""
-                        unlockError = result.errorMessageOrNull() ?: "Wrong PIN"
+                        unlockError = result.errorMessageOrNull(credentialKind)
+                            ?: "Wrong ${credentialKind.label}"
                     }
                 }
             },
@@ -404,13 +415,13 @@ private fun DayKitApp(
 
     when {
         !credentialReady -> SetupCredentialScreen(
-            onCredentialReady = { pin ->
+            onCredentialReady = { pin, kind ->
                 scope.launch {
                     withContext(Dispatchers.Default) {
                         // Save the PIN credential AND create the sensitive-data key,
                         // wrapped by this PIN. Both derive from the same PIN chars;
                         // read them before saveCredential wipes its copy.
-                        container.credentialRepository.saveCredential(pin.toCharArray())
+                        container.credentialRepository.saveCredential(pin.toCharArray(), kind)
                         container.sensitiveKeyManager.initialize(pin.toCharArray())
                     }
                     sensitiveUnlocked = true

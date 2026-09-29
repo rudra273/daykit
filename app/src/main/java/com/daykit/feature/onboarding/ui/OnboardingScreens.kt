@@ -52,8 +52,17 @@ import com.daykit.core.designsystem.components.PinPad
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.designsystem.components.AppTextButton
+import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.permissions.AppLockPermissionState
+import com.daykit.core.security.CredentialKind
 import com.daykit.core.security.CredentialRepository
+import com.daykit.core.security.label
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.daykit.core.permissions.PermissionIntents
 
 /** Shared onboarding scaffold: step dots, icon, headline + copy, and a body slot. */
@@ -122,18 +131,41 @@ private fun OnboardingScaffold(
 
 @Composable
 fun SetupCredentialScreen(
-    onCredentialReady: (String) -> Unit,
+    onCredentialReady: (secret: String, kind: CredentialKind) -> Unit,
 ) {
-    // Two-phase PinPad flow: enter, then confirm.
+    // Two-phase flow: enter, then confirm.
+    var kind by remember { mutableStateOf(CredentialKind.Pin) }
     var firstPin by remember { mutableStateOf<String?>(null) }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
     val confirming = firstPin != null
+    val label = kind.label
     val subtitle = when {
         error != null -> error!!
-        confirming -> "Re-enter your PIN to confirm"
-        else -> "Choose a ${CredentialRepository.MIN_PIN_LENGTH}–12 digit PIN to secure DayKit"
+        confirming -> "Re-enter your $label to confirm"
+        kind == CredentialKind.Pin ->
+            "Choose a ${CredentialRepository.MIN_PIN_LENGTH}–${CredentialRepository.MAX_PIN_LENGTH} digit PIN to secure DayKit"
+        else -> "Choose a password of at least ${CredentialRepository.MIN_PASSWORD_LENGTH} characters, " +
+            "mixing letters with numbers or symbols. It is much harder to guess than a PIN."
+    }
+    val validationError = CredentialRepository.newCredentialError(pin, kind)
+
+    fun submit() {
+        if (!confirming) {
+            if (validationError != null) {
+                error = validationError
+                return
+            }
+            firstPin = pin
+            pin = ""
+        } else if (pin == firstPin) {
+            onCredentialReady(pin, kind)
+        } else {
+            error = if (kind == CredentialKind.Pin) "PINs do not match" else "Passwords do not match"
+            pin = ""
+            firstPin = null
+        }
     }
 
     FrostedLockBackground {
@@ -141,51 +173,69 @@ fun SetupCredentialScreen(
             stepIndex = 0,
             stepCount = 3,
             icon = Icons.Rounded.Security,
-            headline = if (confirming) "Confirm PIN" else "Create PIN",
+            headline = when {
+                confirming && kind == CredentialKind.Pin -> "Confirm PIN"
+                confirming -> "Confirm password"
+                kind == CredentialKind.Pin -> "Create PIN"
+                else -> "Create password"
+            },
             subtitle = subtitle,
         ) {
             Spacer(Modifier.height(Spacing.sm))
-            PinDots(
-                length = CredentialRepository.MIN_PIN_LENGTH,
-                filledCount = pin.length.coerceAtMost(CredentialRepository.MIN_PIN_LENGTH),
-                error = error != null,
-            )
-            Spacer(Modifier.height(Spacing.xxl))
-            PinPad(
-                onDigit = { d ->
-                    if (pin.length < 12) {
-                        pin += d
+            if (kind == CredentialKind.Pin) {
+                PinDots(
+                    length = CredentialRepository.MIN_PIN_LENGTH,
+                    filledCount = pin.length.coerceAtMost(CredentialRepository.MIN_PIN_LENGTH),
+                    error = error != null,
+                )
+                Spacer(Modifier.height(Spacing.xxl))
+                PinPad(
+                    onDigit = { d ->
+                        pin = CredentialRepository.sanitize(pin + d, kind)
                         error = null
-                    }
-                },
-                onBackspace = { pin = pin.dropLast(1); error = null },
-            )
+                    },
+                    onBackspace = { pin = pin.dropLast(1); error = null },
+                )
+            } else {
+                AppTextField(
+                    value = pin,
+                    onValueChange = {
+                        pin = CredentialRepository.sanitize(it, kind)
+                        error = null
+                    },
+                    label = if (confirming) "Confirm password" else "Master password",
+                    isError = error != null,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                        autoCorrectEnabled = false,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { if (pin.isNotEmpty()) submit() }),
+                )
+            }
             Spacer(Modifier.height(Spacing.xl))
             PrimaryButton(
                 text = if (confirming) "Confirm" else "Continue",
-                enabled = pin.length >= CredentialRepository.MIN_PIN_LENGTH,
+                enabled = if (confirming) pin.isNotEmpty() else validationError == null,
                 modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    if (!confirming) {
-                        firstPin = pin
-                        pin = ""
-                    } else {
-                        if (pin == firstPin) {
-                            onCredentialReady(pin)
-                        } else {
-                            error = "PINs do not match"
-                            pin = ""
-                            firstPin = null
-                        }
-                    }
-                },
+                onClick = ::submit,
             )
+            Spacer(Modifier.height(Spacing.sm))
             if (confirming) {
-                Spacer(Modifier.height(Spacing.sm))
                 SecondaryButton(
                     text = "Start over",
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { firstPin = null; pin = ""; error = null },
+                )
+            } else {
+                AppTextButton(
+                    text = if (kind == CredentialKind.Pin) "Use a password instead" else "Use a PIN instead",
+                    onClick = {
+                        kind = if (kind == CredentialKind.Pin) CredentialKind.Password else CredentialKind.Pin
+                        pin = ""
+                        error = null
+                    },
                 )
             }
         }

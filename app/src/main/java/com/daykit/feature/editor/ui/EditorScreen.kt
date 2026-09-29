@@ -90,6 +90,9 @@ private enum class SaveTarget {
 @Composable
 fun EditorScreen(
     onBack: () -> Unit,
+    // Must run before every external launch: otherwise backgrounding swaps the
+    // whole UI for the unlock gate, dropping the result and the unsaved text.
+    onExpectActivityResult: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -109,7 +112,7 @@ fun EditorScreen(
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                    context.openTruncatingOutputStream(uri)?.use { output ->
                         output.write(content.toByteArray(Charsets.UTF_8))
                     } ?: error("Cannot open file")
                 }
@@ -129,7 +132,7 @@ fun EditorScreen(
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                    context.openTruncatingOutputStream(uri)?.use { output ->
                         val pdf = createPdfBytes(content)
                         try {
                             pdf.writeTo(output)
@@ -148,7 +151,7 @@ fun EditorScreen(
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                    context.openTruncatingOutputStream(uri)?.use { output ->
                         val pdf = createPdfFromImages(context, imageUris)
                         try {
                             pdf.writeTo(output)
@@ -207,6 +210,7 @@ fun EditorScreen(
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         pendingImageUris = uris
         pendingSaveTarget = SaveTarget.ImagesPdf
+        onExpectActivityResult()
         createDocumentLauncher.launch("images.pdf")
     }
 
@@ -229,6 +233,7 @@ fun EditorScreen(
         if (uri != null) writeTextTo(uri)
         else {
             pendingSaveTarget = SaveTarget.TextFile
+            onExpectActivityResult()
             createDocumentLauncher.launch(fileName.cleanFileName("untitled.txt"))
         }
     }
@@ -238,7 +243,10 @@ fun EditorScreen(
             val result = withContext(Dispatchers.IO) {
                 runCatching { context.shareableTextUri(fileName.cleanFileName("untitled.txt"), content) }
             }
-            result.onSuccess { context.shareFile(it, fileName.cleanFileName("untitled.txt")) }
+            result.onSuccess {
+                onExpectActivityResult()
+                context.shareFile(it, fileName.cleanFileName("untitled.txt"))
+            }
                 .onFailure { showMessage("Share failed") }
         }
     }
@@ -379,6 +387,7 @@ fun EditorScreen(
                 leadingIcon = Icons.Rounded.FileOpen,
                 onClick = {
                     menuOpen = false
+                    onExpectActivityResult()
                     openDocumentLauncher.launch(arrayOf("text/*", "application/json", "text/csv", "application/xml", "application/javascript"))
                 },
             )
@@ -388,6 +397,7 @@ fun EditorScreen(
                 onClick = {
                     menuOpen = false
                     pendingSaveTarget = SaveTarget.TextFile
+                    onExpectActivityResult()
                     createDocumentLauncher.launch(fileName.cleanFileName("untitled.txt"))
                 },
             )
@@ -397,6 +407,7 @@ fun EditorScreen(
                 onClick = {
                     menuOpen = false
                     pendingSaveTarget = SaveTarget.Pdf
+                    onExpectActivityResult()
                     createDocumentLauncher.launch(fileName.withExtension("pdf"))
                 },
             )
@@ -410,6 +421,7 @@ fun EditorScreen(
                 leadingIcon = Icons.Rounded.Image,
                 onClick = {
                     menuOpen = false
+                    onExpectActivityResult()
                     pickImagesLauncher.launch("image/*")
                 },
             )
@@ -456,6 +468,21 @@ private fun Context.displayName(uri: Uri): String? {
         } else {
             null
         }
+    }
+}
+
+/**
+ * Opens [uri] for overwrite. Plain "w" does not truncate on some providers, so a
+ * shorter save would leave the old file's tail behind; "wt" does, but not every
+ * provider accepts it, hence the fallback.
+ */
+private fun Context.openTruncatingOutputStream(uri: Uri): java.io.OutputStream? {
+    return try {
+        contentResolver.openOutputStream(uri, "wt")
+    } catch (_: IllegalArgumentException) {
+        contentResolver.openOutputStream(uri, "w")
+    } catch (_: java.io.FileNotFoundException) {
+        contentResolver.openOutputStream(uri, "w")
     }
 }
 

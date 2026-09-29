@@ -16,24 +16,31 @@ import javax.crypto.spec.SecretKeySpec
  * Envelope design (so changing the PIN does NOT re-encrypt all data):
  *  - The MSK is a random 256-bit key that actually encrypts the sensitive data.
  *  - The MSK is stored only in wrapped form: `wrappedMsk = AES-GCM(WK, MSK)`,
- *    where the wrapping key `WK` is derived from the PIN via Argon2id.
+ *    where the wrapping key `WK` is derived from the PIN via Argon2id and then
+ *    bound to this device by [PinHardwareBinding] (wrap version 2).
  *  - Unlock derives WK from the entered PIN and unwraps the MSK into memory.
  *    The GCM auth tag means a wrong PIN fails to unwrap (it never yields a wrong
  *    key that silently corrupts data).
  *  - Changing the PIN re-derives WK and re-wraps the SAME MSK — the data on disk
  *    is untouched.
  *
+ * Wrap version 1 (Argon2id only) is still read, and upgraded to version 2 on the
+ * first successful unlock, since that is the only moment the PIN is available.
+ *
  * The unwrapped MSK lives only in memory while unlocked and is wiped on lock.
- * The primary wrapped copy never touches Android Keystore. When the user opts in,
- * BiometricUnlockManager stores a second copy behind an auth-per-use Keystore key;
- * it can only be opened after a fresh strong-biometric check. The PIN copy remains
- * available as the recovery path.
+ * The primary wrapped copy is PIN-wrapped; the hardware binding only hardens the
+ * PIN derivation. When the user opts in, BiometricUnlockManager stores a second
+ * copy behind an auth-per-use Keystore key; it can only be opened after a fresh
+ * strong-biometric check. The PIN copy remains available as the recovery path.
  */
 class SensitiveKeyManager(
     context: Context,
     private val passwordHasher: PasswordHasher,
+    private val hardwareBinding: PinHardwareBinding,
+    // Overridable only so instrumented tests never touch the real key material.
+    prefsName: String = PREFS_NAME,
 ) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
     private val keyCache = SessionKeyCache()
 
@@ -59,19 +66,11 @@ class SensitiveKeyManager(
      */
     fun initialize(pin: CharArray) {
         val generation = keyCache.generation()
-        val salt = passwordHasher.newSalt()
         val msk = ByteArray(MSK_BYTES).also(secureRandom::nextBytes)
-        val wrappingKey = passwordHasher.deriveKey(pin, salt, KDF_CONTEXT)
         try {
-            val wrapped = aesGcmEncrypt(wrappingKey, msk)
-            prefs.edit {
-                putString(KEY_SALT, salt.b64())
-                putString(KEY_WRAPPED_MSK, wrapped.ciphertext.b64())
-                putString(KEY_WRAPPED_IV, wrapped.iv.b64())
-            }
+            persistWrapped(pin, msk)
             keyCache.install(msk, generation)
         } finally {
-            wrappingKey.fill(0)
             msk.fill(0)
         }
     }
@@ -79,22 +78,20 @@ class SensitiveKeyManager(
     /**
      * Derives the wrapping key from [pin], unwraps the MSK, and caches it in
      * memory. Returns true on success; false if the PIN is wrong (unwrap auth
-     * fails) or the manager is not initialized. Does not wipe [pin].
+     * fails) or the manager is not initialized. A version-1 wrap is upgraded to
+     * the hardware-bound version here. Does not wipe [pin].
      */
     fun unlock(pin: CharArray): Boolean {
         val generation = keyCache.generation()
-        val salt = prefs.getString(KEY_SALT, null)?.b64d() ?: return false
-        val ct = prefs.getString(KEY_WRAPPED_MSK, null)?.b64d() ?: return false
-        val iv = prefs.getString(KEY_WRAPPED_IV, null)?.b64d() ?: return false
-        val wrappingKey = passwordHasher.deriveKey(pin, salt, KDF_CONTEXT)
-        return try {
-            val msk = aesGcmDecrypt(wrappingKey, ct, iv)
-            try { keyCache.install(msk, generation) } finally { msk.fill(0) }
-        } catch (error: Exception) {
-            // AEADBadTagException (wrong PIN) or any other failure -> stay locked.
-            false
+        val msk = unwrap(pin) ?: return false
+        try {
+            if (wrapVersion() < WRAP_VERSION_HARDWARE) {
+                // Best effort: a failed upgrade leaves the working v1 wrap in place.
+                runCatching { persistWrapped(pin, msk) }
+            }
+            return keyCache.install(msk, generation)
         } finally {
-            wrappingKey.fill(0)
+            msk.fill(0)
         }
     }
 
@@ -140,30 +137,12 @@ class SensitiveKeyManager(
      */
     fun rewrap(oldPin: CharArray, newPin: CharArray): Boolean {
         val generation = keyCache.generation()
-        val salt = prefs.getString(KEY_SALT, null)?.b64d() ?: return false
-        val ct = prefs.getString(KEY_WRAPPED_MSK, null)?.b64d() ?: return false
-        val iv = prefs.getString(KEY_WRAPPED_IV, null)?.b64d() ?: return false
-        val oldKey = passwordHasher.deriveKey(oldPin, salt, KDF_CONTEXT)
-        val msk = try {
-            aesGcmDecrypt(oldKey, ct, iv)
-        } catch (error: Exception) {
-            return false
-        } finally {
-            oldKey.fill(0)
-        }
-        val newSalt = passwordHasher.newSalt()
-        val newKey = passwordHasher.deriveKey(newPin, newSalt, KDF_CONTEXT)
+        val msk = unwrap(oldPin) ?: return false
         try {
-            val wrapped = aesGcmEncrypt(newKey, msk)
-            prefs.edit {
-                putString(KEY_SALT, newSalt.b64())
-                putString(KEY_WRAPPED_MSK, wrapped.ciphertext.b64())
-                putString(KEY_WRAPPED_IV, wrapped.iv.b64())
-            }
+            persistWrapped(newPin, msk)
             keyCache.install(msk, generation)
             return true
         } finally {
-            newKey.fill(0)
             msk.fill(0)
         }
     }
@@ -199,6 +178,66 @@ class SensitiveKeyManager(
         prefs.edit { clear() }
     }
 
+    /** Unwraps the stored MSK with [pin], or null when the PIN is wrong. Caller zeroes it. */
+    private fun unwrap(pin: CharArray): ByteArray? {
+        val salt = prefs.getString(KEY_SALT, null)?.b64d() ?: return null
+        val ct = prefs.getString(KEY_WRAPPED_MSK, null)?.b64d() ?: return null
+        val iv = prefs.getString(KEY_WRAPPED_IV, null)?.b64d() ?: return null
+        val wrappingKey = runCatching {
+            deriveWrappingKey(pin, salt, wrapVersion(), createBindingKey = false)
+        }.getOrNull() ?: return null
+        return try {
+            aesGcmDecrypt(wrappingKey, ct, iv)
+        } catch (error: Exception) {
+            // AEADBadTagException (wrong PIN) or any other failure -> stay locked.
+            null
+        } finally {
+            wrappingKey.fill(0)
+        }
+    }
+
+    /**
+     * Wraps [msk] under [pin] with a fresh salt at the hardware-bound version,
+     * falling back to Argon2id-only if this device cannot make the binding key, so
+     * setup never fails outright. One commit replaces salt, wrap and version together.
+     */
+    private fun persistWrapped(pin: CharArray, msk: ByteArray) {
+        val salt = passwordHasher.newSalt()
+        val (version, wrappingKey) = runCatching {
+            WRAP_VERSION_HARDWARE to deriveWrappingKey(pin, salt, WRAP_VERSION_HARDWARE, createBindingKey = true)
+        }.getOrElse {
+            WRAP_VERSION_ARGON_ONLY to deriveWrappingKey(pin, salt, WRAP_VERSION_ARGON_ONLY, createBindingKey = false)
+        }
+        try {
+            val wrapped = aesGcmEncrypt(wrappingKey, msk)
+            prefs.edit(commit = true) {
+                putString(KEY_SALT, salt.b64())
+                putString(KEY_WRAPPED_MSK, wrapped.ciphertext.b64())
+                putString(KEY_WRAPPED_IV, wrapped.iv.b64())
+                putInt(KEY_WRAP_VERSION, version)
+            }
+        } finally {
+            wrappingKey.fill(0)
+        }
+    }
+
+    private fun deriveWrappingKey(
+        pin: CharArray,
+        salt: ByteArray,
+        version: Int,
+        createBindingKey: Boolean,
+    ): ByteArray {
+        val argonKey = passwordHasher.deriveKey(pin, salt, KDF_CONTEXT)
+        if (version < WRAP_VERSION_HARDWARE) return argonKey
+        return try {
+            hardwareBinding.bind(argonKey, createIfMissing = createBindingKey)
+        } finally {
+            argonKey.fill(0)
+        }
+    }
+
+    private fun wrapVersion(): Int = prefs.getInt(KEY_WRAP_VERSION, WRAP_VERSION_ARGON_ONLY)
+
     private data class Wrapped(val ciphertext: ByteArray, val iv: ByteArray)
 
     private fun aesGcmEncrypt(key: ByteArray, plaintext: ByteArray): Wrapped {
@@ -224,6 +263,9 @@ class SensitiveKeyManager(
         const val KEY_SALT = "msk_salt"
         const val KEY_WRAPPED_MSK = "wrapped_msk"
         const val KEY_WRAPPED_IV = "wrapped_msk_iv"
+        const val KEY_WRAP_VERSION = "wrap_version"
+        const val WRAP_VERSION_ARGON_ONLY = 1
+        const val WRAP_VERSION_HARDWARE = 2
         const val KDF_CONTEXT = "daykit.sensitive.msk.v1"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val KEY_ALGORITHM = "AES"

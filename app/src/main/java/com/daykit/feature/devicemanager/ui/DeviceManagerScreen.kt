@@ -63,7 +63,11 @@ import com.daykit.feature.devicemanager.data.AppInsight
 import kotlinx.coroutines.launch
 
 @Composable
-fun DeviceManagerScreen(onBack: () -> Unit) {
+fun DeviceManagerScreen(
+    onBack: () -> Unit,
+    // Keeps this screen composed behind the unlock gate so the picker result lands.
+    onExpectActivityResult: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var snapshot by remember { mutableStateOf<DeviceSnapshot?>(null) }
@@ -179,7 +183,7 @@ fun DeviceManagerScreen(onBack: () -> Unit) {
                 }
                 Section("Largest files") {
                     Text("Choose a folder to scan its files. Android does not allow an automatic search of every folder.", style = MaterialTheme.typography.bodySmall)
-                    Button(onClick = { folderPicker.launch(null) }) { Text("Choose folder") }
+                    Button(onClick = { onExpectActivityResult(); folderPicker.launch(null) }) { Text("Choose folder") }
                     if (loadingFiles) LoadingIndicator()
                     if (files?.isEmpty() == true) Text("No files found in that folder.")
                     files?.forEachIndexed { index, file ->

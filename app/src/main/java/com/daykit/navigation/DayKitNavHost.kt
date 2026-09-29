@@ -106,11 +106,21 @@ fun DayKitNavHost(
         opaqueComposable(Routes.TOOL_DAYFLOW) { DayflowScreen(container = container, onBack = back) }
         opaqueComposable(Routes.TOOL_REMINDERS) { ReminderScreen(container = container, onBack = back) }
         opaqueComposable(Routes.TOOL_EXPENSES) { ExpenseScreen(container = container, onBack = back) }
-        opaqueComposable(Routes.TOOL_EDITOR) { EditorScreen(onBack = back) }
+        opaqueComposable(Routes.TOOL_EDITOR) {
+            EditorScreen(
+                onBack = back,
+                onExpectActivityResult = { container.sensitiveKeyManager.expectingActivityResult = true },
+            )
+        }
         opaqueComposable(Routes.TOOL_SCANNER) { DocumentScannerScreen(container = container, onBack = back) }
         opaqueComposable(Routes.TOOL_DNS) { DnsManagerScreen(onBack = back) }
         opaqueComposable(Routes.TOOL_EVENTLIGHT) { EventLightScreen(onBack = back) }
-        opaqueComposable(Routes.TOOL_DEVICE_MANAGER) { DeviceManagerScreen(onBack = back) }
+        opaqueComposable(Routes.TOOL_DEVICE_MANAGER) {
+            DeviceManagerScreen(
+                onBack = back,
+                onExpectActivityResult = { container.sensitiveKeyManager.expectingActivityResult = true },
+            )
+        }
 
         // ── Settings sub-screens ──
         opaqueComposable(Routes.SETTINGS_BACKUP) { BackupRestoreScreen(container = container, onBack = back) }

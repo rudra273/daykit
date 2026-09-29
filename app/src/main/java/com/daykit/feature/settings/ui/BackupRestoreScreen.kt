@@ -133,7 +133,9 @@ fun BackupRestoreScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val googleDriveBackupClient = container.googleDriveBackupClient
 
-    var savedBackupPassword by remember { mutableStateOf<String?>(null) }
+    // Only whether a password exists: the password itself stays encrypted under the
+    // MSK and is decrypted just for the backup or check that needs it.
+    var passwordSet by remember { mutableStateOf(false) }
     var backupPasswordLoaded by remember { mutableStateOf(false) }
     val driveScheduleValue by container.secureSettingRepository
         .observeString(SecureSettingRepository.KEY_DRIVE_BACKUP_SCHEDULE)
@@ -197,10 +199,9 @@ fun BackupRestoreScreen(
     var passwordDraft by remember { mutableStateOf("") }
     var passwordConfirmDraft by remember { mutableStateOf("") }
     var oldPasswordDraft by remember { mutableStateOf("") }
-    var passwordSheetMode by remember { mutableStateOf(if (savedBackupPassword.isNullOrBlank()) "set" else "options") }
+    var passwordSheetMode by remember { mutableStateOf(if (!passwordSet) "set" else "options") }
     var showRemovePasswordWarning by remember { mutableStateOf(false) }
 
-    val passwordSet = !savedBackupPassword.isNullOrBlank()
     val latestBackup = driveBackups.firstOrNull()
     val lastBackupText = latestBackup?.createdAtDisplay
         ?: driveLastBackupAt?.toLongOrNull()?.let(BackupFileNames::displayDate)
@@ -209,12 +210,12 @@ fun BackupRestoreScreen(
     val accountSubtitle = selectedDriveAccount ?: "Select Google account"
 
     LaunchedEffect(Unit) {
-        container.secureSettingRepository
-            .observeString(SecureSettingRepository.KEY_BACKUP_PASSWORD)
-            .collect { password ->
-                savedBackupPassword = password
+        container.backupPasswordStore
+            .observeIsSet()
+            .collect { isSet ->
+                passwordSet = isSet
                 backupPasswordLoaded = true
-                if (password.isNullOrBlank()) {
+                if (!isSet) {
                     passwordSheetMode = "set"
                 }
             }
@@ -279,7 +280,7 @@ fun BackupRestoreScreen(
 
     fun performLocalBackup(uri: Uri) {
         scope.launch {
-            val password = container.secureSettingRepository.getString(SecureSettingRepository.KEY_BACKUP_PASSWORD)
+            val password = runCatching { container.backupPasswordStore.get() }.getOrNull()
             if (password.isNullOrBlank()) {
                 showSnackbar("Set a backup password first")
                 return@launch
@@ -377,7 +378,7 @@ fun BackupRestoreScreen(
 
     fun performDriveBackup(accessToken: String) {
         scope.launch {
-            val password = container.secureSettingRepository.getString(SecureSettingRepository.KEY_BACKUP_PASSWORD)
+            val password = runCatching { container.backupPasswordStore.get() }.getOrNull()
             if (password.isNullOrBlank()) {
                 showSnackbar("Set a backup password first")
                 return@launch
@@ -828,22 +829,31 @@ fun BackupRestoreScreen(
                         onRemoveClick = { showRemovePasswordWarning = true },
                         onCancel = { activeSheet = null },
                         onSave = {
-                            val saved = savedBackupPassword.orEmpty()
                             when {
-                                passwordSheetMode == "change" && oldPasswordDraft != saved -> showSnackbar("Old password is incorrect")
                                 passwordDraft.length < 8 -> showSnackbar("Use at least 8 characters")
                                 passwordDraft != passwordConfirmDraft -> showSnackbar("Passwords do not match")
                                 else -> scope.launch {
-                                    container.secureSettingRepository.putString(SecureSettingRepository.KEY_BACKUP_PASSWORD, passwordDraft)
-                                    clearPasswordDrafts()
-                                    activeSheet = null
-                                    showSnackbar("Backup password saved")
+                                    runCatching {
+                                        if (passwordSheetMode == "change" &&
+                                            !container.backupPasswordStore.matches(oldPasswordDraft)
+                                        ) {
+                                            showSnackbar("Old password is incorrect")
+                                            return@runCatching
+                                        }
+                                        container.backupPasswordStore.set(passwordDraft)
+                                        clearPasswordDrafts()
+                                        activeSheet = null
+                                        showSnackbar("Backup password saved")
+                                    }.onFailure {
+                                        // Only reachable if the vault locked mid-save.
+                                        showSnackbar("Could not save the password. Unlock and try again.")
+                                    }
                                 }
                             }
                         },
                         onConfirmRemove = {
                             scope.launch {
-                                container.secureSettingRepository.delete(SecureSettingRepository.KEY_BACKUP_PASSWORD)
+                                container.backupPasswordStore.clear()
                                 container.secureSettingRepository.putString(
                                     SecureSettingRepository.KEY_DRIVE_BACKUP_SCHEDULE,
                                     DriveBackupSchedule.Off.value,

@@ -76,7 +76,10 @@ import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.designsystem.components.FilterChipButton
+import com.daykit.core.security.CredentialKind
 import com.daykit.core.security.CredentialRepository
+import com.daykit.core.security.label
 import com.daykit.core.security.DayKitDeviceAdmin
 import com.daykit.core.security.PinVerifyResult
 import com.daykit.core.security.errorMessageOrNull
@@ -159,6 +162,7 @@ fun SettingsScreen(
     val settingsPackage = remember(context) { SettingsPackageResolver.resolve(context) }
     var isAdminActive by remember { mutableStateOf(isDeviceAdminActive(context)) }
 
+    var credentialKind by remember { mutableStateOf(container.credentialRepository.credentialKind()) }
     var showChangePin by remember { mutableStateOf(false) }
     var changePinMessage by remember { mutableStateOf<String?>(null) }
     var biometricMessage by remember { mutableStateOf<String?>(null) }
@@ -247,9 +251,14 @@ fun SettingsScreen(
             item { SectionHeader("Security") }
             item {
                 AppCard(contentPadding = PaddingValues(0.dp)) {
-                    // Change Master PIN
+                    // Change master PIN or password
                     AppListRow(
-                        headline = "Change Master PIN",
+                        headline = "Change Master PIN or Password",
+                        supporting = if (credentialKind == CredentialKind.Pin) {
+                            "Currently a PIN"
+                        } else {
+                            "Currently a password"
+                        },
                         leadingIcon = Icons.Rounded.Lock,
                         leadingAccent = accents.indigo,
                         trailing = { NavChevron() },
@@ -424,8 +433,9 @@ fun SettingsScreen(
     // ---- Change PIN sheet ----
     if (showChangePin) {
         ChangePinSheet(
+            currentKind = credentialKind,
             onDismiss = { showChangePin = false },
-            onSave = { oldPin, newPin, onError, onDone ->
+            onSave = { oldPin, newPin, newKind, onError, onDone ->
                 scope.launch {
                     runCatching {
                         val result = withContext(Dispatchers.Default) {
@@ -451,15 +461,16 @@ fun SettingsScreen(
                                 return@runCatching
                             }
                             withContext(Dispatchers.Default) {
-                                container.credentialRepository.saveCredential(newPin.toCharArray())
+                                container.credentialRepository.saveCredential(newPin.toCharArray(), newKind)
                             }
-                            changePinMessage = "PIN updated"
+                            credentialKind = newKind
+                            changePinMessage = if (newKind == CredentialKind.Pin) "PIN updated" else "Password updated"
                             onDone()
                             showChangePin = false
                         } else {
                             onError(
                                 (result as? PinVerifyResult.LockedOut)?.let { result.errorMessageOrNull() }
-                                    ?: "Old PIN is incorrect",
+                                    ?: "Current ${credentialKind.label} is incorrect",
                             )
                         }
                     }.onFailure { error ->
@@ -473,8 +484,9 @@ fun SettingsScreen(
     // ---- Fingerprint disable confirm ----
     if (showBiometricDisableConfirm) {
         ConfirmPinSheet(
+            credentialKind = credentialKind,
             title = "Turn off fingerprint",
-            message = "Enter your master PIN to turn off fingerprint unlock.",
+            message = "Enter your master ${credentialKind.label} to turn off fingerprint unlock.",
             error = biometricDisableError,
             onDismiss = {
                 showBiometricDisableConfirm = false
@@ -495,7 +507,7 @@ fun SettingsScreen(
                         showBiometricDisableConfirm = false
                         biometricDisableError = null
                     } else {
-                        biometricDisableError = result.errorMessageOrNull()
+                        biometricDisableError = result.errorMessageOrNull(credentialKind)
                     }
                 }
             },
@@ -505,8 +517,9 @@ fun SettingsScreen(
     // ---- Screenshot disable confirm ----
     if (showScreenshotDisableConfirm) {
         ConfirmPinSheet(
+            credentialKind = credentialKind,
             title = "Allow screenshots",
-            message = "Enter your master PIN to turn off screenshot protection.",
+            message = "Enter your master ${credentialKind.label} to turn off screenshot protection.",
             error = screenshotDisableError,
             onDismiss = {
                 showScreenshotDisableConfirm = false
@@ -525,7 +538,7 @@ fun SettingsScreen(
                         showScreenshotDisableConfirm = false
                         screenshotDisableError = null
                     } else {
-                        screenshotDisableError = result.errorMessageOrNull()
+                        screenshotDisableError = result.errorMessageOrNull(credentialKind)
                     }
                 }
             },
@@ -535,8 +548,9 @@ fun SettingsScreen(
     // ---- Uninstall protection disable confirm ----
     if (showAdminDisableConfirm) {
         ConfirmPinSheet(
+            credentialKind = credentialKind,
             title = "Turn off uninstall protection",
-            message = "Enter your master PIN to disable uninstall protection.",
+            message = "Enter your master ${credentialKind.label} to disable uninstall protection.",
             error = adminDisableError,
             onDismiss = {
                 showAdminDisableConfirm = false
@@ -554,7 +568,7 @@ fun SettingsScreen(
                         showAdminDisableConfirm = false
                         adminDisableError = null
                     } else {
-                        adminDisableError = result.errorMessageOrNull()
+                        adminDisableError = result.errorMessageOrNull(credentialKind)
                     }
                 }
             },
@@ -591,10 +605,12 @@ private fun ActiveBadge() {
 
 @Composable
 private fun ChangePinSheet(
+    currentKind: CredentialKind,
     onDismiss: () -> Unit,
     onSave: (
         oldPin: String,
         newPin: String,
+        newKind: CredentialKind,
         onError: (String) -> Unit,
         onDone: () -> Unit,
     ) -> Unit,
@@ -602,13 +618,14 @@ private fun ChangePinSheet(
     var oldPin by remember { mutableStateOf("") }
     var newPin by remember { mutableStateOf("") }
     var confirmNewPin by remember { mutableStateOf("") }
+    var newKind by remember { mutableStateOf(currentKind) }
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
 
     val pinsMatch = newPin == confirmNewPin
-    val canChangePin = oldPin.length >= CredentialRepository.MIN_PIN_LENGTH &&
-        newPin.length >= CredentialRepository.MIN_PIN_LENGTH &&
-        confirmNewPin.length >= CredentialRepository.MIN_PIN_LENGTH &&
+    val newPinError = CredentialRepository.newCredentialError(newPin, newKind)
+    val canChangePin = oldPin.isNotEmpty() &&
+        newPinError == null &&
         pinsMatch &&
         !saving
 
@@ -622,51 +639,60 @@ private fun ChangePinSheet(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text(
-                text = "Change PIN",
+                text = "Change master ${currentKind.label}",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            AppTextField(
+            CredentialField(
                 value = oldPin,
                 onValueChange = {
-                    oldPin = it.filter(Char::isDigit).take(12)
+                    oldPin = it
                     error = null
                 },
-                label = "Old PIN",
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                kind = currentKind,
+                label = "Current ${currentKind.label}",
             )
-            AppTextField(
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                CredentialKind.entries.forEach { kind ->
+                    FilterChipButton(
+                        text = if (kind == CredentialKind.Pin) "PIN" else "Password",
+                        selected = newKind == kind,
+                        onClick = {
+                            if (newKind != kind) {
+                                newKind = kind
+                                newPin = ""
+                                confirmNewPin = ""
+                                error = null
+                            }
+                        },
+                    )
+                }
+            }
+            CredentialField(
                 value = newPin,
                 onValueChange = {
-                    newPin = it.filter(Char::isDigit).take(12)
+                    newPin = it
                     error = null
                 },
-                label = "New PIN",
-                isError = newPin.isNotEmpty() && newPin.length < CredentialRepository.MIN_PIN_LENGTH,
-                supportingText = if (newPin.isNotEmpty() && newPin.length < CredentialRepository.MIN_PIN_LENGTH) {
-                    "Use at least ${CredentialRepository.MIN_PIN_LENGTH} digits"
-                } else {
-                    null
-                },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                kind = newKind,
+                label = "New ${newKind.label}",
+                isError = newPin.isNotEmpty() && newPinError != null,
+                supportingText = if (newPin.isNotEmpty()) newPinError else null,
             )
-            AppTextField(
+            CredentialField(
                 value = confirmNewPin,
                 onValueChange = {
-                    confirmNewPin = it.filter(Char::isDigit).take(12)
+                    confirmNewPin = it
                     error = null
                 },
-                label = "Confirm new PIN",
+                kind = newKind,
+                label = "Confirm new ${newKind.label}",
                 isError = newPin.isNotEmpty() && confirmNewPin.isNotEmpty() && !pinsMatch,
                 supportingText = if (newPin.isNotEmpty() && confirmNewPin.isNotEmpty() && !pinsMatch) {
-                    "PINs do not match"
+                    if (newKind == CredentialKind.Pin) "PINs do not match" else "Passwords do not match"
                 } else {
                     null
                 },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             )
             error?.let {
                 Text(
@@ -694,6 +720,7 @@ private fun ChangePinSheet(
                         onSave(
                             oldPin,
                             newPin,
+                            newKind,
                             { message ->
                                 error = message
                                 oldPin = ""
@@ -710,8 +737,33 @@ private fun ChangePinSheet(
     }
 }
 
+/** Masked input for a master credential: number pad for a PIN, full keyboard for a password. */
+@Composable
+private fun CredentialField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    kind: CredentialKind,
+    label: String,
+    isError: Boolean = false,
+    supportingText: String? = null,
+) {
+    AppTextField(
+        value = value,
+        onValueChange = { onValueChange(CredentialRepository.sanitize(it, kind)) },
+        label = label,
+        isError = isError,
+        supportingText = supportingText,
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (kind == CredentialKind.Pin) KeyboardType.NumberPassword else KeyboardType.Password,
+            autoCorrectEnabled = false,
+        ),
+    )
+}
+
 @Composable
 private fun ConfirmPinSheet(
+    credentialKind: CredentialKind,
     title: String,
     message: String,
     onDismiss: () -> Unit,
@@ -745,14 +797,13 @@ private fun ConfirmPinSheet(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.extendedColors.textMuted,
             )
-            AppTextField(
+            CredentialField(
                 value = pin,
-                onValueChange = { pin = it.filter(Char::isDigit).take(12) },
-                label = "Master PIN",
+                onValueChange = { pin = it },
+                kind = credentialKind,
+                label = "Master ${credentialKind.label}",
                 isError = error != null,
                 supportingText = error,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -780,7 +831,7 @@ private fun ConfirmPinSheet(
                 )
                 PrimaryButton(
                     text = "Confirm",
-                    enabled = pin.length >= 4,
+                    enabled = pin.isNotEmpty(),
                     onClick = { onConfirm(pin) },
                 )
             }

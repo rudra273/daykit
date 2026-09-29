@@ -20,6 +20,7 @@ import com.daykit.MainActivity
 import com.daykit.R
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.permissions.AppLockPermissionChecker
+import com.daykit.core.security.CredentialKind
 import com.daykit.core.session.AppLockSessionManager
 import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
 import com.daykit.feature.applock.domain.SettingsPackageResolver
@@ -56,6 +57,9 @@ class AppMonitorService : Service() {
     private var biometricEnabled = false
     private var lastForegroundPackage: String? = null
     private var activeActivityLockPackage: String? = null
+    // Guards the usage fields below, which the poll loop writes and the main
+    // thread reads through the overlay's isFocusBlocked check.
+    private val usageLock = Any()
     private var activeForegroundStartedMillis = 0L
     private var activeForegroundPackageForUsage: String? = null
     private var cachedUsageToday = emptyMap<String, Long>()
@@ -165,8 +169,10 @@ class AppMonitorService : Service() {
         activeActivityLockPackage = null
         activeActivityLockIsFocus = false
         lastForegroundPackage = null
-        activeForegroundStartedMillis = 0L
-        activeForegroundPackageForUsage = null
+        synchronized(usageLock) {
+            activeForegroundStartedMillis = 0L
+            activeForegroundPackageForUsage = null
+        }
     }
 
     private fun observeAppLimits() {
@@ -181,7 +187,8 @@ class AppMonitorService : Service() {
         }
     }
 
-    private fun getTodayUsageMillis(targetPackage: String, now: Long): Long {
+    // Called from the poll loop and, via the overlay's isFocusBlocked, the main thread.
+    private fun getTodayUsageMillis(targetPackage: String, now: Long): Long = synchronized(usageLock) {
         val startOfDay = FocusUsageTracker.getStartOfDayMillis(now)
         if (startOfDay != cachedStartOfDayMillis || now - lastUsageQueryMillis > USAGE_QUERY_INTERVAL_MILLIS) {
             cachedStartOfDayMillis = startOfDay
@@ -189,10 +196,21 @@ class AppMonitorService : Service() {
             lastUsageQueryMillis = now
         }
         val baseUsage = cachedUsageToday[targetPackage] ?: 0L
-        val ongoingSession = if (activeForegroundPackageForUsage == targetPackage && activeForegroundStartedMillis > 0L) {
-            (now - activeForegroundStartedMillis).coerceAtLeast(0L)
+        val ongoingSession = if (activeForegroundPackageForUsage == targetPackage) {
+            unaccountedForegroundMillis(now)
         } else 0L
-        return baseUsage + ongoingSession
+        baseUsage + ongoingSession
+    }
+
+    /**
+     * Live foreground time the cached query has not seen yet. The query already
+     * includes the open session up to [lastUsageQueryMillis], so only time after
+     * the later of that and the session start is new. Caller holds [usageLock].
+     */
+    private fun unaccountedForegroundMillis(now: Long): Long {
+        if (activeForegroundStartedMillis <= 0L) return 0L
+        val countedUntil = maxOf(activeForegroundStartedMillis, lastUsageQueryMillis)
+        return (now - countedUntil).coerceAtLeast(0L)
     }
 
     private fun isDailyLimitExceeded(targetPackage: String, now: Long): Boolean {
@@ -267,14 +285,16 @@ class AppMonitorService : Service() {
 
                 if (foregroundPackage != lastForegroundPackage) {
                     val now = System.currentTimeMillis()
-                    if (activeForegroundPackageForUsage != null && activeForegroundStartedMillis > 0L) {
-                        val sessionDuration = (now - activeForegroundStartedMillis).coerceAtLeast(0L)
-                        val oldPkg = activeForegroundPackageForUsage!!
-                        val currentBase = cachedUsageToday[oldPkg] ?: 0L
-                        cachedUsageToday = cachedUsageToday + (oldPkg to (currentBase + sessionDuration))
+                    synchronized(usageLock) {
+                        val oldPkg = activeForegroundPackageForUsage
+                        if (oldPkg != null) {
+                            val currentBase = cachedUsageToday[oldPkg] ?: 0L
+                            cachedUsageToday = cachedUsageToday +
+                                (oldPkg to (currentBase + unaccountedForegroundMillis(now)))
+                        }
+                        activeForegroundPackageForUsage = foregroundPackage
+                        activeForegroundStartedMillis = now
                     }
-                    activeForegroundPackageForUsage = foregroundPackage
-                    activeForegroundStartedMillis = now
                     lastForegroundPackage = foregroundPackage
                     // A switch just happened — poll fast for a short burst so the
                     // lock covers the app immediately, then let the loop settle
@@ -382,7 +402,11 @@ class AppMonitorService : Service() {
             mainHandler.post { launchActivityLockScreen(packageName, focusBlockUntil, isDailyLimit) }
             return
         }
-        if (biometricEnabled) {
+        // The overlay is a PIN pad in a system window, where typing a password is
+        // unreliable, so a password credential always gets the full activity.
+        val needsKeyboard = (application as DayKitApplication).container.credentialRepository
+            .credentialKind() == CredentialKind.Password
+        if (biometricEnabled || needsKeyboard) {
             mainHandler.post { launchActivityLockScreen(packageName) }
             return
         }

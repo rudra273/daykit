@@ -58,4 +58,85 @@ class FocusUsageTrackerTest {
         assertEquals("1h 30m", FocusUsageTracker.formatUsage(90 * 60_000L))
         assertEquals("2h 15m", FocusUsageTracker.formatUsage(135 * 60_000L))
     }
+
+    private fun resumed(pkg: String, at: Long, cls: String = "Main") =
+        ForegroundTransition(pkg, cls, at, ForegroundTransition.Kind.Resumed)
+
+    private fun paused(pkg: String, at: Long, cls: String = "Main") =
+        ForegroundTransition(pkg, cls, at, ForegroundTransition.Kind.Paused)
+
+    @Test
+    fun `sums closed sessions per package`() {
+        val totals = FocusUsageTracker.foregroundMillisByPackage(
+            listOf(
+                resumed("a", 100), paused("a", 400),
+                resumed("b", 400), paused("b", 500),
+                resumed("a", 600), paused("a", 700),
+            ),
+            startMillis = 0,
+            endMillis = 1_000,
+        )
+        assertEquals(400L, totals["a"])
+        assertEquals(100L, totals["b"])
+    }
+
+    @Test
+    fun `app open before midnight counts only from window start`() {
+        // Only the pause survives into today's window.
+        val totals = FocusUsageTracker.foregroundMillisByPackage(
+            listOf(paused("a", 1_300)),
+            startMillis = 1_000,
+            endMillis = 2_000,
+        )
+        assertEquals(300L, totals["a"])
+    }
+
+    @Test
+    fun `open session is closed at end of window`() {
+        val totals = FocusUsageTracker.foregroundMillisByPackage(
+            listOf(resumed("a", 1_500)),
+            startMillis = 1_000,
+            endMillis = 2_000,
+        )
+        assertEquals(500L, totals["a"])
+    }
+
+    @Test
+    fun `switching activities inside one app is one session`() {
+        // Some apps resume the next activity before pausing the previous one.
+        val totals = FocusUsageTracker.foregroundMillisByPackage(
+            listOf(
+                resumed("a", 100, "First"),
+                resumed("a", 200, "Second"),
+                paused("a", 210, "First"),
+                paused("a", 500, "Second"),
+            ),
+            startMillis = 0,
+            endMillis = 1_000,
+        )
+        assertEquals(400L, totals["a"])
+    }
+
+    @Test
+    fun `stray pause after a completed session is not recounted from window start`() {
+        val totals = FocusUsageTracker.foregroundMillisByPackage(
+            listOf(resumed("a", 100), paused("a", 200), paused("a", 900, "Other")),
+            startMillis = 0,
+            endMillis = 1_000,
+        )
+        assertEquals(100L, totals["a"])
+    }
+
+    @Test
+    fun `shutdown closes every open session`() {
+        val totals = FocusUsageTracker.foregroundMillisByPackage(
+            listOf(
+                resumed("a", 100),
+                ForegroundTransition("android", null, 300, ForegroundTransition.Kind.Shutdown),
+            ),
+            startMillis = 0,
+            endMillis = 1_000,
+        )
+        assertEquals(200L, totals["a"])
+    }
 }

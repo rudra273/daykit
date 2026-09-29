@@ -31,10 +31,24 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.PinDots
 import com.daykit.core.designsystem.components.PinPad
+import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.security.CredentialKind
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -46,6 +60,10 @@ import kotlin.math.roundToInt
  * Auto-submit: whenever [pin] length reaches [pinLength] the caller's [onSubmit]
  * fires. [pinLength] must be the stored PIN's actual digit count
  * (CredentialRepository.pinLength()) so the dots match what the user has to type.
+ *
+ * For a [CredentialKind.Password] the pad is replaced by a password field: the
+ * length is unknown, so it submits from the keyboard's Done key or the Unlock
+ * button instead, and edits arrive through [onTextChange].
  */
 @Composable
 fun LockChallengeContent(
@@ -61,6 +79,8 @@ fun LockChallengeContent(
     appIcon: ImageVector? = null,
     appIconPainter: Painter? = null,
     onBiometric: (() -> Unit)? = null,
+    credentialKind: CredentialKind = CredentialKind.Pin,
+    onTextChange: (String) -> Unit = {},
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -69,7 +89,7 @@ fun LockChallengeContent(
     // Auto-submit on the exact keystroke that completes the PIN; on a wrong
     // PIN the caller clears [pin], re-arming this.
     LaunchedEffect(pin) {
-        if (pin.length == pinLength) onSubmit()
+        if (credentialKind == CredentialKind.Pin && pin.length == pinLength) onSubmit()
     }
 
     // Error -> shake + haptic.
@@ -139,17 +159,78 @@ fun LockChallengeContent(
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(Spacing.xl))
-        PinDots(
-            length = pinLength,
-            filledCount = pin.length.coerceAtMost(pinLength),
-            error = error != null,
-            modifier = Modifier.offset { IntOffset(shake.value.roundToInt(), 0) },
+        if (credentialKind == CredentialKind.Password) {
+            PasswordEntry(
+                password = pin,
+                error = error != null,
+                onPasswordChange = onTextChange,
+                onSubmit = onSubmit,
+                onBiometric = onBiometric,
+                modifier = Modifier.offset { IntOffset(shake.value.roundToInt(), 0) },
+            )
+        } else {
+            PinDots(
+                length = pinLength,
+                filledCount = pin.length.coerceAtMost(pinLength),
+                error = error != null,
+                modifier = Modifier.offset { IntOffset(shake.value.roundToInt(), 0) },
+            )
+            Spacer(Modifier.height(Spacing.xxl))
+            PinPad(
+                onDigit = onDigit,
+                onBackspace = onBackspace,
+                onBiometric = onBiometric,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PasswordEntry(
+    password: String,
+    error: Boolean,
+    onPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onBiometric: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val focusRequester = remember { FocusRequester() }
+    // Bring the keyboard up straight away, as the PIN pad is always visible.
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        AppTextField(
+            value = password,
+            onValueChange = onPasswordChange,
+            label = "Master password",
+            isError = error,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done,
+                autoCorrectEnabled = false,
+            ),
+            keyboardActions = KeyboardActions(onDone = { if (password.isNotEmpty()) onSubmit() }),
+            modifier = Modifier.focusRequester(focusRequester),
         )
-        Spacer(Modifier.height(Spacing.xxl))
-        PinPad(
-            onDigit = onDigit,
-            onBackspace = onBackspace,
-            onBiometric = onBiometric,
+        PrimaryButton(
+            text = "Unlock",
+            enabled = password.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onSubmit,
         )
+        if (onBiometric != null) {
+            SecondaryButton(
+                text = "Use fingerprint",
+                leadingIcon = {
+                    Icon(Icons.Rounded.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onBiometric,
+            )
+        }
     }
 }

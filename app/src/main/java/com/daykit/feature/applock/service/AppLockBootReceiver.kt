@@ -44,7 +44,9 @@ class AppLockBootReceiver : BroadcastReceiver() {
         val hasActiveFocusBlocks = container.focusRepository.activeFocusPackages().isNotEmpty()
         // Read the prefs projection, not the DB: this runs before any unlock.
         val hasArmedSessions = container.focusScheduleCache.getArmed().isNotEmpty()
-        if (hasUsageAccess && (hasPinLockedApps || hasActiveFocusBlocks || hasArmedSessions)) {
+        // Daily limits are enforced only by the monitor too, so they need it back.
+        val hasAppLimits = container.focusAppLimitCache.getEnabledLimits().isNotEmpty()
+        if (hasUsageAccess && (hasPinLockedApps || hasActiveFocusBlocks || hasArmedSessions || hasAppLimits)) {
             AppMonitorService.start(context)
         }
 

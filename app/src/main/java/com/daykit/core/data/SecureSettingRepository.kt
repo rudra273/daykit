@@ -72,7 +72,14 @@ class SecureSettingRepository(
 
     companion object {
         const val KEY_BIOMETRIC_ENABLED = "app_lock.biometric_enabled"
+        /**
+         * Legacy location of the backup password, under the always-available
+         * Keystore key. Read only to migrate into [KEY_BACKUP_PASSWORD_SESSION];
+         * use BackupPasswordStore, never this repository, for the password.
+         */
         const val KEY_BACKUP_PASSWORD = "backup.password"
+        /** Backup password encrypted with the PIN-derived MSK (BackupPasswordStore). */
+        const val KEY_BACKUP_PASSWORD_SESSION = "backup.password.session"
         const val KEY_DRIVE_BACKUP_SCHEDULE = "backup.drive.schedule"
         /** When the last backup ran. Also the automatic schedule's due-check clock. */
         const val KEY_DRIVE_LAST_BACKUP_AT = "backup.drive.last_backup_at"

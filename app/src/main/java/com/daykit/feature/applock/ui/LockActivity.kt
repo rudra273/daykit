@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +52,8 @@ import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.DayKitTheme
 import com.daykit.core.designsystem.components.FrostedLockBackground
 import com.daykit.core.security.BiometricAuthenticator
+import com.daykit.core.security.CredentialKind
+import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.errorMessageOrNull
 import com.daykit.core.session.AppLockSessionManager
 import com.daykit.feature.focus.ui.formatFocusRemaining
@@ -76,47 +79,73 @@ class LockActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        render()
+    }
+
+    /**
+     * singleTop: the monitor re-launching for a different app lands here rather than
+     * in a new instance. Without re-rendering, the screen kept the previous package,
+     * so the PIN granted that app instead of the one now in front.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        render()
+    }
+
+    private fun render() {
+        val packageName = lockedPackageName
+        val blockUntil = focusBlockUntil
         setContent {
-            DayKitTheme {
-                // A strict focus block shows a countdown with no way out — no PIN,
-                // no biometric — until the timer expires.
-                if (focusBlockUntil > System.currentTimeMillis()) {
-                    FocusBlockScreen(
-                        appLabel = resolveLabel(lockedPackageName),
-                        appIcon = resolveIcon(lockedPackageName),
-                        lockUntilMillis = focusBlockUntil,
-                        isDailyLimit = isDailyLimit,
-                        onExpired = { finish() },
-                    )
-                } else {
-                    LockChallengeScreen(
-                        activity = this,
-                        packageName = lockedPackageName,
-                        appLabel = resolveLabel(lockedPackageName),
-                        appIcon = resolveIcon(lockedPackageName),
-                        credentialRepository = container.credentialRepository,
-                        settings = container.secureSettingRepository,
-                        onUnlocked = {
-                            // Belt-and-suspenders: never let a PIN grant open an app
-                            // held by a manual block, a scheduled session, or a daily usage limit.
-                            val sessionBlocked = container.focusScheduleCache
-                                .activeWindows()
-                                .containsKey(lockedPackageName)
-                            val limitMinutes = container.focusAppLimitCache.getEnabledLimits()[lockedPackageName]
-                            val limitBlocked = limitMinutes != null &&
-                                com.daykit.feature.focus.data.FocusUsageTracker.queryTodayUsageStats(applicationContext)[lockedPackageName]?.let {
-                                    it >= limitMinutes * 60_000L
-                                } == true
-                            if (!sessionBlocked &&
-                                !limitBlocked &&
-                                container.focusRepository.focusBlockUntil(lockedPackageName) == null
-                            ) {
-                                AppLockSessionManager.allow(lockedPackageName)
-                            }
-                            finish()
-                        },
-                    )
-                }
+            // Keyed so a half-typed PIN or a running countdown never carries over
+            // to a different target.
+            key(packageName, blockUntil) {
+                LockContent()
+            }
+        }
+    }
+
+    @Composable
+    private fun LockContent() {
+        DayKitTheme {
+            // A strict focus block shows a countdown with no way out — no PIN,
+            // no biometric — until the timer expires.
+            if (focusBlockUntil > System.currentTimeMillis()) {
+                FocusBlockScreen(
+                    appLabel = resolveLabel(lockedPackageName),
+                    appIcon = resolveIcon(lockedPackageName),
+                    lockUntilMillis = focusBlockUntil,
+                    isDailyLimit = isDailyLimit,
+                    onExpired = { finish() },
+                )
+            } else {
+                LockChallengeScreen(
+                    activity = this,
+                    packageName = lockedPackageName,
+                    appLabel = resolveLabel(lockedPackageName),
+                    appIcon = resolveIcon(lockedPackageName),
+                    credentialRepository = container.credentialRepository,
+                    settings = container.secureSettingRepository,
+                    onUnlocked = {
+                        // Belt-and-suspenders: never let a PIN grant open an app
+                        // held by a manual block, a scheduled session, or a daily usage limit.
+                        val sessionBlocked = container.focusScheduleCache
+                            .activeWindows()
+                            .containsKey(lockedPackageName)
+                        val limitMinutes = container.focusAppLimitCache.getEnabledLimits()[lockedPackageName]
+                        val limitBlocked = limitMinutes != null &&
+                            com.daykit.feature.focus.data.FocusUsageTracker.queryTodayUsageStats(applicationContext)[lockedPackageName]?.let {
+                                it >= limitMinutes * 60_000L
+                            } == true
+                        if (!sessionBlocked &&
+                            !limitBlocked &&
+                            container.focusRepository.focusBlockUntil(lockedPackageName) == null
+                        ) {
+                            AppLockSessionManager.allow(lockedPackageName)
+                        }
+                        finish()
+                    },
+                )
             }
         }
     }
@@ -167,6 +196,7 @@ private fun LockChallengeScreen(
     val scope = rememberCoroutineScope()
     val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
     val pinLength = remember { credentialRepository.pinLength() }
+    val credentialKind = remember { credentialRepository.credentialKind() }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var biometricEnabled by remember { mutableStateOf(false) }
@@ -194,7 +224,11 @@ private fun LockChallengeScreen(
     }
 
     fun submit() {
-        if (pin.length < pinLength) return
+        val complete = when (credentialKind) {
+            CredentialKind.Pin -> pin.length >= pinLength
+            CredentialKind.Password -> pin.isNotEmpty()
+        }
+        if (!complete) return
         scope.launch {
             val candidate = pin
             val result = withContext(Dispatchers.Default) {
@@ -203,7 +237,7 @@ private fun LockChallengeScreen(
             if (result is com.daykit.core.security.PinVerifyResult.Success) {
                 onUnlocked()
             } else {
-                error = result.errorMessageOrNull()
+                error = result.errorMessageOrNull(credentialKind)
                 pin = ""
             }
         }
@@ -219,10 +253,8 @@ private fun LockChallengeScreen(
                 pinLength = pinLength,
                 appIconPainter = iconPainter,
                 onDigit = { d ->
-                    if (pin.length < 12) {
-                        pin += d
-                        error = null
-                    }
+                    pin = CredentialRepository.sanitize(pin + d, credentialKind)
+                    error = null
                 },
                 onBackspace = {
                     pin = pin.dropLast(1)
@@ -230,6 +262,11 @@ private fun LockChallengeScreen(
                 },
                 onSubmit = { submit() },
                 onBiometric = if (biometricEnabled) { { tryBiometric() } } else null,
+                credentialKind = credentialKind,
+                onTextChange = {
+                    pin = CredentialRepository.sanitize(it, credentialKind)
+                    error = null
+                },
             )
         }
     }

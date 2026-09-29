@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBackButton
 import com.daykit.core.designsystem.components.FrostedLockBackground
+import com.daykit.core.security.CredentialKind
+import com.daykit.core.security.CredentialRepository
 
 /**
  * Shared in-app tool unlock gate. Replaces the near-duplicate KeyStoreUnlock /
@@ -31,6 +33,7 @@ fun ToolUnlockScreen(
     pin: String,
     error: String?,
     pinLength: Int,
+    credentialKind: CredentialKind,
     biometricEnabled: Boolean,
     icon: ImageVector,
     onBack: () -> Unit,
@@ -58,10 +61,12 @@ fun ToolUnlockScreen(
                     error = error,
                     pinLength = pinLength,
                     appIcon = icon,
-                    onDigit = { d -> onPinChange((pin + d).filter(Char::isDigit).take(12)) },
+                    onDigit = { d -> onPinChange(CredentialRepository.sanitize(pin + d, credentialKind)) },
                     onBackspace = { onPinChange(pin.dropLast(1)) },
                     onSubmit = onUnlock,
                     onBiometric = if (biometricEnabled) onBiometric else null,
+                    credentialKind = credentialKind,
+                    onTextChange = { onPinChange(CredentialRepository.sanitize(it, credentialKind)) },
                 )
             }
         }

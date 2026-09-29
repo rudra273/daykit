@@ -1,6 +1,7 @@
 package com.daykit.core.designsystem.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -32,6 +33,7 @@ fun AppTextField(
     enabled: Boolean = true,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     OutlinedTextField(
         value = value,
@@ -47,6 +49,7 @@ fun AppTextField(
         singleLine = singleLine,
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         shape = MaterialTheme.shapes.small,
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.extendedColors.inputField,
