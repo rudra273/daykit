@@ -3,4 +3,7 @@
     <cache-path
         name="editor_share"
         path="editor-share/" />
+    <cache-path
+        name="image_share"
+        path="image-share/" />
 </paths>

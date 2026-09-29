@@ -57,7 +57,8 @@ private val PRESETS = listOf(
  * Framed as a budget rather than a timer — the thing that makes it read
  * differently from Lock now, which also offers "30m". The bar is prefilled with
  * [usedTodayMillis], so the user sees what the chosen allowance leaves them
- * today before saving.
+ * today before saving. Their daily average (from [weekUsageMillis]) sits under
+ * the presets as the reference point for picking a number.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +66,7 @@ fun FocusAppLimitSheet(
     app: InstalledApp,
     existingLimit: FocusAppLimit?,
     usedTodayMillis: Long,
+    weekUsageMillis: Long,
     onSave: (dailyLimitMinutes: Int) -> Unit,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
@@ -163,6 +165,14 @@ fun FocusAppLimitSheet(
                     )
                 }
                 FilterChipButton(text = "Custom", selected = customOpen, onClick = { customOpen = true })
+            }
+            formatDailyAverage(weekUsageMillis)?.let { average ->
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    text = "You average $average",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.textMuted,
+                )
             }
 
             if (customOpen) {

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,12 +34,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCheckbox
 import com.daykit.core.designsystem.components.AppIconOrMonogram
-import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.EmptyState
@@ -49,15 +51,21 @@ import com.daykit.feature.applock.domain.InstalledApp
 import com.daykit.feature.focus.data.FocusGroup
 
 /**
- * Create/edit sheet for an app group. A group is a name, a color, and a set of
- * apps, so a sheet is the right size — the schedule editor, which has many more
- * fields, is a full page instead (matching how habits are edited).
+ * Create/edit sheet for an app set. A set is a name, a color, and some apps, so
+ * a sheet is the right size — the routine editor, which has many more fields,
+ * is a full page instead (matching how habits are edited).
+ *
+ * Apps are ordered by [weeklyUsage]. An app may belong to several sets; any
+ * other set it is already in shows as a colored tag on its row ([otherSets]),
+ * so overlap is visible rather than prevented.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun FocusGroupEditorSheet(
     existing: FocusGroup?,
     apps: List<InstalledApp>?,
+    otherSets: List<FocusGroup>,
+    weeklyUsage: Map<String, Long>,
     onSave: (name: String, colorIndex: Int, packageNames: List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -70,17 +78,24 @@ fun FocusGroupEditorSheet(
 
     val palette = focusSetPalette()
 
-    val visible = remember(apps, query) {
+    val setsByPackage = remember(otherSets) {
+        otherSets.flatMap { set -> set.packageNames.map { it to set } }
+            .groupBy({ it.first }, { it.second })
+    }
+
+    // Not keyed on the selection, so rows don't jump while ticking boxes.
+    val visible = remember(apps, query, weeklyUsage) {
         apps.orEmpty()
             .filter {
                 query.isBlank() ||
                     it.label.contains(query, ignoreCase = true) ||
                     it.packageName.contains(query, ignoreCase = true)
             }
-            // Selected apps float to the top so a long list stays reviewable.
+            // Already-picked apps float to the top so an edit stays reviewable,
+            // then the most used — the likely next pick.
             .sortedWith(
                 compareByDescending<InstalledApp> { it.packageName in selected }
-                    .thenBy { it.label.lowercase() },
+                    .then(mostUsedFirst(weeklyUsage)),
             )
     }
 
@@ -169,23 +184,12 @@ fun FocusGroupEditorSheet(
                     contentPadding = PaddingValues(bottom = Spacing.sm),
                 ) {
                     items(visible, key = { it.packageName }) { app ->
-                        val checked = app.packageName in selected
-                        AppListRow(
-                            headline = app.label,
-                            leading = {
-                                AppIconOrMonogram(
-                                    icon = app.icon,
-                                    label = app.label,
-                                    packageName = app.packageName,
-                                )
-                            },
-                            trailing = {
-                                AppCheckbox(
-                                    checked = checked,
-                                    onCheckedChange = { toggle(selected, app.packageName) },
-                                )
-                            },
-                            onClick = { toggle(selected, app.packageName) },
+                        SetAppRow(
+                            app = app,
+                            checked = app.packageName in selected,
+                            alsoIn = setsByPackage[app.packageName].orEmpty(),
+                            dailyAverage = formatDailyAverage(weeklyUsage[app.packageName] ?: 0L),
+                            onToggle = { toggle(selected, app.packageName) },
                         )
                     }
                 }
@@ -205,6 +209,83 @@ fun FocusGroupEditorSheet(
                 )
             }
         }
+    }
+}
+
+/**
+ * One pickable app: name, then a tag per other set it's already in (dot + name
+ * in that set's color) and its daily average. Tags inform; they never block.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SetAppRow(
+    app: InstalledApp,
+    checked: Boolean,
+    alsoIn: List<FocusGroup>,
+    dailyAverage: String?,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 58.dp)
+            .clickable(onClick = onToggle)
+            .padding(horizontal = Spacing.lg, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppIconOrMonogram(icon = app.icon, label = app.label, packageName = app.packageName)
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = app.label,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (alsoIn.isNotEmpty() || dailyAverage != null) {
+                Spacer(Modifier.height(2.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) {
+                    alsoIn.forEach { set -> SetTag(set) }
+                    if (dailyAverage != null) {
+                        Text(
+                            text = dailyAverage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.extendedColors.textMuted,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.width(Spacing.md))
+        AppCheckbox(checked = checked, onCheckedChange = { onToggle() })
+    }
+}
+
+/** Small pill naming another set, tinted in that set's color. */
+@Composable
+private fun SetTag(set: FocusGroup) {
+    val color = focusSetColor(set.colorIndex)
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(color.asAccentContainer())
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = set.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

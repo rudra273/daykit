@@ -26,6 +26,7 @@ import com.daykit.feature.expense.ui.ExpenseScreen
 import com.daykit.feature.filelocker.ui.FileLockerScreen
 import com.daykit.feature.habit.ui.HabitScreen
 import com.daykit.feature.home.ui.HomeScreen
+import com.daykit.feature.imagetool.ui.ImageToolScreen
 import com.daykit.feature.keystore.ui.KeyStoreScreen
 import com.daykit.feature.notes.ui.SecureNotesScreen
 import com.daykit.feature.reminder.ui.ReminderScreen
@@ -112,6 +113,7 @@ fun DayKitNavHost(
                 onExpectActivityResult = { container.sensitiveKeyManager.expectingActivityResult = true },
             )
         }
+        opaqueComposable(Routes.TOOL_IMAGE) { ImageToolScreen(container = container, onBack = back) }
         opaqueComposable(Routes.TOOL_SCANNER) { DocumentScannerScreen(container = container, onBack = back) }
         opaqueComposable(Routes.TOOL_DNS) { DnsManagerScreen(onBack = back) }
         opaqueComposable(Routes.TOOL_EVENTLIGHT) { EventLightScreen(onBack = back) }

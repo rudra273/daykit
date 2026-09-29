@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.PhotoSizeSelectLarge
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FlashOn
@@ -110,6 +111,8 @@ fun HomeScreen(
             listOf("reminder", "notification", "alarm")),
         ToolTile(Routes.TOOL_SCANNER, "Document Scanner", "Scan documents", Icons.Rounded.DocumentScanner, { accents.blue },
             listOf("scanner", "scan document", "document", "camera", "pdf")),
+        ToolTile(Routes.TOOL_IMAGE, "Image Tool", "Resize, compress & strip location", Icons.Rounded.PhotoSizeSelectLarge, { accents.green },
+            listOf("image", "photo", "resize", "compress", "convert", "exif", "location", "metadata", "jpeg", "png", "webp")),
         ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.yellow },
             listOf("editor", "document", "text", "pdf")),
         ToolTile(Routes.TOOL_DNS, "DNS Manager", "Set up Private DNS", Icons.Rounded.Dns, { accents.red },

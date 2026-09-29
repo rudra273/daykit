@@ -41,6 +41,10 @@ import com.daykit.feature.focus.data.FocusGroup
  *
  * When [sets] is non-empty (Lock now only), they appear as chips above the list,
  * so a whole app set can be locked in one tap without a separate entry point.
+ *
+ * Apps are ordered by [weeklyUsage], most used first — the app someone wants to
+ * lock or limit is almost always one they use a lot — with their daily average
+ * as the row's supporting line.
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -48,6 +52,7 @@ fun FocusAppPickerSheet(
     title: String,
     apps: List<InstalledApp>?,
     blockedPackages: Set<String>,
+    weeklyUsage: Map<String, Long>,
     onSelect: (InstalledApp) -> Unit,
     onDismiss: () -> Unit,
     sets: List<FocusGroup> = emptyList(),
@@ -55,7 +60,7 @@ fun FocusAppPickerSheet(
 ) {
     var query by remember { mutableStateOf("") }
 
-    val selectable = remember(apps, blockedPackages, query) {
+    val selectable = remember(apps, blockedPackages, query, weeklyUsage) {
         apps.orEmpty()
             .filterNot { it.packageName in blockedPackages }
             .filter {
@@ -63,7 +68,7 @@ fun FocusAppPickerSheet(
                     it.label.contains(query, ignoreCase = true) ||
                     it.packageName.contains(query, ignoreCase = true)
             }
-            .sortedBy { it.label.lowercase() }
+            .sortedWith(mostUsedFirst(weeklyUsage))
     }
 
     AppBottomSheet(onDismissRequest = onDismiss) {
@@ -117,7 +122,7 @@ fun FocusAppPickerSheet(
                     items(selectable, key = { it.packageName }) { app ->
                         AppListRow(
                             headline = app.label,
-                            supporting = app.packageName,
+                            supporting = formatDailyAverage(weeklyUsage[app.packageName] ?: 0L),
                             leading = {
                                 AppIconOrMonogram(
                                     icon = app.icon,

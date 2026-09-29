@@ -83,6 +83,11 @@ class FocusAppLimitRepository(
         return FocusUsageTracker.queryTodayUsageStats(context)
     }
 
+    /** Last seven days of foreground use, for suggestions; keep it off the main thread. */
+    fun getWeekUsageMap(): Map<String, Long> {
+        return FocusUsageTracker.queryWeekUsageStats(context)
+    }
+
     fun getTodayUsageMillis(packageName: String): Long {
         return getTodayUsageMap()[packageName] ?: 0L
     }

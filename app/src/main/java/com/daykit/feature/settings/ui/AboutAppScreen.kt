@@ -107,6 +107,7 @@ fun AboutAppScreen(
                     "DNS Manager opens Android private DNS settings and does not operate a DNS server or collect DNS traffic.",
                     "Editor creates user-directed text files and temporary share files only when the user chooses to save or share.",
                     "Document Scanner lets the user capture or import multiple pages, crop, rotate, and enhance them, then save the finished scan as a PDF.",
+                    "Image Tool resizes, crops, compresses, and converts a photo you pick, entirely on the device. It re-encodes the image, so location and camera metadata are removed, and it saves or shares the result only when the user chooses.",
                 ),
             )
             AboutSection(
@@ -146,7 +147,7 @@ private fun AboutHero() {
         )
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            "Version 1.0.7",
+            "Version 1.0.8",
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodySmall,
         )

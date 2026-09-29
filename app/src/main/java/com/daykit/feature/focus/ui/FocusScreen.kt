@@ -2,6 +2,7 @@ package com.daykit.feature.focus.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +23,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.rememberCoroutineScope
+import com.daykit.core.designsystem.components.AccentIconTile
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,7 +83,9 @@ import com.daykit.feature.focus.data.FocusRecurrence
 import com.daykit.feature.focus.data.FocusSchedule
 import com.daykit.feature.focus.data.FocusUsageTracker
 import com.daykit.feature.focus.service.FocusScheduleScheduler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 
@@ -121,10 +132,37 @@ fun FocusScreen(
         .observeSchedules()
         .collectAsStateWithLifecycle(initialValue = emptyList())
 
+    // Weekly usage is read only when the user asks for suggestions — never in
+    // the background. Once scanned, the pickers reuse it to order apps; until
+    // then they stay alphabetical.
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var weeklyUsage by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    var scan by remember { mutableStateOf(SuggestScan.Idle) }
+    val onScan: () -> Unit = {
+        if (scan != SuggestScan.Scanning) {
+            scan = SuggestScan.Scanning
+            scope.launch {
+                val started = System.currentTimeMillis()
+                val usage = withContext(Dispatchers.IO) {
+                    val homes = homeScreenPackages(context)
+                    container.focusAppLimitRepository.getWeekUsageMap()
+                        .filterKeys { it !in homes }
+                }
+                // Long enough to read as "checking", so the result doesn't flash in.
+                delay((SCAN_MIN_MILLIS - (System.currentTimeMillis() - started)).coerceAtLeast(0L))
+                weeklyUsage = usage
+                scan = SuggestScan.Done
+            }
+        }
+    }
+
     when (val current = editor) {
         is FocusEditor.Group -> FocusGroupEditorHost(
             container = container,
             existing = current.existing,
+            allSets = groups,
+            weeklyUsage = weeklyUsage,
             onDone = { editor = null },
         )
 
@@ -132,6 +170,7 @@ fun FocusScreen(
             container = container,
             existing = current.existing,
             groups = groups,
+            weeklyUsage = weeklyUsage,
             onMonitorNeeded = onMonitorNeeded,
             onDone = { editor = null },
         )
@@ -140,12 +179,37 @@ fun FocusScreen(
             container = container,
             groups = groups,
             schedules = schedules,
+            weeklyUsage = weeklyUsage,
+            scan = scan,
+            onScan = onScan,
             onBack = onBack,
             onMonitorNeeded = onMonitorNeeded,
             onEdit = { editor = it },
         )
     }
 }
+
+/** Where the on-demand "Suggest apps to block" scan is. */
+private enum class SuggestScan { Idle, Scanning, Done }
+
+/** Below this daily average an app isn't worth suggesting. */
+private const val SUGGEST_MIN_DAILY_MILLIS = 5 * 60_000L
+private const val SUGGESTION_COUNT = 5
+private const val SCAN_MIN_MILLIS = 900L
+
+/**
+ * The launcher is foreground every time the user is "between apps", so it would
+ * top any usage ranking; it's never something to block.
+ */
+private fun homeScreenPackages(context: android.content.Context): Set<String> =
+    context.packageManager
+        .queryIntentActivities(
+            android.content.Intent(android.content.Intent.ACTION_MAIN)
+                .addCategory(android.content.Intent.CATEGORY_HOME),
+            android.content.pm.PackageManager.MATCH_ALL,
+        )
+        .map { it.activityInfo.packageName }
+        .toSet()
 
 /** One app currently blocked, whichever mode did it. Drawn as a ringed icon in the hero. */
 private data class BlockedNow(
@@ -163,6 +227,9 @@ private fun FocusHome(
     container: AppContainer,
     groups: List<FocusGroup>,
     schedules: List<FocusSchedule>,
+    weeklyUsage: Map<String, Long>,
+    scan: SuggestScan,
+    onScan: () -> Unit,
     onBack: () -> Unit,
     onMonitorNeeded: () -> Unit,
     onEdit: (FocusEditor) -> Unit,
@@ -257,6 +324,22 @@ private fun FocusHome(
     val lockedPackages = remember(focusBlocks) { focusBlocks.map { it.packageName }.toSet() }
     val groupsById = remember(groups) { groups.associateBy { it.groupId } }
     val activeScheduleIds = remember(activeSessions) { activeSessions.map { it.scheduleId }.toSet() }
+    // Biggest weekly use first, so the limits most likely to bite sit on top.
+    val sortedLimits = remember(appLimits, weeklyUsage) {
+        appLimits.sortedByDescending { weeklyUsage[it.packageName] ?: 0L }
+    }
+    // Heavy-use apps with nothing on them yet. An app already limited or locked
+    // is handled, so it isn't suggested.
+    val suggestions = remember(installedApps, weeklyUsage, appLimits, lockedPackages) {
+        val limited = appLimits.map { it.packageName }.toSet()
+        installedApps.orEmpty()
+            .filter { it.packageName !in limited && it.packageName !in lockedPackages }
+            .filter {
+                (weeklyUsage[it.packageName] ?: 0L) >= SUGGEST_MIN_DAILY_MILLIS * FocusUsageTracker.WEEK_DAYS
+            }
+            .sortedWith(mostUsedFirst(weeklyUsage))
+            .take(SUGGESTION_COUNT)
+    }
 
     val blockedNow = run {
         val endOfDay = FocusUsageTracker.getEndOfDayMillis(nowMillis)
@@ -380,11 +463,30 @@ private fun FocusHome(
                 }
             }
 
+            if (hasUsageAccess) {
+                item(key = "suggestions") {
+                    when (scan) {
+                        SuggestScan.Idle -> SuggestButton(onClick = onScan)
+                        SuggestScan.Scanning -> ScanningCard()
+                        SuggestScan.Done -> MostUsedCard(
+                            apps = suggestions,
+                            weeklyUsage = weeklyUsage,
+                            onRescan = onScan,
+                            onLock = { quickBlockApp = it },
+                            onLimit = { app ->
+                                appLimitToEdit = null
+                                appLimitTargetApp = app
+                            },
+                        )
+                    }
+                }
+            }
+
             if (appLimits.isNotEmpty()) {
                 item(key = "header-limits") {
                     FocusModeHeader(mode = FocusMode.DailyLimit, title = "Daily limits")
                 }
-                items(appLimits, key = { "limit-${it.packageName}" }) { limit ->
+                items(sortedLimits, key = { "limit-${it.packageName}" }) { limit ->
                     val app = appsByPackage[limit.packageName]
                     val usageMillis = todayUsage[limit.packageName] ?: 0L
                     val isExceeded = limit.enabled && usageMillis >= limit.dailyLimitMinutes * 60_000L
@@ -469,6 +571,7 @@ private fun FocusHome(
             title = "Lock what?",
             apps = installedApps,
             blockedPackages = lockedPackages,
+            weeklyUsage = weeklyUsage,
             sets = groups,
             onSelectSet = { set -> lockPickerOpen = false; groupToBlock = set },
             onSelect = { app -> lockPickerOpen = false; quickBlockApp = app },
@@ -521,6 +624,7 @@ private fun FocusHome(
             title = "Limit which app?",
             apps = installedApps,
             blockedPackages = existingLimitPackages,
+            weeklyUsage = weeklyUsage,
             onSelect = { app ->
                 appLimitPickerOpen = false
                 appLimitTargetApp = app
@@ -535,6 +639,7 @@ private fun FocusHome(
             app = app,
             existingLimit = appLimitToEdit,
             usedTodayMillis = todayUsage[app.packageName] ?: 0L,
+            weekUsageMillis = weeklyUsage[app.packageName] ?: 0L,
             onSave = { dailyLimitMinutes ->
                 val targetApp = app
                 appLimitTargetApp = null
@@ -847,6 +952,162 @@ private fun RoutineCard(
     }
 }
 
+/**
+ * The week's heaviest apps that nothing covers yet, each with a bar against the
+ * top one and two one-tap actions drawn as the mode icons in their own colors —
+ * hourglass to Lock now, gauge to set a Daily limit — straight into that
+ * app's sheet, skipping the picker.
+ */
+@Composable
+private fun MostUsedCard(
+    apps: List<InstalledApp>,
+    weeklyUsage: Map<String, Long>,
+    onRescan: () -> Unit,
+    onLock: (InstalledApp) -> Unit,
+    onLimit: (InstalledApp) -> Unit,
+) {
+    val top = apps.maxOfOrNull { weeklyUsage[it.packageName] ?: 0L }?.coerceAtLeast(1L) ?: 1L
+    val muted = MaterialTheme.extendedColors.textMuted
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Most used this week",
+                style = MaterialTheme.typography.titleSmall,
+                color = muted,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onRescan, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = "Check again",
+                    tint = muted,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        if (apps.isEmpty()) {
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = "Nothing heavy left to block. Nice.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        apps.forEach { app ->
+            val week = weeklyUsage[app.packageName] ?: 0L
+            Spacer(Modifier.height(Spacing.md))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AppIconOrMonogram(icon = app.icon, label = app.label, packageName = app.packageName)
+                Spacer(Modifier.width(Spacing.md))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = app.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            text = formatDailyAverage(week).orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = muted,
+                            maxLines = 1,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    FocusBudgetBar(
+                        progress = week.toFloat() / top,
+                        color = muted.copy(alpha = 0.5f),
+                        height = 4.dp,
+                    )
+                }
+                Spacer(Modifier.width(Spacing.sm))
+                ModeIconButton(
+                    mode = FocusMode.LockNow,
+                    contentDescription = "Lock ${app.label} now",
+                    onClick = { onLock(app) },
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                ModeIconButton(
+                    mode = FocusMode.DailyLimit,
+                    contentDescription = "Set a daily limit for ${app.label}",
+                    onClick = { onLimit(app) },
+                )
+            }
+        }
+    }
+}
+
+/** Entry to the on-demand scan; nothing reads a week of usage until this is tapped. */
+@Composable
+private fun SuggestButton(onClick: () -> Unit) {
+    AppCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AccentIconTile(
+                icon = Icons.Rounded.AutoAwesome,
+                accent = MaterialTheme.colorScheme.primary,
+                size = 36.dp,
+                iconSize = 20.dp,
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                text = "Suggest apps to block",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.extendedColors.textMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScanningCard() {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                text = "Checking your last 7 days…",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+/** A round button showing [mode]'s icon on its tint — the mode's color is the label. */
+@Composable
+private fun ModeIconButton(mode: FocusMode, contentDescription: String, onClick: () -> Unit) {
+    val accent = mode.accent
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(accent.asAccentContainer())
+            .clickable(onClickLabel = contentDescription, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = mode.icon,
+            contentDescription = contentDescription,
+            tint = accent,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
 /** The set's color as a tile with its app count, standing in for an app icon. */
 @Composable
 private fun SetSwatch(color: Color, count: Int) {
@@ -955,6 +1216,8 @@ private fun WarningCard(
 private fun FocusGroupEditorHost(
     container: AppContainer,
     existing: FocusGroup?,
+    allSets: List<FocusGroup>,
+    weeklyUsage: Map<String, Long>,
     onDone: () -> Unit,
     onSaved: (groupId: String) -> Unit = {},
 ) {
@@ -974,6 +1237,8 @@ private fun FocusGroupEditorHost(
     FocusGroupEditorSheet(
         existing = existing,
         apps = installedApps,
+        otherSets = allSets.filter { it.groupId != existing?.groupId },
+        weeklyUsage = weeklyUsage,
         onSave = { name, colorIndex, packages ->
             errors.launchGuarded("Couldn't save the app set.") {
                 val id = container.focusGroupRepository.saveGroup(
@@ -995,6 +1260,7 @@ private fun FocusScheduleEditorHost(
     container: AppContainer,
     existing: FocusSchedule?,
     groups: List<FocusGroup>,
+    weeklyUsage: Map<String, Long>,
     onMonitorNeeded: () -> Unit,
     onDone: () -> Unit,
 ) {
@@ -1034,6 +1300,8 @@ private fun FocusScheduleEditorHost(
         FocusGroupEditorHost(
             container = container,
             existing = null,
+            allSets = groups,
+            weeklyUsage = weeklyUsage,
             onSaved = callback,
             onDone = { onSetCreated = null },
         )

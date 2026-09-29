@@ -46,13 +46,51 @@ object FocusUsageTracker {
     fun queryTodayUsageStats(
         context: Context,
         nowMillis: Long = System.currentTimeMillis(),
+    ): Map<String, Long> = queryUsageStats(context, getStartOfDayMillis(nowMillis), nowMillis)
+
+    /**
+     * Foreground usage per package over roughly the last [WEEK_DAYS] days, for
+     * the on-demand "Suggest apps to block" scan. Call it off the main thread.
+     *
+     * Uses the system's aggregated daily stats, not the event replay the daily
+     * limits use. Replaying a week of raw events is fragile: one lost resume
+     * turns a stray pause into days of "use" credited from the window start,
+     * which put rarely-opened apps at the top. The aggregate's bucket edges can
+     * include part of the day before the window — harmless for a ranking,
+     * which is why daily limits (where it isn't) keep the event replay.
+     */
+    fun queryWeekUsageStats(
+        context: Context,
+        nowMillis: Long = System.currentTimeMillis(),
     ): Map<String, Long> {
         if (!AppLockPermissionChecker.hasUsageAccess(context)) return emptyMap()
-        val startOfDay = getStartOfDayMillis(nowMillis)
+        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+            ?: return emptyMap()
+        return usageStatsManager
+            .queryAndAggregateUsageStats(getWeekStartMillis(nowMillis), nowMillis)
+            .mapValues { (_, stats) -> stats.totalTimeInForeground }
+            .filterValues { it > 0L }
+    }
+
+    /** Local midnight [WEEK_DAYS] - 1 days before today. */
+    fun getWeekStartMillis(nowMillis: Long = System.currentTimeMillis()): Long =
+        Calendar.getInstance().apply {
+            timeInMillis = getStartOfDayMillis(nowMillis)
+            add(Calendar.DAY_OF_YEAR, -(WEEK_DAYS - 1))
+        }.timeInMillis
+
+    const val WEEK_DAYS = 7
+
+    private fun queryUsageStats(
+        context: Context,
+        startMillis: Long,
+        endMillis: Long,
+    ): Map<String, Long> {
+        if (!AppLockPermissionChecker.hasUsageAccess(context)) return emptyMap()
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
             ?: return emptyMap()
 
-        val events = usageStatsManager.queryEvents(startOfDay, nowMillis)
+        val events = usageStatsManager.queryEvents(startMillis, endMillis)
         val event = UsageEvents.Event()
         val transitions = mutableListOf<ForegroundTransition>()
         while (events.hasNextEvent()) {
@@ -70,7 +108,7 @@ object FocusUsageTracker {
                 kind = kind,
             )
         }
-        return foregroundMillisByPackage(transitions, startOfDay, nowMillis)
+        return foregroundMillisByPackage(transitions, startMillis, endMillis)
     }
 
     /**
