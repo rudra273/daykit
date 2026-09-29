@@ -3,6 +3,8 @@ package com.daykit.feature.focus.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -29,21 +31,27 @@ import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.feature.applock.domain.InstalledApp
+import com.daykit.feature.focus.data.FocusGroup
 
 /**
- * Sheet for choosing which app to block. Shown before [FocusBlockSheet], which
- * then picks the duration for the app selected here.
+ * Sheet for choosing an app, shown before the Lock now or Daily limit sheet.
  *
- * Apps that already have an active block are omitted — a block cannot be
- * replaced or extended while it runs, so offering them would be a dead end.
+ * Apps in [blockedPackages] are omitted — for Lock now, a running block can't be
+ * replaced; for Daily limit, the app already has one (edit it from its row).
+ *
+ * When [sets] is non-empty (Lock now only), they appear as chips above the list,
+ * so a whole app set can be locked in one tap without a separate entry point.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun FocusAppPickerSheet(
+    title: String,
     apps: List<InstalledApp>?,
     blockedPackages: Set<String>,
     onSelect: (InstalledApp) -> Unit,
     onDismiss: () -> Unit,
+    sets: List<FocusGroup> = emptyList(),
+    onSelectSet: (FocusGroup) -> Unit = {},
 ) {
     var query by remember { mutableStateOf("") }
 
@@ -66,10 +74,21 @@ fun FocusAppPickerSheet(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text(
-                text = "Block an app",
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            val usableSets = sets.filter { it.packageNames.isNotEmpty() }
+            if (usableSets.isNotEmpty() && query.isBlank()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    usableSets.forEach { set ->
+                        FocusSetChip(set = set, onClick = { onSelectSet(set) })
+                    }
+                }
+            }
             AppTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -88,12 +107,7 @@ fun FocusAppPickerSheet(
 
                 selectable.isEmpty() -> EmptyState(
                     icon = Icons.Rounded.SearchOff,
-                    title = if (query.isBlank()) "No apps available to block" else "No apps found",
-                    description = if (query.isBlank()) {
-                        "Every app you can block already has an active focus block."
-                    } else {
-                        null
-                    },
+                    title = if (query.isBlank()) "Every app is already set" else "No apps found",
                 )
 
                 else -> LazyColumn(

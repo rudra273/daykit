@@ -1,6 +1,17 @@
 package com.daykit.feature.focus.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.daykit.core.designsystem.asAccentContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,8 +51,6 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.AppTopBar
-import com.daykit.core.designsystem.components.FilterChipButton
-import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.focus.data.FocusGroup
@@ -75,7 +84,9 @@ fun FocusScheduleEditorPage(
     groups: List<FocusGroup>,
     onSave: (FocusScheduleDraft) -> Unit,
     onDismiss: () -> Unit,
+    onCreateSet: (onCreated: (groupId: String) -> Unit) -> Unit,
 ) {
+    val accent = FocusMode.Routine.accent
     var groupId by remember { mutableStateOf(existing?.groupId ?: groups.firstOrNull()?.groupId) }
     var label by remember { mutableStateOf(existing?.label.orEmpty()) }
     var startHour by remember { mutableStateOf(existing?.startHour ?: 9) }
@@ -98,7 +109,7 @@ fun FocusScheduleEditorPage(
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize()) {
             AppTopBar(
-                title = if (existing == null) "New schedule" else "Edit schedule",
+                title = if (existing == null) "New routine" else "Edit routine",
                 onBack = onDismiss,
             )
             LazyColumn(
@@ -112,23 +123,21 @@ fun FocusScheduleEditorPage(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 item("group") {
-                    EditorSection(title = "Apps") {
-                        if (groups.isEmpty()) {
-                            Text(
-                                text = "Create a group first — a schedule blocks a group of apps.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.extendedColors.textMuted,
-                            )
-                        } else {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                                groups.forEach { group ->
-                                    FilterChipButton(
-                                        text = "${group.name} · ${group.packageNames.size}",
-                                        selected = group.groupId == groupId,
-                                        onClick = { groupId = group.groupId },
-                                    )
-                                }
+                    EditorSection(title = "App set") {
+                        // "New set" sits beside the existing ones, so a first
+                        // routine never dead-ends on "create a group first".
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            groups.forEach { group ->
+                                FocusSetChip(
+                                    set = group,
+                                    selected = group.groupId == groupId,
+                                    onClick = { groupId = group.groupId },
+                                )
                             }
+                            FocusNewSetChip(onClick = { onCreateSet { groupId = it } })
                         }
                     }
                 }
@@ -154,6 +163,28 @@ fun FocusScheduleEditorPage(
                                 text = FocusRecurrence.formatTime(endHour, endMinute),
                                 onClick = { pickingEnd = true },
                             )
+                        }
+                        Spacer(Modifier.height(Spacing.md))
+                        DayBand(
+                            startMinute = startHour * 60 + startMinute,
+                            endMinute = endHour * 60 + endMinute,
+                            accent = accent,
+                            height = 10.dp,
+                        )
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            listOf("12a", "6a", "12p", "6p", "12a").forEachIndexed { i, mark ->
+                                Text(
+                                    text = mark,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.extendedColors.textMuted,
+                                    textAlign = when (i) {
+                                        0 -> TextAlign.Start
+                                        4 -> TextAlign.End
+                                        else -> TextAlign.Center
+                                    },
+                                    modifier = Modifier.weight(if (i == 0 || i == 4) 0.5f else 1f),
+                                )
+                            }
                         }
                         Spacer(Modifier.height(Spacing.sm))
                         val crossesMidnight = endHour * 60 + endMinute <= startHour * 60 + startMinute
@@ -181,34 +212,27 @@ fun FocusScheduleEditorPage(
                 }
 
                 item("mode") {
-                    EditorSection(title = "Strictness") {
+                    EditorSection(title = "If you need out") {
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                            FilterChipButton(
-                                text = "Normal",
+                            StrictnessOption(
+                                icon = Icons.Rounded.LockOpen,
+                                title = "Flexible",
+                                subtitle = "PIN ends early",
+                                accent = accent,
                                 selected = !strict,
                                 onClick = { strict = false },
+                                modifier = Modifier.weight(1f),
                             )
-                            FilterChipButton(
-                                text = "Strict",
+                            StrictnessOption(
+                                icon = Icons.Rounded.Lock,
+                                title = "Strict",
+                                subtitle = "No way out",
+                                accent = MaterialTheme.extendedColors.danger,
                                 selected = strict,
                                 onClick = { if (!strict) confirmStrict = true },
+                                modifier = Modifier.weight(1f),
                             )
                         }
-                        Spacer(Modifier.height(Spacing.sm))
-                        Text(
-                            text = if (strict) {
-                                "Strict: you cannot end a session early — not even with your PIN. " +
-                                    "It repeats on every day you picked."
-                            } else {
-                                "Normal: you can end a session early with your PIN."
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (strict) {
-                                MaterialTheme.extendedColors.danger
-                            } else {
-                                MaterialTheme.extendedColors.textMuted
-                            },
-                        )
                     }
                 }
 
@@ -238,12 +262,13 @@ fun FocusScheduleEditorPage(
                     modifier = Modifier.weight(1f),
                     onClick = onDismiss,
                 )
-                PrimaryButton(
-                    text = "Save",
+                FocusAccentButton(
+                    text = "Save routine",
+                    accent = accent,
                     modifier = Modifier.weight(1f),
                     enabled = canSave,
                     onClick = {
-                        val id = groupId ?: return@PrimaryButton
+                        val id = groupId ?: return@FocusAccentButton
                         onSave(
                             FocusScheduleDraft(
                                 groupId = id,
@@ -335,6 +360,51 @@ private fun FocusTimePickerDialog(
             }
         },
     )
+}
+
+/** One of the two strictness cards: icon, one-word title, a four-word consequence. */
+@Composable
+private fun StrictnessOption(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    accent: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.medium)
+            .background(if (selected) accent.asAccentContainer() else MaterialTheme.extendedColors.inputField)
+            .then(
+                if (selected) {
+                    Modifier.border(1.dp, accent, MaterialTheme.shapes.medium)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(onClick = onClick)
+            .padding(Spacing.md),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) accent else MaterialTheme.extendedColors.textMuted,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (selected) accent else MaterialTheme.extendedColors.textMuted,
+        )
+    }
 }
 
 /** Titled card wrapping one group of form fields, as the habit editor does. */

@@ -9,10 +9,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
@@ -30,11 +35,10 @@ import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.FilterChipButton
-import com.daykit.core.designsystem.components.PrimaryButton
-import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.applock.domain.InstalledApp
 import com.daykit.feature.focus.data.FocusAppLimit
+import com.daykit.feature.focus.data.FocusUsageTracker
 
 private data class LimitPreset(val label: String, val minutes: Int)
 
@@ -43,153 +47,171 @@ private val PRESETS = listOf(
     LimitPreset("30m", 30),
     LimitPreset("45m", 45),
     LimitPreset("1h", 60),
-    LimitPreset("1h 30m", 90),
     LimitPreset("2h", 120),
     LimitPreset("3h", 180),
 )
 
+/**
+ * Sheet to set or edit an app's Daily limit.
+ *
+ * Framed as a budget rather than a timer — the thing that makes it read
+ * differently from Lock now, which also offers "30m". The bar is prefilled with
+ * [usedTodayMillis], so the user sees what the chosen allowance leaves them
+ * today before saving.
+ */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun FocusAppLimitSheet(
     app: InstalledApp,
     existingLimit: FocusAppLimit?,
+    usedTodayMillis: Long,
     onSave: (dailyLimitMinutes: Int) -> Unit,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
+    val accent = FocusMode.DailyLimit.accent
     val initialPreset = PRESETS.firstOrNull { it.minutes == existingLimit?.dailyLimitMinutes }
-    var selectedPreset by remember {
-        mutableStateOf<Int?>(initialPreset?.minutes ?: if (existingLimit == null) 30 else null)
-    }
-
+    val initialCustom = existingLimit?.takeIf { initialPreset == null }?.dailyLimitMinutes
+    var selectedPreset by remember { mutableStateOf(initialPreset?.minutes ?: 30) }
+    var customOpen by remember { mutableStateOf(initialCustom != null) }
     var customHours by remember {
-        mutableStateOf(
-            if (existingLimit != null && initialPreset == null) {
-                val h = existingLimit.dailyLimitMinutes / 60
-                if (h > 0) h.toString() else ""
-            } else "",
-        )
+        mutableStateOf(initialCustom?.let { it / 60 }?.takeIf { it > 0 }?.toString().orEmpty())
     }
     var customMinutes by remember {
-        mutableStateOf(
-            if (existingLimit != null && initialPreset == null) {
-                val m = existingLimit.dailyLimitMinutes % 60
-                if (m > 0) m.toString() else ""
-            } else "",
-        )
+        mutableStateOf(initialCustom?.let { it % 60 }?.takeIf { it > 0 }?.toString().orEmpty())
     }
-
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val customTotalMinutes = run {
-        val h = customHours.toIntOrNull() ?: 0
-        val m = customMinutes.toIntOrNull() ?: 0
-        h * 60 + m
-    }
-    val usingCustom = customHours.isNotBlank() || customMinutes.isNotBlank()
-    val totalMinutes = if (usingCustom) customTotalMinutes else (selectedPreset ?: 0)
+    val customTotalMinutes = (customHours.toIntOrNull() ?: 0) * 60 + (customMinutes.toIntOrNull() ?: 0)
+    val totalMinutes = if (customOpen) customTotalMinutes else selectedPreset
     val isValid = totalMinutes > 0
+    val limitMillis = totalMinutes * 60_000L
+    val leftMillis = (limitMillis - usedTodayMillis).coerceAtLeast(0L)
+    val exhausted = isValid && leftMillis == 0L
 
     AppBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                AppIconOrMonogram(
-                    icon = app.icon,
-                    label = app.label,
-                    packageName = app.packageName,
-                )
+                AppIconOrMonogram(icon = app.icon, label = app.label, packageName = app.packageName)
                 Spacer(Modifier.width(Spacing.md))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (existingLimit != null) "Edit daily limit" else "Set daily limit",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "${app.label} · Resets at midnight",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.extendedColors.textMuted,
-                    )
-                }
+                Text(
+                    text = "${app.label} each day",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
             }
 
             Spacer(Modifier.height(Spacing.lg))
-
             Text(
-                text = "Daily usage allowance",
-                style = MaterialTheme.typography.labelLarge,
+                text = if (isValid) FocusUsageTracker.formatUsage(limitMillis) else "–",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(Modifier.height(Spacing.xs))
             Text(
-                text = "Once you reach this time today, DayKit blocks the app until 12:00 AM.",
-                style = MaterialTheme.typography.bodySmall,
+                text = "a day",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.extendedColors.textMuted,
             )
 
             Spacer(Modifier.height(Spacing.md))
-
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                PRESETS.forEach { preset ->
-                    FilterChipButton(
-                        text = preset.label,
-                        selected = !usingCustom && selectedPreset == preset.minutes,
-                        onClick = {
-                            selectedPreset = preset.minutes
-                            customHours = ""
-                            customMinutes = ""
-                        },
+            FocusBudgetBar(
+                progress = if (limitMillis > 0) usedTodayMillis.toFloat() / limitMillis else 0f,
+                color = if (exhausted) MaterialTheme.extendedColors.danger else accent,
+                height = 10.dp,
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "${FocusUsageTracker.formatUsage(usedTodayMillis)} used today",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.textMuted,
+                )
+                if (isValid) {
+                    Text(
+                        text = if (exhausted) "Locks now" else "${FocusUsageTracker.formatUsage(leftMillis)} left",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (exhausted) MaterialTheme.extendedColors.danger else accent,
                     )
                 }
             }
 
-            Spacer(Modifier.height(Spacing.md))
-
-            Row(
+            Spacer(Modifier.height(Spacing.lg))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                AppTextField(
-                    value = customHours,
-                    onValueChange = {
-                        customHours = it.filter { ch -> ch.isDigit() }.take(2)
-                        if (customHours.isNotEmpty()) selectedPreset = null
-                    },
-                    label = "Custom hours",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                )
-                AppTextField(
-                    value = customMinutes,
-                    onValueChange = {
-                        customMinutes = it.filter { ch -> ch.isDigit() }.take(2)
-                        if (customMinutes.isNotEmpty()) selectedPreset = null
-                    },
-                    label = "Custom minutes",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                )
+                PRESETS.forEach { preset ->
+                    FilterChipButton(
+                        text = preset.label,
+                        selected = !customOpen && selectedPreset == preset.minutes,
+                        onClick = {
+                            selectedPreset = preset.minutes
+                            customOpen = false
+                        },
+                    )
+                }
+                FilterChipButton(text = "Custom", selected = customOpen, onClick = { customOpen = true })
+            }
+
+            if (customOpen) {
+                Spacer(Modifier.height(Spacing.md))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    AppTextField(
+                        value = customHours,
+                        onValueChange = { customHours = it.filter(Char::isDigit).take(2) },
+                        label = "Hours",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    AppTextField(
+                        value = customMinutes,
+                        onValueChange = { customMinutes = it.filter(Char::isDigit).take(2) },
+                        label = "Minutes",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
 
             Spacer(Modifier.height(Spacing.lg))
-
-            PrimaryButton(
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.Bedtime,
+                    contentDescription = null,
+                    tint = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                Text(
+                    text = "Refills at midnight",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.textMuted,
+                )
+            }
+            Spacer(Modifier.height(Spacing.sm))
+            FocusAccentButton(
                 text = if (existingLimit != null) "Save limit" else "Set limit",
+                accent = accent,
                 enabled = isValid,
                 onClick = { onSave(totalMinutes) },
             )
 
             if (existingLimit != null && onDelete != null) {
-                Spacer(Modifier.height(Spacing.sm))
-                SecondaryButton(
-                    text = "Delete limit",
+                AppTextButton(
+                    text = "Remove limit",
+                    color = MaterialTheme.extendedColors.danger,
                     onClick = { showDeleteConfirm = true },
                 )
             }
@@ -199,13 +221,11 @@ fun FocusAppLimitSheet(
     if (showDeleteConfirm && onDelete != null) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete daily limit?") },
-            text = {
-                Text("DayKit will stop automatically blocking ${app.label} based on usage.")
-            },
+            title = { Text("Remove daily limit?") },
+            text = { Text("${app.label} will no longer lock after a set time each day.") },
             confirmButton = {
                 AppTextButton(
-                    text = "Delete",
+                    text = "Remove",
                     onClick = {
                         showDeleteConfirm = false
                         onDelete()
@@ -213,10 +233,7 @@ fun FocusAppLimitSheet(
                 )
             },
             dismissButton = {
-                AppTextButton(
-                    text = "Cancel",
-                    onClick = { showDeleteConfirm = false },
-                )
+                AppTextButton(text = "Cancel", onClick = { showDeleteConfirm = false })
             },
         )
     }

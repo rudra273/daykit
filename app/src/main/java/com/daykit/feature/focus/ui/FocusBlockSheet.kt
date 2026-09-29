@@ -2,18 +2,21 @@ package com.daykit.feature.focus.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,38 +25,41 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBottomSheet
-import com.daykit.core.designsystem.components.AppTextButton
+import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.FilterChipButton
-import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.feature.focus.data.FocusRecurrence
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 private data class DurationPreset(val label: String, val millis: Long)
 
-/** Steps of the sheet: pick a duration, then type to confirm. */
-private enum class FocusStep { Duration, Confirm }
-
 private val PRESETS = listOf(
+    DurationPreset("15m", 15 * 60_000L),
     DurationPreset("30m", 30 * 60_000L),
     DurationPreset("1h", 60 * 60_000L),
     DurationPreset("3h", 3 * 60 * 60_000L),
     DurationPreset("6h", 6 * 60 * 60_000L),
-    DurationPreset("12h", 12 * 60 * 60_000L),
 )
 
-/** Word the user must type on the final step. Guards an irreversible action. */
-private const val CONFIRM_WORD = "LOCK"
+/** The ring is full at this length, so a longer lock visibly weighs more. */
+private const val RING_FULL_MILLIS = 6 * 60 * 60_000L
 
 /**
- * Bottom sheet to start a strict timed lock ("focus block") on [appLabel].
- * Presents preset durations plus a custom hours+minutes entry, then a single
- * confirm step — the warning and a typed [CONFIRM_WORD] acknowledgement together —
- * because the block is irreversible (no early cancel, not even with the PIN). On
- * confirm invokes [onConfirm] with the chosen duration in millis.
+ * Bottom sheet to start a Lock now block on [appLabel] (one app or an app set).
+ *
+ * Rather than explaining the rules, it shows the outcome: a coral ring sized to
+ * the duration and the wall-clock time the app opens again. The block is
+ * irreversible (no early cancel, not even with the PIN), so it commits through
+ * [HoldToConfirmButton] rather than a tap. [leading] is the app icon or set
+ * swatch shown beside the title.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -61,20 +67,20 @@ fun FocusBlockSheet(
     appLabel: String,
     onConfirm: (durationMillis: Long) -> Unit,
     onDismiss: () -> Unit,
+    leading: (@Composable () -> Unit)? = null,
 ) {
-    var selectedPreset by remember { mutableStateOf<Long?>(PRESETS[2].millis) }
+    val accent = FocusMode.LockNow.accent
+    var selectedPreset by remember { mutableStateOf(PRESETS[2].millis) }
+    var customOpen by remember { mutableStateOf(false) }
     var customHours by remember { mutableStateOf("") }
     var customMinutes by remember { mutableStateOf("") }
-    var step by remember { mutableStateOf(FocusStep.Duration) }
-    var typedConfirm by remember { mutableStateOf("") }
 
     val customMillis = run {
         val h = customHours.toLongOrNull() ?: 0L
         val m = customMinutes.toLongOrNull() ?: 0L
         (h * 60 + m) * 60_000L
     }
-    val usingCustom = customHours.isNotBlank() || customMinutes.isNotBlank()
-    val durationMillis = if (usingCustom) customMillis else (selectedPreset ?: 0L)
+    val durationMillis = if (customOpen) customMillis else selectedPreset
     val valid = durationMillis > 0L
 
     AppBottomSheet(onDismissRequest = onDismiss) {
@@ -82,116 +88,126 @@ fun FocusBlockSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (step == FocusStep.Duration) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                leading?.let {
+                    it()
+                    Spacer(Modifier.width(Spacing.md))
+                }
                 Text(
-                    text = "Lock $appLabel for…",
+                    text = "Lock $appLabel",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(Spacing.md))
+            }
 
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    PRESETS.forEach { preset ->
-                        FilterChipButton(
-                            text = preset.label,
-                            selected = !usingCustom && selectedPreset == preset.millis,
-                            onClick = {
-                                selectedPreset = preset.millis
-                                customHours = ""
-                                customMinutes = ""
-                            },
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.lg))
+            CountdownRing(
+                progress = (durationMillis.toFloat() / RING_FULL_MILLIS).coerceIn(0.04f, 1f),
+                color = accent,
+                size = 120.dp,
+                strokeWidth = 8.dp,
+            ) {
                 Text(
-                    text = "Custom",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
+                    text = if (valid) formatFocusDuration(durationMillis) else "–",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(Spacing.sm))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = if (valid) {
+                    "Opens again ${formatOpensAt(System.currentTimeMillis() + durationMillis)}"
+                } else {
+                    "Pick how long"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(Spacing.lg))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                PRESETS.forEach { preset ->
+                    FilterChipButton(
+                        text = preset.label,
+                        selected = !customOpen && selectedPreset == preset.millis,
+                        onClick = {
+                            selectedPreset = preset.millis
+                            customOpen = false
+                        },
+                    )
+                }
+                FilterChipButton(
+                    text = "Custom",
+                    selected = customOpen,
+                    onClick = { customOpen = true },
+                )
+            }
+
+            if (customOpen) {
+                Spacer(Modifier.height(Spacing.md))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    AppTextField(
                         value = customHours,
                         onValueChange = { customHours = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Hours") },
-                        singleLine = true,
+                        label = "Hours",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(110.dp),
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.width(Spacing.sm))
-                    OutlinedTextField(
+                    AppTextField(
                         value = customMinutes,
                         onValueChange = { customMinutes = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Minutes") },
-                        singleLine = true,
+                        label = "Minutes",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(110.dp),
-                    )
-                }
-
-                Spacer(Modifier.height(Spacing.lg))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppTextButton(text = "Cancel", onClick = onDismiss)
-                    Spacer(Modifier.width(Spacing.sm))
-                    PrimaryButton(
-                        text = "Continue",
-                        enabled = valid,
-                        onClick = { step = FocusStep.Confirm },
-                    )
-                }
-            } else {
-                Text(
-                    text = "Type $CONFIRM_WORD to confirm",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(Modifier.height(Spacing.sm))
-                Text(
-                    text = "You won't be able to open $appLabel for " +
-                        "${formatFocusDuration(durationMillis)} — not even with your PIN. " +
-                        "This can't be undone until the timer ends. " +
-                        "Type $CONFIRM_WORD below to start.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
-                )
-                Spacer(Modifier.height(Spacing.md))
-                OutlinedTextField(
-                    value = typedConfirm,
-                    onValueChange = { typedConfirm = it.take(CONFIRM_WORD.length) },
-                    label = { Text(CONFIRM_WORD) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        capitalization = KeyboardCapitalization.Characters,
-                        autoCorrectEnabled = false,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(Spacing.lg))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppTextButton(
-                        text = "Back",
-                        onClick = { typedConfirm = ""; step = FocusStep.Duration },
-                    )
-                    Spacer(Modifier.width(Spacing.sm))
-                    PrimaryButton(
-                        text = "Start focus block",
-                        enabled = typedConfirm.trim().equals(CONFIRM_WORD, ignoreCase = true),
-                        onClick = { onConfirm(durationMillis) },
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
+
+            Spacer(Modifier.height(Spacing.lg))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                Text(
+                    text = "No way out, not even your PIN",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.textMuted,
+                )
+            }
+            Spacer(Modifier.height(Spacing.sm))
+            HoldToConfirmButton(
+                text = "Hold to lock",
+                accent = accent,
+                enabled = valid,
+                onConfirm = { onConfirm(durationMillis) },
+            )
         }
+    }
+}
+
+/** "at 4:30 PM", "tomorrow at 9:00 AM", or "on Fri at 9:00 AM". */
+internal fun formatOpensAt(untilMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String {
+    val at = Instant.ofEpochMilli(untilMillis).atZone(zone).toLocalDateTime()
+    val time = FocusRecurrence.formatTime(at.hour, at.minute)
+    val today = LocalDate.now(zone)
+    return when (at.toLocalDate()) {
+        today -> "at $time"
+        today.plusDays(1) -> "tomorrow at $time"
+        else -> "on ${FocusRecurrence.shortLabel(at.dayOfWeek)} at $time"
     }
 }

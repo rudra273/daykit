@@ -68,11 +68,7 @@ fun FocusGroupEditorSheet(
     }
     var query by remember { mutableStateOf("") }
 
-    val accents = MaterialTheme.extendedColors.accents
-    val palette = listOf(
-        accents.blue, accents.teal, accents.green, accents.red,
-        accents.orange, accents.yellow, accents.purple, accents.pink, accents.indigo,
-    )
+    val palette = focusSetPalette()
 
     val visible = remember(apps, query) {
         apps.orEmpty()
@@ -98,7 +94,7 @@ fun FocusGroupEditorSheet(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text(
-                text = if (existing == null) "New group" else "Edit group",
+                text = if (existing == null) "New app set" else "Edit app set",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -106,7 +102,7 @@ fun FocusGroupEditorSheet(
             AppTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = "Group name",
+                label = "Set name",
                 placeholder = "Social, Games, News…",
             )
 
@@ -203,7 +199,7 @@ fun FocusGroupEditorSheet(
                 AppTextButton(text = "Cancel", onClick = onDismiss)
                 Spacer(Modifier.width(Spacing.sm))
                 PrimaryButton(
-                    text = "Save group",
+                    text = "Save set",
                     enabled = canSave,
                     onClick = { onSave(name.trim(), colorIndex, selected.toList()) },
                 )
