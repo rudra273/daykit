@@ -81,6 +81,7 @@ import com.daykit.feature.focus.data.FocusAppLimit
 import com.daykit.feature.focus.data.FocusGroup
 import com.daykit.feature.focus.data.FocusRecurrence
 import com.daykit.feature.focus.data.FocusSchedule
+import com.daykit.feature.focus.data.FocusSuggestionFilter
 import com.daykit.feature.focus.data.FocusUsageTracker
 import com.daykit.feature.focus.service.FocusScheduleScheduler
 import kotlinx.coroutines.Dispatchers
@@ -139,19 +140,21 @@ fun FocusScreen(
     val scope = rememberCoroutineScope()
     var weeklyUsage by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var scan by remember { mutableStateOf(SuggestScan.Idle) }
+    var suggestionExclusions by remember { mutableStateOf<Set<String>>(emptySet()) }
     val onScan: () -> Unit = {
         if (scan != SuggestScan.Scanning) {
             scan = SuggestScan.Scanning
             scope.launch {
                 val started = System.currentTimeMillis()
-                val usage = withContext(Dispatchers.IO) {
-                    val homes = homeScreenPackages(context)
+                val (usage, excluded) = withContext(Dispatchers.IO) {
+                    val homes = FocusSuggestionFilter.homeScreenPackages(context)
                     container.focusAppLimitRepository.getWeekUsageMap()
-                        .filterKeys { it !in homes }
+                        .filterKeys { it !in homes } to FocusSuggestionFilter.excludedPackages(context)
                 }
                 // Long enough to read as "checking", so the result doesn't flash in.
                 delay((SCAN_MIN_MILLIS - (System.currentTimeMillis() - started)).coerceAtLeast(0L))
                 weeklyUsage = usage
+                suggestionExclusions = excluded
                 scan = SuggestScan.Done
             }
         }
@@ -180,6 +183,7 @@ fun FocusScreen(
             groups = groups,
             schedules = schedules,
             weeklyUsage = weeklyUsage,
+            suggestionExclusions = suggestionExclusions,
             scan = scan,
             onScan = onScan,
             onBack = onBack,
@@ -196,20 +200,6 @@ private enum class SuggestScan { Idle, Scanning, Done }
 private const val SUGGEST_MIN_DAILY_MILLIS = 5 * 60_000L
 private const val SUGGESTION_COUNT = 5
 private const val SCAN_MIN_MILLIS = 900L
-
-/**
- * The launcher is foreground every time the user is "between apps", so it would
- * top any usage ranking; it's never something to block.
- */
-private fun homeScreenPackages(context: android.content.Context): Set<String> =
-    context.packageManager
-        .queryIntentActivities(
-            android.content.Intent(android.content.Intent.ACTION_MAIN)
-                .addCategory(android.content.Intent.CATEGORY_HOME),
-            android.content.pm.PackageManager.MATCH_ALL,
-        )
-        .map { it.activityInfo.packageName }
-        .toSet()
 
 /** One app currently blocked, whichever mode did it. Drawn as a ringed icon in the hero. */
 private data class BlockedNow(
@@ -228,6 +218,7 @@ private fun FocusHome(
     groups: List<FocusGroup>,
     schedules: List<FocusSchedule>,
     weeklyUsage: Map<String, Long>,
+    suggestionExclusions: Set<String>,
     scan: SuggestScan,
     onScan: () -> Unit,
     onBack: () -> Unit,
@@ -329,11 +320,13 @@ private fun FocusHome(
         appLimits.sortedByDescending { weeklyUsage[it.packageName] ?: 0L }
     }
     // Heavy-use apps with nothing on them yet. An app already limited or locked
-    // is handled, so it isn't suggested.
-    val suggestions = remember(installedApps, weeklyUsage, appLimits, lockedPackages) {
+    // is handled, and essentials (WhatsApp, payments, 2FA…) are never what the
+    // user means by distracting, so neither is suggested.
+    val suggestions = remember(installedApps, weeklyUsage, appLimits, lockedPackages, suggestionExclusions) {
         val limited = appLimits.map { it.packageName }.toSet()
         installedApps.orEmpty()
             .filter { it.packageName !in limited && it.packageName !in lockedPackages }
+            .filter { it.packageName !in suggestionExclusions }
             .filter {
                 (weeklyUsage[it.packageName] ?: 0L) >= SUGGEST_MIN_DAILY_MILLIS * FocusUsageTracker.WEEK_DAYS
             }
