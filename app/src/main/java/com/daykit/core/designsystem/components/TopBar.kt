@@ -32,6 +32,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
@@ -45,6 +46,14 @@ import com.daykit.core.designsystem.extendedColors
 /** Standard header height, excluding the status-bar inset. Every screen uses this via [AppTopBar]. */
 val AppTopBarHeight = 48.dp
 
+/**
+ * Header height for top-level tabs whose title is a single line. A lone title centered
+ * in [AppTopBarHeight] floats well below the status bar; this height puts it where a
+ * title-plus-subtitle bar (Today) places its title. Screens using it must add
+ * [Spacing.md] to their content's top padding to keep the gap before the first section.
+ */
+val AppTopBarCompactHeight = 36.dp
+
 @Composable
 fun AppTopBar(
     title: String,
@@ -52,6 +61,7 @@ fun AppTopBar(
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
     titleContent: (@Composable () -> Unit)? = null,
+    height: Dp = AppTopBarHeight,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Box(
@@ -65,7 +75,7 @@ fun AppTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .height(AppTopBarHeight)
+                .height(height)
                 .padding(horizontal = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -127,6 +137,7 @@ fun SearchAppTopBar(
     onBack: (() -> Unit)? = null,
     searchPlaceholder: String = "Search",
     titleContent: (@Composable () -> Unit)? = null,
+    height: Dp = AppTopBarHeight,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -138,6 +149,7 @@ fun SearchAppTopBar(
             modifier = modifier,
             title = title,
             onBack = onBack,
+            height = height,
             titleContent = {
                 BasicTextField(
                     value = query,
@@ -184,6 +196,7 @@ fun SearchAppTopBar(
             title = title,
             onBack = onBack,
             titleContent = titleContent,
+            height = height,
             actions = {
                 IconButton(onClick = { onSearchActiveChange(true) }) {
                     Icon(

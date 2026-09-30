@@ -68,7 +68,7 @@ import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.AppTopBar
-import com.daykit.core.designsystem.components.AppTopBarHeight
+import com.daykit.core.designsystem.components.AppTopBarCompactHeight
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.RowDivider
@@ -208,7 +208,7 @@ fun SettingsScreen(
     val accents = MaterialTheme.extendedColors.accents
     val listState = rememberLazyListState()
 
-    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight
+    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarCompactHeight
     Box(Modifier.fillMaxSize()) {
 
         if (!settingsLoaded) {
@@ -218,7 +218,7 @@ fun SettingsScreen(
             ) {
                 LoadingIndicator()
             }
-            AppTopBar(title = "Settings", modifier = Modifier.align(Alignment.TopCenter))
+            AppTopBar(title = "Settings", height = AppTopBarCompactHeight, modifier = Modifier.align(Alignment.TopCenter))
             return
         }
 
@@ -228,7 +228,7 @@ fun SettingsScreen(
             contentPadding = PaddingValues(
                 start = Spacing.lg,
                 end = Spacing.lg,
-                top = headerHeight,
+                top = headerHeight + Spacing.md,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xl,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -426,6 +426,7 @@ fun SettingsScreen(
         }
         AppTopBar(
             title = "Settings",
+            height = AppTopBarCompactHeight,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }

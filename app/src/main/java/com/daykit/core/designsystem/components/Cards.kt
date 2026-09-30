@@ -1,6 +1,5 @@
 package com.daykit.core.designsystem.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -29,8 +30,9 @@ import com.daykit.core.designsystem.isAppInDarkTheme
 
 /**
  * The core surface primitive.
- * Light cards use a soft shadow and faint hairline. Dark cards separate from the
- * page through their surface color alone.
+ * Light cards are soft clay: no outline, a wide cool-tinted shadow, and a faint
+ * inner shade toward the bottom edge. Dark cards separate from the page through
+ * their surface color alone.
  */
 @Composable
 fun AppCard(
@@ -41,40 +43,51 @@ fun AppCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val dark = isAppInDarkTheme()
+    val cardColor = MaterialTheme.extendedColors.card
+    // Light mode paints the fill itself so the inner shade spans the whole card.
     val colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.extendedColors.card,
+        containerColor = if (dark) cardColor else Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
     )
-    // Very soft clay lift in light mode; dark mode separates by color step only.
-    val elevation = if (dark) CardDefaults.cardElevation(defaultElevation = 0.dp)
-    else CardDefaults.cardElevation(defaultElevation = 0.5.dp)
-    // Dark cards rely on surface contrast; light cards retain a faint hairline.
-    val border = if (dark) null
-    else BorderStroke(1.dp, MaterialTheme.extendedColors.divider.copy(alpha = 0.5f))
+    // Material's shadow is kept flat; the clay lift is drawn by [clay] instead.
+    val elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    val surface = if (dark) modifier
+    else modifier
+        .clay(shape)
+        .background(cardColor, shape)
+        .background(ClayInnerShade, shape)
 
+    val body: @Composable ColumnScope.() -> Unit = {
+        Column(Modifier.padding(contentPadding), content = content)
+    }
     if (onClick != null) {
-        Card(
-            onClick = onClick,
-            modifier = modifier,
-            shape = shape,
-            colors = colors,
-            elevation = elevation,
-            border = border,
-        ) {
-            Column(Modifier.padding(contentPadding), content = content)
-        }
+        Card(onClick = onClick, modifier = surface, shape = shape, colors = colors, elevation = elevation, content = body)
     } else {
-        Card(
-            modifier = modifier,
-            shape = shape,
-            colors = colors,
-            elevation = elevation,
-            border = border,
-        ) {
-            Column(Modifier.padding(contentPadding), content = content)
-        }
+        Card(modifier = surface, shape = shape, colors = colors, elevation = elevation, content = body)
     }
 }
+
+/** Slate-navy tint so clay shadows read cool and soft rather than grey. */
+private val ClayTint = Color(0xFF3A4A6B)
+
+/** Barely-there darkening toward the bottom edge: the "pressed clay" volume. */
+private val ClayInnerShade = Brush.verticalGradient(
+    0.0f to Color.Transparent,
+    0.6f to Color.Transparent,
+    1.0f to ClayTint.copy(alpha = 0.035f),
+)
+
+/**
+ * A wide, low-contrast drop shadow. The color alphas multiply with the platform's
+ * shadow alpha, so these values stay diffuse rather than drawing a rim.
+ */
+private fun Modifier.clay(shape: Shape): Modifier = shadow(
+    elevation = 14.dp,
+    shape = shape,
+    clip = false,
+    ambientColor = ClayTint.copy(alpha = 0.18f),
+    spotColor = ClayTint.copy(alpha = 0.32f),
+)
 
 /** A small rounded icon tile filled with the accent's tinted container color. */
 @Composable

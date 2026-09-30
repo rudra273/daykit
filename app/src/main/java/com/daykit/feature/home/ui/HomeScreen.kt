@@ -56,7 +56,7 @@ import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.SearchAppTopBar
-import com.daykit.core.designsystem.components.AppTopBarHeight
+import com.daykit.core.designsystem.components.AppTopBarCompactHeight
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.navigation.Routes
@@ -131,14 +131,14 @@ fun HomeScreen(
 
     BackHandler(enabled = searchActive) { searchActive = false; query = "" }
 
-    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight
+    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarCompactHeight
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg, top = headerHeight,
+                start = Spacing.lg, end = Spacing.lg, top = headerHeight + Spacing.md,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xxl,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -170,6 +170,7 @@ fun HomeScreen(
             searchActive = searchActive,
             onSearchActiveChange = { searchActive = it; if (!it) query = "" },
             searchPlaceholder = "Search tools",
+            height = AppTopBarCompactHeight,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }

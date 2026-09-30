@@ -25,7 +25,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,7 +73,7 @@ fun RootScaffold(
 
     val density = LocalDensity.current
     val navigationInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    var bottomBarHeight by remember { mutableStateOf(60.dp + navigationInset) }
+    var bottomBarHeight by remember { mutableStateOf(52.dp + navigationInset) }
 
     Box(Modifier.fillMaxSize()) {
         DayKitNavHost(
@@ -93,7 +92,7 @@ fun RootScaffold(
                         .onSizeChanged { bottomBarHeight = with(density) { it.height.toDp() } }
                         .background(glassChromeBrush())
                         .navigationBarsPadding()
-                        .heightIn(min = 60.dp),
+                        .heightIn(min = 52.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TopLevelDestination.entries.forEach { dest ->
@@ -109,7 +108,7 @@ fun RootScaffold(
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 60.dp)
+                                .heightIn(min = 52.dp)
                                 .clickable(role = Role.Tab, onClickLabel = dest.label) {
                                     navController.navigate(dest.route) {
                                         popUpTo(navController.graph.findStartDestination().id) {
@@ -126,12 +125,12 @@ fun RootScaffold(
                             Crossfade(targetState = selected, animationSpec = tween(180), label = "tab icon") { active ->
                                 Icon(
                                     imageVector = if (active) dest.icon else dest.inactiveIcon,
-                                    contentDescription = null,
+                                    // Icon-only tabs: the label is the accessible name.
+                                    contentDescription = dest.label,
                                     tint = tint,
-                                    modifier = Modifier.size(24.dp).scale(iconScale),
+                                    modifier = Modifier.size(26.dp).scale(iconScale),
                                 )
                             }
-                            Text(dest.label, style = MaterialTheme.typography.labelMedium, color = tint)
                         }
                     }
                 }
