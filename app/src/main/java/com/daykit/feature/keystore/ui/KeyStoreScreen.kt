@@ -50,9 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -62,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.text.KeyboardOptions
 import com.daykit.AppContainer
+import com.daykit.core.util.SensitiveClipboard
 import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
@@ -97,7 +96,6 @@ fun KeyStoreScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
     val entries by container.keyStoreRepository
         .observeEntries()
         .collectAsStateWithLifecycle(initialValue = null)
@@ -241,7 +239,7 @@ fun KeyStoreScreen(
                                     entry = entry,
                                     onClick = { actionEntry = entry },
                                     onCopy = {
-                                        clipboard.setText(AnnotatedString(entry.value))
+                                        SensitiveClipboard.copy(context, entry.name, entry.value)
                                         scope.launch { snackbarHostState.showSnackbar("${entry.name} value copied") }
                                     },
                                 )
@@ -261,7 +259,7 @@ fun KeyStoreScreen(
             entry = entry,
             onDismiss = { actionEntry = null },
             onCopy = {
-                clipboard.setText(AnnotatedString(entry.value))
+                SensitiveClipboard.copy(context, entry.name, entry.value)
                 scope.launch { snackbarHostState.showSnackbar("Copied") }
             },
             onEdit = {

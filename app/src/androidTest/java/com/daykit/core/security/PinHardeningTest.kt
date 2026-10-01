@@ -124,6 +124,20 @@ class PinHardeningTest {
     }
 
     @Test
+    fun failedAttemptLogSurvivesASuccessfulUnlock() {
+        val repository = credentials()
+        repository.saveCredential(PIN.toCharArray())
+
+        repository.verify("000000".toCharArray())
+        repository.verify("111111".toCharArray())
+        assertEquals(PinVerifyResult.Success, repository.verify(PIN.toCharArray()))
+
+        assertEquals(2, repository.failedAttemptLog().size)
+        repository.clearFailedAttemptLog()
+        assertEquals(0, repository.failedAttemptLog().size)
+    }
+
+    @Test
     fun staleVerifierAfterInterruptedPinChangeHeals() {
         val repository = credentials()
         val manager = keyManager()

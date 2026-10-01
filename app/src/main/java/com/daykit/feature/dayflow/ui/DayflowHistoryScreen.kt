@@ -1,5 +1,6 @@
 package com.daykit.feature.dayflow.ui
 
+import com.daykit.core.util.TimeFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,7 +29,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val historyTabs = listOf("Mood", "Journal", "Pomodoro")
-private val sessionDateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a")
+private fun sessionDateFormatter(): DateTimeFormatter =
+    DateTimeFormatter.ofPattern("MMM d, yyyy · ${TimeFormat.pattern()}")
 
 @Composable
 fun DayflowHistoryScreen(container: AppContainer, onBack: () -> Unit) {
@@ -68,7 +70,7 @@ private fun PomodoroHistoryContent(container: AppContainer) {
                 Column(Modifier.fillMaxWidth()) {
                     val label = if (session.kind == "break") "Break" else "Pomodoro"
                     val date = Instant.ofEpochMilli(session.startedAtMillis)
-                        .atZone(ZoneId.systemDefault()).format(sessionDateFormatter)
+                        .atZone(ZoneId.systemDefault()).format(sessionDateFormatter())
                     Text("$label · ${session.state.replaceFirstChar { it.uppercase() }}",
                         style = MaterialTheme.typography.titleMedium)
                     Text(date, style = MaterialTheme.typography.bodySmall,

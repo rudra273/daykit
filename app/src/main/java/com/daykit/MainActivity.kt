@@ -2,6 +2,7 @@ package com.daykit
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.core.content.IntentCompat
@@ -35,6 +36,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
+import com.daykit.core.data.AppPreferences
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.permissions.AppLockPermissionChecker
 import com.daykit.core.permissions.AppLockPermissionState
@@ -259,6 +261,17 @@ private fun DayKitApp(
             if (!activity.isChangingConfigurations) {
                 container.sensitiveKeyManager.lock()
             }
+        }
+    }
+
+    // Independent of FLAG_SECURE: blanks only the Recents thumbnail, so it is
+    // useful when screenshots are allowed. Android 13+ only.
+    val hideInRecents by AppPreferences.rememberPreference(AppPreferences.KEY_HIDE_IN_RECENTS) {
+        AppPreferences.hideInRecents
+    }
+    LaunchedEffect(hideInRecents) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            activity.setRecentsScreenshotEnabled(!hideInRecents)
         }
     }
 

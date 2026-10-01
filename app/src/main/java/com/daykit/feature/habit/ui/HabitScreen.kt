@@ -2,6 +2,8 @@
 
 package com.daykit.feature.habit.ui
 
+import com.daykit.core.util.TimeFormat
+import com.daykit.core.util.WeekDays
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
@@ -117,13 +119,11 @@ import com.daykit.feature.habit.data.HabitGoalType
 import com.daykit.feature.habit.data.HabitKind
 import com.daykit.feature.habit.data.HabitLog
 import com.daykit.feature.habit.reminder.HabitReminderScheduler
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
 
 private enum class HabitTab {
@@ -1262,14 +1262,14 @@ private fun MonthHeatmap(
     relapseDates: Set<String>,
 ) {
     val firstDay = month.atDay(1)
-    // DayOfWeek.value is 1=Mon..7=Sun, so this grid is Monday-first like the rest of the app.
-    val offset = firstDay.dayOfWeek.value - 1
+    val weekStartsOn = WeekDays.firstDay()
+    val offset = WeekDays.leadingBlanks(firstDay, weekStartsOn)
     val days = month.lengthOfMonth()
     val cells = offset + days
     val rows = (cells + 6) / 7
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            listOf("M", "T", "W", "T", "F", "S", "S").forEach {
+            WeekDays.narrowLabels(weekStartsOn).forEach {
                 Text(it, color = MaterialTheme.extendedColors.textMuted, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             }
         }
@@ -2409,8 +2409,7 @@ private data class ProgressWindow(
 private val monthLabelFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy")
 private val dayLabelFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d")
 
-private fun weekStartOf(date: LocalDate): LocalDate =
-    date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+private fun weekStartOf(date: LocalDate): LocalDate = WeekDays.startOf(date)
 
 /** "Mar 3 – 9" within one month, "Dec 29 – Jan 4" when the week straddles two. */
 private fun weekRangeLabel(start: LocalDate, end: LocalDate): String {
@@ -2649,14 +2648,7 @@ private fun formatMinutes(minutes: Int): String {
     }
 }
 
-private fun timeText(hour: Int, minute: Int): String {
-    val suffix = if (hour < 12) "AM" else "PM"
-    val displayHour = when (val value = hour % 12) {
-        0 -> 12
-        else -> value
-    }
-    return "$displayHour:${minute.toString().padStart(2, '0')} $suffix"
-}
+private fun timeText(hour: Int, minute: Int): String = TimeFormat.format(hour, minute)
 
 private fun hour12(hour: Int): Int {
     return when (val value = hour.coerceIn(0, 23) % 12) {

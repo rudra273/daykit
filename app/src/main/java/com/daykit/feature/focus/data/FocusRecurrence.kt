@@ -1,5 +1,6 @@
 package com.daykit.feature.focus.data
 
+import com.daykit.core.util.TimeFormat
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -95,16 +96,9 @@ object FocusRecurrence {
         DayOfWeek.SUNDAY -> "Sun"
     }
 
-    /** Formats an hour+minute pair as "9:00 AM", matching the reminder screen. */
-    fun formatTime(hour: Int, minute: Int): String {
-        val period = if (hour < 12) "AM" else "PM"
-        val display = when {
-            hour == 0 -> 12
-            hour > 12 -> hour - 12
-            else -> hour
-        }
-        return "%d:%02d %s".format(display, minute, period)
-    }
+    /** Formats an hour+minute pair as "9:00 AM" or "09:00", per the user's clock setting. */
+    fun formatTime(hour: Int, minute: Int, use24Hour: Boolean = TimeFormat.is24Hour()): String =
+        TimeFormat.format(hour, minute, use24Hour)
 
     fun toEpochMillis(dateTime: LocalDateTime, zone: ZoneId = ZoneId.systemDefault()): Long =
         dateTime.atZone(zone).toInstant().toEpochMilli()

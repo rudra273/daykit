@@ -1,5 +1,6 @@
 package com.daykit.feature.reminder.notification
 
+import com.daykit.core.data.AppPreferences
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,7 +17,7 @@ import com.daykit.R
 import com.daykit.feature.reminder.ui.ReminderAlarmActivity
 
 object ReminderNotifier {
-    private const val CHANNEL_ID = "reminders"
+    const val CHANNEL_ID = "reminders"
 
     fun show(context: Context, reminderId: String, title: String, occurrenceMillis: Long, alert: Boolean = true) {
         val appContext = context.applicationContext
@@ -54,6 +55,7 @@ object ReminderNotifier {
                 .putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val snoozeMinutes = AppPreferences.snoozeMinutes
         val snoozePendingIntent = PendingIntent.getBroadcast(
             appContext,
             reminderId.hashCode() xor 0x51_00_2E,
@@ -62,7 +64,7 @@ object ReminderNotifier {
                 .setData(android.net.Uri.parse("daykit://reminder/$reminderId/$occurrenceMillis/snooze"))
                 .putExtra(ReminderActionReceiver.EXTRA_OCCURRENCE, occurrenceMillis)
                 .putExtra(ReminderActionReceiver.EXTRA_REMINDER_ID, reminderId)
-                .putExtra(ReminderActionReceiver.EXTRA_SNOOZE_DURATION, ReminderActionReceiver.TEN_MINUTES),
+                .putExtra(ReminderActionReceiver.EXTRA_SNOOZE_DURATION, snoozeMinutes * MILLIS_PER_MINUTE),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val dismissedPendingIntent = PendingIntent.getBroadcast(
@@ -82,14 +84,15 @@ object ReminderNotifier {
             .setContentText(timeRemainingText(occurrenceMillis))
             .setContentIntent(openPendingIntent)
             .setDeleteIntent(dismissedPendingIntent)
-            .apply { if (alert) setFullScreenIntent(fullScreenPendingIntent, true) }
+            // The user can choose a plain heads-up notification over the alarm page.
+            .apply { if (alert && AppPreferences.reminderFullScreen) setFullScreenIntent(fullScreenPendingIntent, true) }
             .setSilent(!alert)
 
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setOngoing(true)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .addAction(R.drawable.ic_todo_tracker, "Snooze 10 min", snoozePendingIntent)
+            .addAction(R.drawable.ic_todo_tracker, "Snooze $snoozeMinutes min", snoozePendingIntent)
             .addAction(R.drawable.ic_todo_tracker, "Complete", completePendingIntent)
             .build()
         NotificationManagerCompat.from(appContext).notify(notificationId(reminderId), notification)
@@ -109,7 +112,7 @@ object ReminderNotifier {
         return "Overdue by $overdueMinutes ${if (overdueMinutes == 1L) "minute" else "minutes"}"
     }
 
-    private fun ensureChannel(context: Context) {
+    fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(

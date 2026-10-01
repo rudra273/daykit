@@ -5,7 +5,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.util.Log
+import com.daykit.core.data.AppPreferences
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.session.AppLockSessionManager
 import androidx.core.content.ContextCompat
@@ -20,8 +22,18 @@ class DayKitApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // SharedPreferences holds listeners weakly, so keep a strong reference here.
+    private val preferenceMirror = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == null || key == AppPreferences.KEY_APP_LOCK_RELOCK) {
+            AppLockSessionManager.relock = AppPreferences.appLockRelock
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
+        AppPreferences.init(this)
+        AppLockSessionManager.relock = AppPreferences.appLockRelock
+        AppPreferences.registerListener(preferenceMirror)
         container = AppContainer(this)
         AppLockSessionManager.clearAll()
         registerScreenOffLock()

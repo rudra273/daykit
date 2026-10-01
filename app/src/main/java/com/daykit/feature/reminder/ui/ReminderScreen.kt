@@ -2,6 +2,7 @@
 
 package com.daykit.feature.reminder.ui
 
+import com.daykit.core.util.TimeFormat
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
@@ -596,7 +597,7 @@ private fun ReminderFormSheet(
                     onClick = { dateOpen = true },
                 )
                 SecondaryButton(
-                    text = time.format(DateTimeFormatter.ofPattern("h:mm a")),
+                    text = time.format(TimeFormat.formatter()),
                     modifier = Modifier.weight(1f),
                     leadingIcon = { Icon(Icons.Rounded.Schedule, contentDescription = null, modifier = Modifier.size(16.dp)) },
                     onClick = { timeOpen = true },
@@ -704,7 +705,11 @@ private fun TimePickerDialog(
     initialHour: Int,
     initialMinute: Int,
 ) {
-    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute)
+    val state = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = TimeFormat.is24Hour(),
+    )
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.extendedColors.card,
@@ -746,7 +751,7 @@ private fun Long.toAbsoluteText(): String {
     return Instant.ofEpochMilli(this)
         .atZone(ZoneId.systemDefault())
         .toLocalDateTime()
-        .format(DateTimeFormatter.ofPattern("dd MMM yyyy, h:mm a"))
+        .format(DateTimeFormatter.ofPattern("dd MMM yyyy, ${TimeFormat.pattern()}"))
 }
 
 private fun LocalDate.toMillis(): Long =

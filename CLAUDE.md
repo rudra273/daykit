@@ -66,7 +66,9 @@ Key invariants:
 - The key is wiped after a user-configurable grace window once the app is backgrounded (`LockGracePeriod`, default 10s, max 1 min, `KEY_LOCK_GRACE_SECONDS` mirrored in `SettingFlagCache` so `ON_STOP` reads it synchronously), including when DayKit launches a picker, chooser, or permission screen. `SensitiveKeyManager.onBackgrounded` posts the delayed wipe and `onForegrounded` (on `ON_START`, before results are delivered) re-checks the deadline against `elapsedRealtime`, because a frozen process may never run the delayed wipe. Screen-off (`DayKitApplication`) and task removal still wipe immediately. Lengthening the window requires the PIN. **Before launching an external activity, set `container.sensitiveKeyManager.expectingActivityResult = true`** so the current screen can receive its result behind the unlock gate. Any callback that needs the MSK must use `runWhenUnlocked`; its work resumes only after a fresh PIN or biometric unlock.
 - `MainActivity` and the lock activities set `FLAG_SECURE`; screenshot protection is a user setting that toggles it.
 
-`AppLockSessionManager` is a separate, in-memory, 5-minute-TTL grant map for *third-party* apps the user has locked — unrelated to the MSK.
+`AppLockSessionManager` is a separate, in-memory grant map for *third-party* apps the user has locked — unrelated to the MSK. Its expiry follows the user's `AppLockRelock` choice (default `OnLeave`: evicted on app switch, 5-minute TTL; relaxed modes stamp `leftAtMillis` and expire after the away time). `DayKitApplication` mirrors the pref into `AppLockSessionManager.relock`; screen-off always clears every grant.
+
+Key Store copies go through `SensitiveClipboard`: flagged `EXTRA_IS_SENSITIVE` and cleared by a WorkManager job (the process may be frozen by then), never a plain `setText`.
 
 ## Persistence
 
@@ -92,7 +94,13 @@ Strictness is the safety valve: a **Normal** scheduled session can be ended earl
 
 Schedules use exact alarms (`FocusScheduleScheduler`, modelled on `ReminderScheduler`) and **re-arm themselves** in `FocusScheduleReceiver` — AlarmManager has no weekday recurrence, so never `setRepeating`. `AppLockBootReceiver` re-projects and re-arms after boot. Exact-alarm permission is checked via `AppLockPermissionChecker.canScheduleExactAlarms` and deliberately excluded from `AppLockPermissionState.allGranted` — App Lock works without it; only schedules need it, and the Focus screen warns when it's missing rather than silently drifting.
 
-All settings keys are `const val KEY_*` on `SecureSettingRepository.Companion` — add new ones there, not as loose strings.
+All encrypted settings keys are `const val KEY_*` on `SecureSettingRepository.Companion` — add new ones there, not as loose strings.
+
+## Settings
+
+The Settings tab is a hub (`SettingsScreen`) linking to sub-pages: Security & Privacy, General, Appearance, Home Screen, Notifications & Permissions, Backup & Restore, Data & Storage. Sub-pages use `SettingsSubPage`, `OptionSheet` and `rememberPinGatedChange` from `SettingsComponents.kt`. Any change that *relaxes* a security setting (longer auto-lock, clipboard kept longer, App Lock re-locking later, plaintext notes export) must go through `rememberPinGatedChange`; tightening applies immediately.
+
+Non-secret preferences live in `AppPreferences` (plain prefs, same file as theme/haptics) so formatters, receivers and the monitor service read them synchronously. Use its helpers rather than hardcoding: `Money` (currency), `WeekDays` (first day of week), `TimeFormat` (12/24h, also pass `is24Hour` to Material time pickers). Before `AppPreferences.init` (JVM tests) getters return defaults.
 
 ## Backup
 

@@ -770,8 +770,8 @@ fun BackupRestoreScreen(
                     )
                     RowDivider(startIndent = Spacing.lg)
                     AppListRow(
-                        headline = "Appearance and widgets",
-                        supporting = "Theme, haptics, and dashboard widget preferences.",
+                        headline = "App preferences",
+                        supporting = "Theme, widgets, region, reminders and Home layout. Security settings are not included.",
                         trailing = { AppSwitch(checked = includeAppPreferences == true, onCheckedChange = { enabled ->
                             scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_PREFERENCES, enabled) }
                         }) },
@@ -934,7 +934,7 @@ private fun toolDisplayName(toolKey: String): String = when (toolKey) {
     BackupToolKeys.REMINDERS -> "Reminders"
     BackupToolKeys.APP_LOCK -> "App Lock selections"
     BackupToolKeys.EVENT_LIGHT -> "Event Light"
-    BackupToolKeys.APP_PREFERENCES -> "Appearance and widgets"
+    BackupToolKeys.APP_PREFERENCES -> "App preferences"
     else -> toolKey
 }
 

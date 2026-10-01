@@ -1,5 +1,6 @@
 package com.daykit.feature.widget
 
+import com.daykit.core.util.TimeFormat
 import android.content.Context
 import android.content.Intent
 import android.view.View
@@ -39,7 +40,7 @@ private class ReminderFactory(private val context: Context) : RemoteViewsService
             ?: return RemoteViews(context.packageName, R.layout.widget_reminder_error)
         val time = reminder.widgetDisplayTime
         val formatted = android.text.format.DateFormat.getMediumDateFormat(context).format(Date(time)) +
-            " · " + android.text.format.DateFormat.getTimeFormat(context).format(Date(time))
+            " · " + TimeFormat.formatter().format(java.time.Instant.ofEpochMilli(time).atZone(java.time.ZoneId.systemDefault()))
         val overdue = time <= System.currentTimeMillis()
         val status = when {
             reminder.snoozedUntilMillis != null -> R.string.widget_reminder_snoozed

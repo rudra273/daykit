@@ -1,6 +1,7 @@
 package com.daykit.feature.dayflow.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import com.daykit.core.util.WeekDays
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -48,7 +49,8 @@ fun MoodHistoryScreen(container: AppContainer) {
         runCatching { YearMonth.from(LocalDate.parse(entry.date)) == month }.getOrDefault(false)
     }
     val byDate = entries.associateBy { it.date }
-    val firstDayOffset = month.atDay(1).dayOfWeek.value - 1 // Monday first
+    val weekStartsOn = WeekDays.firstDay()
+    val firstDayOffset = WeekDays.leadingBlanks(month.atDay(1), weekStartsOn)
     val days: List<LocalDate?> = List(firstDayOffset) { null } +
         (1..month.lengthOfMonth()).map(month::atDay)
 
@@ -74,7 +76,7 @@ fun MoodHistoryScreen(container: AppContainer) {
             item {
                 AppCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth()) {
-                        listOf("M", "T", "W", "T", "F", "S", "S").forEach { label ->
+                        WeekDays.narrowLabels(weekStartsOn).forEach { label ->
                             Text(label, modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.labelMedium)
                         }

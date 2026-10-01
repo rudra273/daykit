@@ -1,5 +1,6 @@
 package com.daykit.feature.focus.ui
 
+import com.daykit.core.util.TimeFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -340,7 +341,11 @@ private fun FocusTimePickerDialog(
     onConfirm: (Int, Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute)
+    val state = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = TimeFormat.is24Hour(),
+    )
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.extendedColors.card,

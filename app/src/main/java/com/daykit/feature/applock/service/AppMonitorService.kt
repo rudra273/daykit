@@ -307,9 +307,10 @@ class AppMonitorService : Service() {
                             activeActivityLockPackage = null
                             activeActivityLockIsFocus = false
                         }
-                        // Evicting every other package's grant is safe here: a real app
-                        // switch always surfaces the new package as a resume event.
-                        AppLockSessionManager.keepOnly(foregroundPackage)
+                        // Evicting (or, in a relaxed re-lock mode, stamping) every other
+                        // package's grant is safe here: a real app switch always
+                        // surfaces the new package as a resume event.
+                        AppLockSessionManager.onForegroundChanged(foregroundPackage)
                     }
                 }
 

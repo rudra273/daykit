@@ -1,5 +1,6 @@
 package com.daykit.feature.home.ui
 
+import com.daykit.core.data.AppPreferences
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,22 +17,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Dns
-import androidx.compose.material.icons.rounded.PhotoSizeSelectLarge
-import androidx.compose.material.icons.rounded.DocumentScanner
-import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.FlashOn
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.SearchOff
-import androidx.compose.material.icons.rounded.Timer
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.TrackChanges
-import androidx.compose.material.icons.rounded.VpnKey
-import androidx.compose.material.icons.rounded.Notes
-import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,8 +28,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.WindowInsets
@@ -59,16 +43,6 @@ import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.AppTopBarCompactHeight
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
-import com.daykit.navigation.Routes
-
-private data class ToolTile(
-    val route: String,
-    val name: String,
-    val description: String,
-    val icon: ImageVector,
-    val accent: @Composable () -> Color,
-    val keywords: List<String>,
-)
 
 @Composable
 fun HomeScreen(
@@ -84,50 +58,22 @@ fun HomeScreen(
 
     val accents = MaterialTheme.extendedColors.accents
 
-    val security = listOf(
-        ToolTile(Routes.TOOL_APPLOCK, "App Lock", "Protect selected apps", Icons.Rounded.Lock, { accents.blue },
-            listOf("app lock", "lock")),
-        ToolTile(Routes.TOOL_KEYSTORE, "Key Store", "Store private values", Icons.Rounded.VpnKey, { accents.indigo },
-            listOf("key store", "password", "vault")),
-        ToolTile(Routes.TOOL_NOTES, "Notes", "Keep private notes", Icons.Rounded.Notes, { accents.teal },
-            listOf("notes", "secure notes")),
-        ToolTile(Routes.TOOL_FILEVAULT, "File Vault", "Protect photos & videos", Icons.Rounded.Folder, { accents.purple },
-            listOf("file vault", "file locker", "hide files", "images", "videos")),
-    )
-    val productivity = listOf(
-        ToolTile(Routes.TOOL_DAYFLOW, "Dayflow", "Pomodoro, journal & mood", Icons.Rounded.AutoAwesome, { accents.indigo },
-            listOf("dayflow", "pomodoro", "journal", "mood", "timer")),
-        ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TrackChanges, { accents.green },
-            listOf("habit", "habits")),
-        ToolTile(Routes.TOOL_FOCUS, "Focus", "Block distractions", Icons.Rounded.Timer, { accents.red },
-            listOf("focus", "focus block", "block app", "distraction", "screen time")),
-        ToolTile(Routes.TOOL_EXPENSES, "Expenses", "Track monthly spending", Icons.Rounded.Payments, { accents.pink },
-            listOf("expenses", "budget", "money")),
-    )
-    val other = listOf(
-        ToolTile(Routes.TOOL_DEVICE_MANAGER, "Device Manager", "Usage, storage & battery", Icons.Rounded.PhoneAndroid, { accents.teal },
-            listOf("device manager", "usage", "storage", "battery", "largest files", "apps")),
-        ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
-            listOf("reminder", "notification", "alarm")),
-        ToolTile(Routes.TOOL_SCANNER, "Document Scanner", "Scan documents", Icons.Rounded.DocumentScanner, { accents.blue },
-            listOf("scanner", "scan document", "document", "camera", "pdf")),
-        ToolTile(Routes.TOOL_IMAGE, "Image Tool", "Resize, compress & strip location", Icons.Rounded.PhotoSizeSelectLarge, { accents.green },
-            listOf("image", "photo", "resize", "compress", "convert", "exif", "location", "metadata", "jpeg", "png", "webp")),
-        ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.yellow },
-            listOf("editor", "document", "text", "pdf")),
-        ToolTile(Routes.TOOL_DNS, "DNS Manager", "Set up Private DNS", Icons.Rounded.Dns, { accents.red },
-            listOf("dns", "ad block", "private dns")),
-        ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", "Light for video calls", Icons.Rounded.FlashOn, { accents.yellow },
-            listOf("event light", "ring light", "video call light", "night light", "border light")),
-    )
-
+    val hiddenTools by AppPreferences.rememberPreference(AppPreferences.KEY_HOME_HIDDEN_TOOLS) {
+        AppPreferences.homeHiddenTools
+    }
+    val toolOrder by AppPreferences.rememberPreference(AppPreferences.KEY_HOME_TOOL_ORDER) {
+        AppPreferences.homeToolOrder
+    }
+    // Search still finds hidden tools, so hiding one never makes it unreachable.
     val q = query.trim()
-    fun match(t: ToolTile) = q.isBlank() || t.keywords.any { it.contains(q, true) } ||
-        t.name.contains(q, true)
-    val fSecurity = security.filter(::match)
-    val fProductivity = productivity.filter(::match)
-    val fOther = other.filter(::match)
-    val nothing = fSecurity.isEmpty() && fProductivity.isEmpty() && fOther.isEmpty()
+    fun match(t: ToolTile) = if (q.isBlank()) {
+        t.route !in hiddenTools
+    } else {
+        t.keywords.any { it.contains(q, true) } || t.name.contains(q, true)
+    }
+    val sections = homeToolCatalog(accents).ordered(toolOrder)
+        .map { section -> section.copy(tools = section.tools.filter(::match)) }
+    val nothing = sections.all { it.tools.isEmpty() }
 
     BackHandler(enabled = searchActive) { searchActive = false; query = "" }
 
@@ -148,20 +94,23 @@ fun HomeScreen(
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
                         icon = Icons.Rounded.SearchOff,
-                        title = "No tools found",
-                        description = "Try a different search.",
+                        title = if (q.isBlank()) "All tools are hidden" else "No tools found",
+                        description = if (q.isBlank()) {
+                            "Show them again in Settings → Home Screen, or search for a tool."
+                        } else {
+                            "Try a different search."
+                        },
                         modifier = Modifier.padding(top = Spacing.xxl),
                     )
                 }
             }
-            toolSection("Security", fSecurity, onOpenTool, firstSection = true)
-            toolSection("Productivity", fProductivity, onOpenTool, firstSection = fSecurity.isEmpty())
-            toolSection(
-                "Utilities",
-                fOther,
-                onOpenTool,
-                firstSection = fSecurity.isEmpty() && fProductivity.isEmpty(),
-            )
+            var firstVisible = true
+            sections.forEach { section ->
+                if (section.tools.isNotEmpty()) {
+                    toolSection(section.title, section.tools, onOpenTool, firstSection = firstVisible)
+                    firstVisible = false
+                }
+            }
         }
         SearchAppTopBar(
             title = "DayKit",

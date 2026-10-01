@@ -1,5 +1,6 @@
 package com.daykit.feature.reminder.ui
 
+import com.daykit.core.data.AppPreferences
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -175,7 +176,8 @@ private fun ReminderAlarmScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                listOf(5, 10, 30).forEach { minutes ->
+                // Always offer the user's default snooze length alongside the presets.
+                (listOf(5, 10, 30) + AppPreferences.snoozeMinutes).distinct().sorted().forEach { minutes ->
                     SecondaryButton(
                         text = "$minutes min",
                         modifier = Modifier.weight(1f),

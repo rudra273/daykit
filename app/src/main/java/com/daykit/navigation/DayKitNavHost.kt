@@ -34,6 +34,11 @@ import com.daykit.feature.scanner.ui.DocumentScannerScreen
 import com.daykit.feature.settings.ui.AboutAppScreen
 import com.daykit.feature.settings.ui.AppearanceScreen
 import com.daykit.feature.settings.ui.BackupRestoreScreen
+import com.daykit.feature.settings.ui.DataStorageScreen
+import com.daykit.feature.settings.ui.GeneralSettingsScreen
+import com.daykit.feature.settings.ui.HomeLayoutSettingsScreen
+import com.daykit.feature.settings.ui.NotificationSettingsScreen
+import com.daykit.feature.settings.ui.SecuritySettingsScreen
 import com.daykit.feature.settings.ui.PrivacyPolicyScreen
 import com.daykit.feature.settings.ui.SettingsScreen
 import com.daykit.feature.today.ui.TodayScreen
@@ -76,8 +81,12 @@ fun DayKitNavHost(
         }
         opaqueComposable(Routes.SETTINGS) {
             SettingsScreen(
-                container = container,
                 bottomBarPadding = bottomBarPadding,
+                onOpenSecurity = { navController.navigate(Routes.SETTINGS_SECURITY) },
+                onOpenGeneral = { navController.navigate(Routes.SETTINGS_GENERAL) },
+                onOpenHomeLayout = { navController.navigate(Routes.SETTINGS_HOME_LAYOUT) },
+                onOpenNotifications = { navController.navigate(Routes.SETTINGS_NOTIFICATIONS) },
+                onOpenDataStorage = { navController.navigate(Routes.SETTINGS_DATA) },
                 onOpenBackupRestore = { navController.navigate(Routes.SETTINGS_BACKUP) },
                 onOpenAppearance = { navController.navigate(Routes.SETTINGS_APPEARANCE) },
                 onOpenAboutApp = { navController.navigate(Routes.SETTINGS_ABOUT) },
@@ -125,6 +134,11 @@ fun DayKitNavHost(
         }
 
         // ── Settings sub-screens ──
+        opaqueComposable(Routes.SETTINGS_SECURITY) { SecuritySettingsScreen(container = container, onBack = back) }
+        opaqueComposable(Routes.SETTINGS_GENERAL) { GeneralSettingsScreen(onBack = back) }
+        opaqueComposable(Routes.SETTINGS_HOME_LAYOUT) { HomeLayoutSettingsScreen(onBack = back) }
+        opaqueComposable(Routes.SETTINGS_NOTIFICATIONS) { NotificationSettingsScreen(onBack = back) }
+        opaqueComposable(Routes.SETTINGS_DATA) { DataStorageScreen(container = container, onBack = back) }
         opaqueComposable(Routes.SETTINGS_BACKUP) { BackupRestoreScreen(container = container, onBack = back) }
         opaqueComposable(Routes.SETTINGS_APPEARANCE) { AppearanceScreen(onBack = back) }
         opaqueComposable(Routes.SETTINGS_ABOUT) { AboutAppScreen(onBack = back) }

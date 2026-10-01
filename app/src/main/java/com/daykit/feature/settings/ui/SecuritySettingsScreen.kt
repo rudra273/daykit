@@ -2,6 +2,21 @@
 
 package com.daykit.feature.settings.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import android.os.Build
+import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.LockClock
+import androidx.compose.material.icons.rounded.ReportGmailerrorred
+import com.daykit.core.data.AppLockRelock
+import com.daykit.core.data.AppPreferences
+import com.daykit.core.data.ClipboardClear
+import com.daykit.core.util.TimeFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -11,49 +26,31 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Fingerprint
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -63,14 +60,10 @@ import androidx.compose.ui.platform.LocalContext
 import com.daykit.AppContainer
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.designsystem.Spacing
-import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppTextButton
-import com.daykit.core.designsystem.components.AppTextField
-import com.daykit.core.designsystem.components.AppTopBar
-import com.daykit.core.designsystem.components.AppTopBarCompactHeight
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.RowDivider
@@ -145,13 +138,9 @@ private suspend fun setSettingsLocked(
 }
 
 @Composable
-fun SettingsScreen(
+fun SecuritySettingsScreen(
     container: AppContainer,
-    bottomBarPadding: androidx.compose.foundation.layout.PaddingValues,
-    onOpenBackupRestore: () -> Unit,
-    onOpenAppearance: () -> Unit,
-    onOpenAboutApp: () -> Unit,
-    onOpenPrivacyPolicy: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val activity = context as FragmentActivity
@@ -183,9 +172,55 @@ fun SettingsScreen(
     var showScreenshotDisableConfirm by remember { mutableStateOf(false) }
     var screenshotDisableError by remember { mutableStateOf<String?>(null) }
     var showLockGracePicker by remember { mutableStateOf(false) }
-    // A longer window weakens the lock, so it needs the PIN; shorter applies at once.
-    var pendingLockGraceSeconds by remember { mutableStateOf<Int?>(null) }
-    var lockGraceError by remember { mutableStateOf<String?>(null) }
+    var showClipboardPicker by remember { mutableStateOf(false) }
+    var showRelockPicker by remember { mutableStateOf(false) }
+    var showFailedAttempts by remember { mutableStateOf(false) }
+    val hideInRecents by AppPreferences.rememberPreference(AppPreferences.KEY_HIDE_IN_RECENTS) {
+        AppPreferences.hideInRecents
+    }
+    val clipboardSeconds by AppPreferences.rememberPreference(AppPreferences.KEY_CLIPBOARD_CLEAR_SECONDS) {
+        AppPreferences.clipboardClearSeconds
+    }
+    val appLockRelock by AppPreferences.rememberPreference(AppPreferences.KEY_APP_LOCK_RELOCK) {
+        AppPreferences.appLockRelock
+    }
+    // Re-read whenever the page resumes, since a wrong entry may have happened elsewhere.
+    var failedAttempts by remember { mutableStateOf(container.credentialRepository.failedAttemptLog()) }
+
+    // Relaxing any of these needs the master credential; tightening applies at once.
+    val lockGraceChange = rememberPinGatedChange<Int>(
+        container = container,
+        title = "Lock later",
+        message = { seconds ->
+            "Enter your master ${credentialKind.label} to lock DayKit " +
+                "${LockGracePeriod.label(seconds).replaceFirstChar { it.lowercase() }} instead."
+        },
+        apply = { seconds ->
+            scope.launch {
+                container.secureSettingRepository.putInt(SecureSettingRepository.KEY_LOCK_GRACE_SECONDS, seconds)
+            }
+        },
+    )
+    val clipboardChange = rememberPinGatedChange<Int>(
+        container = container,
+        title = "Keep copied secrets longer",
+        message = { seconds ->
+            "Enter your master ${credentialKind.label} to " + if (seconds == 0) {
+                "stop clearing copied secrets."
+            } else {
+                "clear copied secrets ${ClipboardClear.label(seconds).replaceFirstChar { it.lowercase() }}."
+            }
+        },
+        apply = { seconds -> AppPreferences.clipboardClearSeconds = seconds },
+    )
+    val relockChange = rememberPinGatedChange<AppLockRelock>(
+        container = container,
+        title = "Re-lock apps later",
+        message = { mode ->
+            "Enter your master ${credentialKind.label} to re-lock apps ${mode.label.replaceFirstChar { it.lowercase() }}."
+        },
+        apply = { mode -> AppPreferences.appLockRelock = mode },
+    )
     var showAdminDisableConfirm by remember { mutableStateOf(false) }
     var adminDisableError by remember { mutableStateOf<String?>(null) }
 
@@ -212,6 +247,7 @@ fun SettingsScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                failedAttempts = container.credentialRepository.failedAttemptLog()
                 val wasAdmin = isAdminActive
                 isAdminActive = isDeviceAdminActive(context)
                 if (!wasAdmin && isAdminActive) {
@@ -226,49 +262,18 @@ fun SettingsScreen(
     }
 
     val accents = MaterialTheme.extendedColors.accents
-    val listState = rememberLazyListState()
 
-    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarCompactHeight
-    Box(Modifier.fillMaxSize()) {
-
+    SettingsSubPage(title = "Security & Privacy", onBack = onBack) {
         if (!settingsLoaded) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                LoadingIndicator()
-            }
-            AppTopBar(title = "Settings", height = AppTopBarCompactHeight, modifier = Modifier.align(Alignment.TopCenter))
-            return
-        }
-
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = Spacing.lg,
-                end = Spacing.lg,
-                top = headerHeight + Spacing.md,
-                bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xl,
-            ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            // ---- Data ----
-            item { SectionHeader("Data", topPadding = 0.dp) }
             item {
-                AppCard(contentPadding = PaddingValues(0.dp)) {
-                    AppListRow(
-                        headline = "Backup & Restore",
-                        leadingIcon = Icons.Rounded.CloudUpload,
-                        leadingAccent = accents.blue,
-                        trailing = { NavChevron() },
-                        onClick = onOpenBackupRestore,
-                    )
+                Box(Modifier.fillMaxWidth().padding(top = Spacing.xxl), contentAlignment = Alignment.Center) {
+                    LoadingIndicator()
                 }
             }
+            return@SettingsSubPage
+        }
 
-            // ---- Security ----
-            item { SectionHeader("Security") }
+            item { SectionHeader("Unlock", topPadding = 0.dp) }
             item {
                 AppCard(contentPadding = PaddingValues(0.dp)) {
                     // Change master PIN or password
@@ -350,7 +355,11 @@ fun SettingsScreen(
                         trailing = { NavChevron() },
                         onClick = { showLockGracePicker = true },
                     )
-                    RowDivider(startIndent = Spacing.lg)
+                }
+            }
+            item { SectionHeader("Privacy") }
+            item {
+                AppCard(contentPadding = PaddingValues(0.dp)) {
                     // Screenshot protection
                     AppListRow(
                         headline = "Screenshot Protection",
@@ -376,6 +385,50 @@ fun SettingsScreen(
                         },
                     )
                     RowDivider(startIndent = Spacing.lg)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        AppListRow(
+                            headline = "Hide in Recents",
+                            supporting = "Blank DayKit's preview in the app switcher",
+                            leadingIcon = Icons.Rounded.Layers,
+                            leadingAccent = accents.indigo,
+                            onClick = { AppPreferences.hideInRecents = !hideInRecents },
+                            trailing = {
+                                AppSwitch(
+                                    checked = hideInRecents,
+                                    onCheckedChange = { AppPreferences.hideInRecents = it },
+                                )
+                            },
+                        )
+                        RowDivider(startIndent = Spacing.lg)
+                    }
+                    AppListRow(
+                        headline = "Clear Copied Secrets",
+                        supporting = ClipboardClear.label(clipboardSeconds),
+                        leadingIcon = Icons.Rounded.ContentPaste,
+                        leadingAccent = accents.teal,
+                        trailing = { NavChevron() },
+                        onClick = { showClipboardPicker = true },
+                    )
+                }
+            }
+            item { SettingsFootnote("Copied Key Store values are hidden from the clipboard preview and cleared after this time.") }
+            item { SectionHeader("App Lock") }
+            item {
+                AppCard(contentPadding = PaddingValues(0.dp)) {
+                    AppListRow(
+                        headline = "Re-lock Locked Apps",
+                        supporting = appLockRelock.label,
+                        leadingIcon = Icons.Rounded.LockClock,
+                        leadingAccent = accents.blue,
+                        trailing = { NavChevron() },
+                        onClick = { showRelockPicker = true },
+                    )
+                }
+            }
+            item { SettingsFootnote("Turning the screen off always re-locks every app.") }
+            item { SectionHeader("Protection") }
+            item {
+                AppCard(contentPadding = PaddingValues(0.dp)) {
                     // Uninstall protection
                     AppListRow(
                         headline = "Uninstall Protection",
@@ -416,49 +469,22 @@ fun SettingsScreen(
                     }
                 }
             }
-
-            // ---- Preferences ----
-            item { SectionHeader("Preferences") }
+            item { SectionHeader("Activity") }
             item {
                 AppCard(contentPadding = PaddingValues(0.dp)) {
                     AppListRow(
-                        headline = "Appearance",
-                        leadingIcon = Icons.Rounded.Palette,
-                        leadingAccent = accents.orange,
+                        headline = "Failed Unlock Attempts",
+                        supporting = when {
+                            failedAttempts.isEmpty() -> "None recorded"
+                            else -> "${failedAttempts.size} recent · last ${formatAttemptTime(failedAttempts.first())}"
+                        },
+                        leadingIcon = Icons.Rounded.ReportGmailerrorred,
+                        leadingAccent = accents.red,
                         trailing = { NavChevron() },
-                        onClick = onOpenAppearance,
+                        onClick = { showFailedAttempts = true },
                     )
                 }
             }
-
-            // ---- About ----
-            item { SectionHeader("About") }
-            item {
-                AppCard(contentPadding = PaddingValues(0.dp)) {
-                    AppListRow(
-                        headline = "About DayKit",
-                        leadingIcon = Icons.Rounded.Info,
-                        leadingAccent = accents.blue,
-                        trailing = { NavChevron() },
-                        onClick = onOpenAboutApp,
-                    )
-                    RowDivider(startIndent = Spacing.lg)
-                    AppListRow(
-                        headline = "Privacy Policy",
-                        leadingIcon = Icons.Rounded.Policy,
-                        leadingAccent = accents.green,
-                        trailing = { NavChevron() },
-                        onClick = onOpenPrivacyPolicy,
-                    )
-                }
-            }
-
-        }
-        AppTopBar(
-            title = "Settings",
-            height = AppTopBarCompactHeight,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
     }
 
     // ---- Change PIN sheet ----
@@ -578,54 +604,67 @@ fun SettingsScreen(
 
     // ---- Auto-lock picker ----
     if (showLockGracePicker) {
-        LockGraceSheet(
-            selectedSeconds = lockGraceSeconds,
+        OptionSheet(
+            title = "Auto-Lock",
+            description = "How long DayKit stays unlocked after you switch to another app. " +
+                "Turning the screen off always locks it immediately.",
+            options = LockGracePeriod.OPTIONS_SECONDS,
+            selected = lockGraceSeconds,
+            label = LockGracePeriod::label,
             onDismiss = { showLockGracePicker = false },
             onSelect = { seconds ->
                 showLockGracePicker = false
-                if (seconds > lockGraceSeconds) {
-                    lockGraceError = null
-                    pendingLockGraceSeconds = seconds
-                } else if (seconds != lockGraceSeconds) {
-                    scope.launch {
-                        container.secureSettingRepository.putInt(
-                            SecureSettingRepository.KEY_LOCK_GRACE_SECONDS,
-                            seconds,
-                        )
-                    }
+                if (seconds != lockGraceSeconds) lockGraceChange.request(seconds, seconds > lockGraceSeconds)
+            },
+        )
+    }
+
+    // ---- Clipboard picker ----
+    if (showClipboardPicker) {
+        OptionSheet(
+            title = "Clear Copied Secrets",
+            description = "When a value copied from Key Store is wiped from the clipboard.",
+            options = ClipboardClear.OPTIONS_SECONDS,
+            selected = clipboardSeconds,
+            label = ClipboardClear::label,
+            onDismiss = { showClipboardPicker = false },
+            onSelect = { seconds ->
+                showClipboardPicker = false
+                if (seconds != clipboardSeconds) {
+                    // 0 means never, the weakest choice.
+                    fun strength(value: Int) = if (value == 0) Int.MAX_VALUE else value
+                    clipboardChange.request(seconds, strength(seconds) > strength(clipboardSeconds))
                 }
             },
         )
     }
 
-    // ---- Auto-lock lengthen confirm ----
-    pendingLockGraceSeconds?.let { seconds ->
-        ConfirmPinSheet(
-            credentialKind = credentialKind,
-            title = "Lock later",
-            message = "Enter your master ${credentialKind.label} to lock DayKit " +
-                "${LockGracePeriod.label(seconds).replaceFirstChar { it.lowercase() }} instead.",
-            error = lockGraceError,
-            onDismiss = {
-                pendingLockGraceSeconds = null
-                lockGraceError = null
+    // ---- App Lock re-lock picker ----
+    if (showRelockPicker) {
+        OptionSheet(
+            title = "Re-lock Locked Apps",
+            description = "When an app you unlocked through App Lock asks for your " +
+                "${credentialKind.label} again.",
+            options = AppLockRelock.entries,
+            selected = appLockRelock,
+            label = { it.label },
+            onDismiss = { showRelockPicker = false },
+            onSelect = { mode ->
+                showRelockPicker = false
+                if (mode != appLockRelock) relockChange.request(mode, mode.ordinal > appLockRelock.ordinal)
             },
-            onConfirm = { pin ->
-                scope.launch {
-                    val result = withContext(Dispatchers.Default) {
-                        container.credentialRepository.verify(pin.toCharArray())
-                    }
-                    if (result is PinVerifyResult.Success) {
-                        container.secureSettingRepository.putInt(
-                            SecureSettingRepository.KEY_LOCK_GRACE_SECONDS,
-                            seconds,
-                        )
-                        pendingLockGraceSeconds = null
-                        lockGraceError = null
-                    } else {
-                        lockGraceError = result.errorMessageOrNull(credentialKind)
-                    }
-                }
+        )
+    }
+
+    // ---- Failed attempts ----
+    if (showFailedAttempts) {
+        FailedAttemptsSheet(
+            attempts = failedAttempts,
+            onDismiss = { showFailedAttempts = false },
+            onClear = {
+                container.credentialRepository.clearFailedAttemptLog()
+                failedAttempts = emptyList()
+                showFailedAttempts = false
             },
         )
     }
@@ -660,64 +699,6 @@ fun SettingsScreen(
         )
     }
 
-}
-
-@Composable
-private fun LockGraceSheet(
-    selectedSeconds: Int,
-    onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit,
-) {
-    AppBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier.padding(
-                start = Spacing.lg,
-                end = Spacing.lg,
-                bottom = Spacing.sm,
-            ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Text(
-                text = "Auto-Lock",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "How long DayKit stays unlocked after you switch to another app. " +
-                    "Turning the screen off always locks it immediately.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.extendedColors.textMuted,
-            )
-        }
-        LockGracePeriod.OPTIONS_SECONDS.forEach { seconds ->
-            AppListRow(
-                headline = LockGracePeriod.label(seconds),
-                trailing = if (seconds == selectedSeconds) {
-                    {
-                        Icon(
-                            imageVector = Icons.Rounded.Check,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                } else {
-                    null
-                },
-                onClick = { onSelect(seconds) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun NavChevron() {
-    Icon(
-        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-        contentDescription = null,
-        tint = MaterialTheme.extendedColors.textMuted,
-        modifier = Modifier.size(20.dp),
-    )
 }
 
 @Composable
@@ -871,103 +852,66 @@ private fun ChangePinSheet(
 }
 
 /** Masked input for a master credential: number pad for a PIN, full keyboard for a password. */
-@Composable
-private fun CredentialField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    kind: CredentialKind,
-    label: String,
-    isError: Boolean = false,
-    supportingText: String? = null,
-) {
-    AppTextField(
-        value = value,
-        onValueChange = { onValueChange(CredentialRepository.sanitize(it, kind)) },
-        label = label,
-        isError = isError,
-        supportingText = supportingText,
-        visualTransformation = PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = if (kind == CredentialKind.Pin) KeyboardType.NumberPassword else KeyboardType.Password,
-            autoCorrectEnabled = false,
-        ),
-    )
-}
 
 @Composable
-private fun ConfirmPinSheet(
-    credentialKind: CredentialKind,
-    title: String,
-    message: String,
+private fun FailedAttemptsSheet(
+    attempts: List<Long>,
     onDismiss: () -> Unit,
-    onConfirm: (pin: String) -> Unit,
-    error: String? = null,
-    showFingerprint: Boolean = false,
-    onFingerprint: (() -> Unit)? = null,
+    onClear: () -> Unit,
 ) {
-    var pin by remember { mutableStateOf("") }
-    // Clear the PIN field whenever a new error arrives from the caller.
-    LaunchedEffect(error) {
-        if (error != null) pin = ""
-    }
-
     AppBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.padding(
-                start = Spacing.lg,
-                end = Spacing.lg,
-                bottom = Spacing.lg,
-            ),
+            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text(
-                text = title,
+                text = "Failed Unlock Attempts",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = message,
+                text = if (attempts.isEmpty()) {
+                    "No wrong PIN or password entries have been recorded."
+                } else {
+                    "Wrong entries on any DayKit lock screen, including locked apps. " +
+                        "The last ${attempts.size} are kept."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.extendedColors.textMuted,
             )
-            CredentialField(
-                value = pin,
-                onValueChange = { pin = it },
-                kind = credentialKind,
-                label = "Master ${credentialKind.label}",
-                isError = error != null,
-                supportingText = error,
-            )
+            attempts.forEach { millis ->
+                Text(
+                    text = formatAttemptTime(millis),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (showFingerprint && onFingerprint != null) {
-                    SecondaryButton(
-                        text = "Fingerprint",
-                        leadingIcon = {
-                            Icon(
-                                Icons.Rounded.Fingerprint,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
-                        onClick = onFingerprint,
+                if (attempts.isNotEmpty()) {
+                    AppTextButton(
+                        text = "Clear",
+                        color = MaterialTheme.extendedColors.textMuted,
+                        onClick = onClear,
                     )
-                    Spacer(Modifier.weight(1f))
                 }
-                AppTextButton(
-                    text = "Cancel",
-                    color = MaterialTheme.extendedColors.textMuted,
-                    onClick = onDismiss,
-                )
-                PrimaryButton(
-                    text = "Confirm",
-                    enabled = pin.isNotEmpty(),
-                    onClick = { onConfirm(pin) },
-                )
+                PrimaryButton(text = "Done", onClick = onDismiss)
             }
         }
+    }
+}
+
+/** "Today, 9:41 PM" / "12 Sep, 21:41". */
+private fun formatAttemptTime(millis: Long): String {
+    val dateTime = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
+    val time = TimeFormat.format(dateTime.hour, dateTime.minute)
+    val date = dateTime.toLocalDate()
+    val today = LocalDate.now()
+    return when (date) {
+        today -> "Today, $time"
+        today.minusDays(1) -> "Yesterday, $time"
+        else -> "${date.format(DateTimeFormatter.ofPattern("d MMM yyyy"))}, $time"
     }
 }

@@ -137,10 +137,27 @@ class CredentialRepository(
 
     private fun hashVersion(): Int = prefs.getInt(KEY_HASH_VERSION, HASH_VERSION_ARGON_ONLY)
 
+    /**
+     * Times of recent wrong PIN/password entries, newest first, across every
+     * unlock surface. Unlike the lockout counter this survives a correct entry,
+     * so the user can see that someone tried while they were away.
+     */
+    fun failedAttemptLog(): List<Long> =
+        prefs.getString(KEY_FAILED_LOG, null)
+            ?.split(',')
+            ?.mapNotNull(String::toLongOrNull)
+            .orEmpty()
+
+    fun clearFailedAttemptLog() {
+        prefs.edit { remove(KEY_FAILED_LOG) }
+    }
+
     private fun registerFailure(now: Long): PinVerifyResult {
         val attempts = prefs.getInt(KEY_FAILED_ATTEMPTS, 0) + 1
         val lockMillis = lockoutForAttempts(attempts)
+        val log = (listOf(now) + failedAttemptLog()).take(MAX_FAILED_LOG_ENTRIES)
         prefs.edit {
+            putString(KEY_FAILED_LOG, log.joinToString(","))
             putInt(KEY_FAILED_ATTEMPTS, attempts)
             if (lockMillis > 0L) {
                 putLong(KEY_LOCKED_UNTIL, now + lockMillis)
@@ -210,6 +227,8 @@ class CredentialRepository(
         private const val KEY_KIND = "credential_kind"
         private const val KEY_FAILED_ATTEMPTS = "failed_attempts"
         private const val KEY_LOCKED_UNTIL = "locked_until_millis"
+        private const val KEY_FAILED_LOG = "failed_attempt_log"
+        private const val MAX_FAILED_LOG_ENTRIES = 20
 
         private const val HASH_VERSION_ARGON_ONLY = 1
         private const val HASH_VERSION_HARDWARE = 2

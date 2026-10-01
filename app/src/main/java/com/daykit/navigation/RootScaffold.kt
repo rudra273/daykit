@@ -43,6 +43,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.daykit.AppContainer
+import com.daykit.core.data.AppPreferences
+import com.daykit.core.data.StartTab
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.fragment.app.FragmentActivity
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.designsystem.components.glassChromeBrush
@@ -62,6 +65,21 @@ fun RootScaffold(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val onTopLevel = currentDestination?.hierarchy?.any { it.route in TOP_LEVEL_ROUTES } == true
+
+    // Open on the user's chosen tab once per launch. Home stays the graph's start
+    // destination so back from Today still lands on Home, as with a tab tap.
+    var startTabApplied by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!startTabApplied) {
+            startTabApplied = true
+            if (AppPreferences.startTab == StartTab.Today) {
+                navController.navigate(Routes.TODAY) {
+                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
 
     // Media shared into the app goes to the file vault, which consumes the URIs.
     val pendingShares by container.pendingVaultShares.collectAsStateWithLifecycle()

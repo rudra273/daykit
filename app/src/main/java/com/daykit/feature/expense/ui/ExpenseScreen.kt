@@ -2,6 +2,7 @@
 
 package com.daykit.feature.expense.ui
 
+import com.daykit.core.util.WeekDays
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -95,13 +96,11 @@ import com.daykit.feature.expense.data.ExpenseEntryKind
 import com.daykit.feature.expense.data.ExpenseMonthSummary
 import com.daykit.feature.expense.data.MonthlyBill
 import kotlinx.coroutines.CancellationException
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToLong
 
 private enum class ExpenseChartMode {
@@ -1405,7 +1404,7 @@ private fun chartBars(
     return when (mode) {
         ExpenseChartMode.Daily -> {
             val today = LocalDate.now()
-            val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            val weekStart = WeekDays.startOf(today)
             (0..6).map { offset ->
                 val date = weekStart.plusDays(offset.toLong())
                 val amount = allEntries

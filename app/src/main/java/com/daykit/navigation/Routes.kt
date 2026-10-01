@@ -31,6 +31,11 @@ object Routes {
     const val TOOL_EVENTLIGHT = "tool/eventlight"
     const val TOOL_DEVICE_MANAGER = "tool/device_manager"
 
+    const val SETTINGS_SECURITY = "settings/security"
+    const val SETTINGS_GENERAL = "settings/general"
+    const val SETTINGS_HOME_LAYOUT = "settings/home_layout"
+    const val SETTINGS_NOTIFICATIONS = "settings/notifications"
+    const val SETTINGS_DATA = "settings/data"
     const val SETTINGS_BACKUP = "settings/backup"
     const val SETTINGS_APPEARANCE = "settings/appearance"
     const val SETTINGS_ABOUT = "settings/about"
