@@ -2912,20 +2912,6 @@ private fun formatMinutes(minutes: Int): String {
 
 private fun timeText(hour: Int, minute: Int): String = TimeFormat.format(hour, minute)
 
-private val habitPalette = listOf(
-    Color(0xFF22C55E),
-    Color(0xFF38BDF8),
-    Color(0xFFF59E0B),
-    Color(0xFFEC4899),
-    Color(0xFFA78BFA),
-    Color(0xFF14B8A6),
-    Color(0xFFFB7185),
-    Color(0xFF818CF8),
-    Color(0xFFEAB308),
-    Color(0xFF2DD4BF),
-)
-
-private fun habitColor(index: Int): Color = habitPalette[index.mod(habitPalette.size)]
 
 private fun dateFromMillis(millis: Long): LocalDate {
     return Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
