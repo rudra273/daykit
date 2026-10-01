@@ -1,5 +1,8 @@
 package com.daykit.feature.settings.ui
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.rounded.Layers
+import com.daykit.core.designsystem.ClayStore
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.selectable
 import androidx.activity.compose.BackHandler
@@ -38,6 +41,7 @@ fun AppearanceScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val mode by ThemeModeStore.rememberThemeMode()
     val hapticsEnabled by HapticStore.rememberHapticsEnabled()
+    val clayEnabled by ClayStore.rememberClayEnabled()
     val accents = MaterialTheme.extendedColors.accents
 
     val options = listOf(
@@ -73,19 +77,34 @@ fun AppearanceScreen(onBack: () -> Unit) {
                 }
             }
 
+            SectionHeader("Style")
+            AppCard(contentPadding = PaddingValues(0.dp)) {
+                AppListRow(
+                    headline = "Clay cards",
+                    supporting = "Soft lift and edge on cards. Off for flat cards.",
+                    leadingIcon = Icons.Rounded.Layers,
+                    leadingAccent = accents.indigo,
+                    modifier = Modifier.toggleable(
+                        value = clayEnabled,
+                        onValueChange = { ClayStore.set(context, it) },
+                        role = Role.Switch,
+                    ),
+                    trailing = { AppSwitch(checked = clayEnabled, onCheckedChange = null) },
+                )
+            }
+
             SectionHeader("Feedback")
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 AppListRow(
                     headline = "Haptic feedback",
                     leadingIcon = Icons.Rounded.Vibration,
                     leadingAccent = accents.green,
-                    onClick = { HapticStore.set(context, !hapticsEnabled) },
-                    trailing = {
-                        AppSwitch(
-                            checked = hapticsEnabled,
-                            onCheckedChange = { HapticStore.set(context, it) },
-                        )
-                    },
+                    modifier = Modifier.toggleable(
+                        value = hapticsEnabled,
+                        onValueChange = { HapticStore.set(context, it) },
+                        role = Role.Switch,
+                    ),
+                    trailing = { AppSwitch(checked = hapticsEnabled, onCheckedChange = null) },
                 )
             }
         }

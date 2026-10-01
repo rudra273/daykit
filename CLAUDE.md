@@ -113,6 +113,8 @@ Non-secret preferences live in `AppPreferences` (plain prefs, same file as theme
 
 Use `core/designsystem/components/*` (`AppCard`, `AppTextField`, `PrimaryButton`, `AppBottomSheet`, `ToolUnlockScreen`, `EmptyState`, `LoadingIndicator`, …) and `Spacing` / `MaterialTheme.extendedColors` rather than raw Material3 widgets and hardcoded dp/colors. `ExtendedColors` is a semantic layer (card, accents, `isDark`) supplied via `LocalExtendedColors` in `DayKitTheme`.
 
+No wide, faint shadows or gradients: on an 8-bit display they band, and the panel's dithering turns the bands into visible grain. `AppCard`'s clay look (toggle: `ClayStore`, provided as `LocalClayCards`) is a tight 4dp shadow plus a 1dp inner bevel; a soft glow uses `Modifier.ditheredGlow`, not `Brush.radialGradient`.
+
 ## Background components
 
 App Lock runs `AppMonitorService`, a `specialUse` foreground service that polls UsageStats (adaptive 250ms → 1s cadence) and raises `LockActivity` / an overlay via `LockOverlayController`. It reads locked packages from the plain-prefs cache so it works before the DB is unlocked. `EventLightService` is a second `specialUse` FGS drawing a border overlay. Reminders use `AlarmManager` exact alarms plus `ReminderAlarmActivity`; habit reminders use WorkManager. Widgets (`feature/widget/`) are classic `RemoteViews` AppWidgetProviders refreshed through `WidgetUpdater`.

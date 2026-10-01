@@ -1,5 +1,6 @@
 package com.daykit.feature.today.ui
 
+import com.daykit.core.designsystem.components.ditheredGlow
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -361,10 +362,12 @@ private fun HeroCard(
     rings: List<Ring>,
     legend: List<Triple<Color, String, String>>,
 ) {
+    val glow = MaterialTheme.colorScheme.primary
     AppCard(contentPadding = PaddingValues(0.dp)) {
         Column(
             Modifier
                 .fillMaxWidth()
+                .ditheredGlow(glow, alpha = 0.16f)
                 .padding(Spacing.lg),
         ) {
             Text(greeting, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)

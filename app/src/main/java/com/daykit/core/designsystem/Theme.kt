@@ -80,6 +80,7 @@ val MaterialTheme.extendedColors: ExtendedColors
 @Composable
 fun DayKitTheme(content: @Composable () -> Unit) {
     val mode by ThemeModeStore.rememberThemeMode()
+    val clayCards by ClayStore.rememberClayEnabled()
     val darkTheme = when (mode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
@@ -101,7 +102,10 @@ fun DayKitTheme(content: @Composable () -> Unit) {
         }
     }
 
-    CompositionLocalProvider(LocalExtendedColors provides extended) {
+    CompositionLocalProvider(
+        LocalExtendedColors provides extended,
+        LocalClayCards provides clayCards,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = DayKitTypography,

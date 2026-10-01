@@ -1,5 +1,6 @@
 package com.daykit.core.backup
 
+import com.daykit.core.designsystem.ClayStore
 import android.content.Context
 import com.daykit.core.data.AppPreferences
 import com.daykit.core.data.SecureSettingRepository
@@ -38,6 +39,7 @@ class AppPreferencesBackupContributor(
         .put("reminderFullScreen", AppPreferences.reminderFullScreen)
         .put("homeHiddenTools", JSONArray(AppPreferences.homeHiddenTools.toList()))
         .put("homeToolOrder", JSONArray(AppPreferences.homeToolOrder))
+        .put("clayCards", ClayStore.get(context))
 
     override suspend fun importJson(payload: JSONObject) {
         val theme = ThemeMode.valueOf(payload.getString("theme"))
@@ -57,6 +59,7 @@ class AppPreferencesBackupContributor(
         enumOrNull<StartTab>(payload.optString("startTab"))?.let { AppPreferences.startTab = it }
         if (payload.has("snoozeMinutes")) AppPreferences.snoozeMinutes = payload.getInt("snoozeMinutes")
         if (payload.has("reminderFullScreen")) AppPreferences.reminderFullScreen = payload.getBoolean("reminderFullScreen")
+        if (payload.has("clayCards")) ClayStore.set(context, payload.getBoolean("clayCards"))
         payload.optJSONArray("homeHiddenTools")?.let { AppPreferences.homeHiddenTools = it.strings().toSet() }
         payload.optJSONArray("homeToolOrder")?.let { AppPreferences.homeToolOrder = it.strings() }
     }
