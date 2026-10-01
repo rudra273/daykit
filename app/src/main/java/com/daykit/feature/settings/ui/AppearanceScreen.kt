@@ -1,5 +1,6 @@
 package com.daykit.feature.settings.ui
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -112,7 +113,10 @@ fun AppearanceScreen(
         scope.launch {
             runCatching { CustomWallpaper.import(context, uri) }
                 .onSuccess { PageBackgroundStore.set(context, PageBackgroundKind.Custom) }
-                .onFailure { snackbar.showSnackbar("Couldn't use that photo.") }
+                .onFailure { error ->
+                    Log.w("Appearance", "Background photo import failed", error)
+                    snackbar.showSnackbar("Couldn't use that photo.")
+                }
             importing = false
         }
     }
@@ -174,11 +178,11 @@ fun AppearanceScreen(
                             photoRevision = wallpaperRevision,
                             busy = importing && kind == PageBackgroundKind.Custom,
                             onClick = {
-                                if (kind == PageBackgroundKind.Custom && !hasPhoto) {
-                                    choosePhoto()
-                                } else {
-                                    PageBackgroundStore.set(context, kind)
-                                }
+                                // "Your photo": first tap (or a tap when it is already
+                                // the background) opens the picker; otherwise select it.
+                                val pick = kind == PageBackgroundKind.Custom &&
+                                    (!hasPhoto || background == PageBackgroundKind.Custom)
+                                if (pick) choosePhoto() else PageBackgroundStore.set(context, kind)
                             },
                         )
                     }
@@ -263,7 +267,12 @@ private fun BackgroundSwatch(
     val preview = remember(kind, dark, plain) {
         meshPalette(kind, dark)?.let(PageBackground::Mesh) ?: PageBackground.Plain(plain)
     }
-    val label = if (kind == PageBackgroundKind.Custom && !hasPhoto) "Add photo" else kind.label
+    val label = when {
+        kind != PageBackgroundKind.Custom -> kind.label
+        !hasPhoto -> "Add photo"
+        selected -> "Change photo"
+        else -> kind.label
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

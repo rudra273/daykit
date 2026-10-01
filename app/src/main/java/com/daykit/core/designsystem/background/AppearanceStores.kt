@@ -18,15 +18,18 @@ enum class CardStyle(val label: String) {
     Glass("Liquid glass"),
 }
 
-/** The page behind every screen. [Custom] is the user's own image (see [CustomWallpaper]). */
+/**
+ * The page behind every screen, in the order shown in Settings. [Custom] is the
+ * user's own image (see [CustomWallpaper]). Stored by name, so reordering is safe.
+ */
 enum class PageBackgroundKind(val label: String) {
     Plain("Plain"),
-    Aurora("Aurora"),
-    Dusk("Dusk"),
-    Lagoon("Lagoon"),
     Waves("Waves"),
     Orbit("Orbit"),
     Contour("Contour"),
+    Aurora("Aurora"),
+    Dusk("Dusk"),
+    Lagoon("Lagoon"),
     Custom("Your photo"),
 }
 

@@ -158,13 +158,16 @@ fun DayKitNavHost(
 private fun NavGraphBuilder.opaqueComposable(route: String, content: @Composable () -> Unit) {
     composable(route) {
         Box(Modifier.fillMaxSize().pageBackground()) {
-            if (LocalPageBackground.current.isDecorated) {
-                MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(background = Color.Transparent)) {
-                    content()
-                }
+            // Always the same tree shape: switching between two branches here would
+            // dispose and rebuild the whole screen (losing its state) whenever a
+            // background finishes loading or the user picks a different one.
+            val scheme = MaterialTheme.colorScheme
+            val pageScheme = if (LocalPageBackground.current.isDecorated) {
+                scheme.copy(background = Color.Transparent)
             } else {
-                content()
+                scheme
             }
+            MaterialTheme(colorScheme = pageScheme, content = content)
         }
     }
 }
