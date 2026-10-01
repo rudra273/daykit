@@ -48,7 +48,7 @@ class FocusBlockStore(context: Context) {
             .filterNot { it.packageName == packageName }
             .filter { it.lockUntilMillis > now }
             .toMutableList()
-        updated.add(FocusBlock(packageName, label, lockUntilMillis))
+        updated.add(FocusBlock(packageName, label, lockUntilMillis, startedAtMillis = now))
         writeAll(updated)
     }
 
@@ -84,6 +84,7 @@ class FocusBlockStore(context: Context) {
                     packageName = item.getString(KEY_PACKAGE_NAME),
                     label = item.optString(KEY_LABEL, item.getString(KEY_PACKAGE_NAME)),
                     lockUntilMillis = item.optLong(KEY_LOCK_UNTIL, 0L),
+                    startedAtMillis = item.optLong(KEY_STARTED_AT, 0L),
                 )
             }
         }.getOrDefault(emptyList())
@@ -98,7 +99,8 @@ class FocusBlockStore(context: Context) {
                     JSONObject()
                         .put(KEY_PACKAGE_NAME, block.packageName)
                         .put(KEY_LABEL, block.label)
-                        .put(KEY_LOCK_UNTIL, block.lockUntilMillis),
+                        .put(KEY_LOCK_UNTIL, block.lockUntilMillis)
+                        .put(KEY_STARTED_AT, block.startedAtMillis),
                 )
             }
         prefs.edit(commit = true) {
@@ -121,6 +123,7 @@ class FocusBlockStore(context: Context) {
         const val KEY_PACKAGE_NAME = "packageName"
         const val KEY_LABEL = "label"
         const val KEY_LOCK_UNTIL = "lockUntilMillis"
+        const val KEY_STARTED_AT = "startedAtMillis"
     }
 }
 
@@ -128,4 +131,18 @@ data class FocusBlock(
     val packageName: String,
     val label: String,
     val lockUntilMillis: Long,
-)
+    /** When the block began; 0 for blocks stored before this was recorded. */
+    val startedAtMillis: Long = 0L,
+) {
+    /**
+     * Share of the block still to wait, 1 → 0 as the unlock approaches. A block
+     * with no recorded start can't be measured, so it reads as a full ring.
+     */
+    fun remainingFraction(nowMillis: Long): Float {
+        val remaining = (lockUntilMillis - nowMillis).coerceAtLeast(0L)
+        if (remaining == 0L) return 0f
+        val span = lockUntilMillis - startedAtMillis
+        if (startedAtMillis <= 0L || span <= 0L) return 1f
+        return (remaining.toFloat() / span).coerceIn(0f, 1f)
+    }
+}

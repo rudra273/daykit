@@ -19,8 +19,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -39,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -50,6 +54,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -57,27 +62,43 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AccentIconTile
+import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.permissions.AppLockPermissionChecker
 import com.daykit.core.util.Money
 import com.daykit.core.util.TimeFormat
+import com.daykit.feature.applock.domain.InstalledApp
 import com.daykit.feature.dayflow.data.focusedMinutesOn
+import com.daykit.feature.focus.data.ArmedSchedule
+import com.daykit.feature.focus.data.FocusAppLimit
+import com.daykit.feature.focus.data.FocusUsageTracker
+import com.daykit.feature.focus.ui.BlockedNow
+import com.daykit.feature.focus.ui.CountdownRing
+import com.daykit.feature.focus.ui.FocusBudgetBar
+import com.daykit.feature.focus.ui.FocusMode
+import com.daykit.feature.focus.ui.buildBlockedNow
 import com.daykit.feature.habit.data.Habit
 import com.daykit.feature.habit.data.HabitDashboard
 import com.daykit.feature.habit.data.HabitGoalType
 import com.daykit.feature.habit.ui.habitColor
 import com.daykit.feature.reminder.data.Reminder
 import com.daykit.navigation.Routes
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -86,8 +107,8 @@ import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** Four Pomodoro work sessions: the focus ring's "full" mark. */
-private const val FOCUS_GOAL_MINUTES = 100L
+/** One Pomodoro work session; the bar chart's floor so a single session doesn't fill it. */
+private const val POMODORO_MINUTES = 25L
 private const val MAX_REMINDERS = 5
 
 @Composable
@@ -96,15 +117,30 @@ fun TodayScreen(
     bottomBarPadding: PaddingValues,
     onOpenTool: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val zone = remember { ZoneId.systemDefault() }
 
-    // Ticks once a minute so relative times, rings and the date roll over while open.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var todayUsage by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    var hasUsageAccess by remember { mutableStateOf(AppLockPermissionChecker.hasUsageAccess(context)) }
+    var armed by remember { mutableStateOf<List<ArmedSchedule>>(emptyList()) }
+    var apps by remember { mutableStateOf<Map<String, InstalledApp>>(emptyMap()) }
     LaunchedEffect(Unit) {
-        while (true) {
-            delay(60_000 - now % 60_000)
-            now = System.currentTimeMillis()
+        apps = container.installedAppProvider.loadLaunchableApps().associateBy { it.packageName }
+    }
+    // Refreshes on every resume (usage changes while DayKit is in the background), then
+    // once a minute so relative times, budgets and the date roll over while open.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                now = System.currentTimeMillis()
+                hasUsageAccess = AppLockPermissionChecker.hasUsageAccess(context)
+                armed = container.focusScheduleRepository.armedSchedules()
+                todayUsage = withContext(Dispatchers.IO) { container.focusAppLimitRepository.getTodayUsageMap() }
+                delay(60_000 - System.currentTimeMillis() % 60_000)
+            }
         }
     }
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
@@ -124,6 +160,10 @@ fun TodayScreen(
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val moodHistory by remember { container.dayflowRepository.observeMoodHistory() }
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val appLimits by remember { container.focusAppLimitRepository.observeAppLimits() }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val focusBlocks by remember { container.focusRepository.observeFocusBlocks() }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
     val week = TodayStats.lastSevenDays(today)
     val weekLabels = week.map { it.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()) }
@@ -133,9 +173,23 @@ fun TodayScreen(
     val buildHabits = dashboard?.buildHabits.orEmpty()
     val habitsDone = buildHabits.count { dashboard?.logFor(it.habitId, today)?.completed == true }
 
-    // ── Focus ──
-    val focusWeek = week.map { focusedMinutesOn(sessions, it, now, zone) }
-    val focusToday = focusWeek.last()
+    // ── Pomodoro (Dayflow) ──
+    val pomodoroWeek = week.map { focusedMinutesOn(sessions, it, now, zone) }
+
+    // ── Focus: screen-time budget across enabled daily limits ──
+    val enabledLimits = appLimits.filter { it.enabled }
+    val budgetMillis = enabledLimits.sumOf { it.dailyLimitMinutes * 60_000L }
+    val usedMillis = enabledLimits.sumOf { (todayUsage[it.packageName] ?: 0L).coerceAtMost(it.dailyLimitMinutes * 60_000L) }
+    val hasBudget = budgetMillis > 0 && hasUsageAccess
+    val activeSessions = armed.filter { now in it.startMillis until it.endMillis }
+    val blockedNow = buildBlockedNow(
+        focusBlocks = focusBlocks,
+        appLimits = appLimits,
+        todayUsage = todayUsage,
+        activeSessions = activeSessions,
+        labelFor = { apps[it]?.label },
+        nowMillis = now,
+    )
 
     // ── Reminders ──
     val endOfToday = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
@@ -147,15 +201,16 @@ fun TodayScreen(
 
     val accents = MaterialTheme.extendedColors.accents
     val habitRing = if (buildHabits.isEmpty()) 0f else habitsDone.toFloat() / buildHabits.size
-    val focusRing = focusToday.toFloat() / FOCUS_GOAL_MINUTES
+    // Budget left rather than used, so every ring reads "fuller is better".
+    val budgetRing = if (hasBudget) 1f - usedMillis.toFloat() / budgetMillis else 0f
     val reminderTotal = clearedToday + dueToday
     val reminderRing = if (reminderTotal == 0) 0f else clearedToday.toFloat() / reminderTotal
     val scored = listOfNotNull(
         habitRing.takeIf { buildHabits.isNotEmpty() },
-        focusRing.coerceAtMost(1f),
+        budgetRing.takeIf { hasBudget },
         reminderRing.takeIf { reminderTotal > 0 },
     )
-    val dayScore = (scored.average().toFloat() * 100).toInt()
+    val dayScore = if (scored.isEmpty()) 0 else (scored.average().toFloat() * 100).toInt()
 
     val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight
     Box(Modifier.fillMaxSize()) {
@@ -175,12 +230,15 @@ fun TodayScreen(
                     score = dayScore,
                     rings = listOf(
                         Ring(habitRing, accents.green),
-                        Ring(focusRing, accents.indigo),
+                        Ring(budgetRing, FocusMode.DailyLimit.accent),
                         Ring(reminderRing, accents.orange),
                     ),
                     legend = listOf(
                         Triple(accents.green, "Habits", if (buildHabits.isEmpty()) "—" else "$habitsDone/${buildHabits.size}"),
-                        Triple(accents.indigo, "Focus", "$focusToday/$FOCUS_GOAL_MINUTES min"),
+                        Triple(
+                            FocusMode.DailyLimit.accent, "Screen time",
+                            if (hasBudget) "${FocusUsageTracker.formatUsage(budgetMillis - usedMillis)} left" else "—",
+                        ),
                         Triple(accents.orange, "Reminders", if (reminderTotal == 0) "—" else "$clearedToday/$reminderTotal"),
                     ),
                 )
@@ -237,7 +295,21 @@ fun TodayScreen(
 
             item(key = "focus") {
                 FocusCard(
-                    minutes = focusWeek,
+                    blocked = blockedNow,
+                    limits = enabledLimits,
+                    usage = todayUsage,
+                    apps = apps,
+                    hasUsageAccess = hasUsageAccess,
+                    budgetMillis = budgetMillis,
+                    usedMillis = usedMillis,
+                    accent = accents.red,
+                    onOpen = { onOpenTool(Routes.TOOL_FOCUS) },
+                )
+            }
+
+            item(key = "pomodoro") {
+                PomodoroCard(
+                    minutes = pomodoroWeek,
                     labels = weekLabels,
                     accent = accents.indigo,
                     onOpen = { onOpenTool(Routes.TOOL_DAYFLOW) },
@@ -605,11 +677,108 @@ private fun ReminderTimelineRow(
 // ─────────────────────────────── Focus & mood ───────────────────────────────
 
 @Composable
-private fun FocusCard(minutes: List<Long>, labels: List<String>, accent: Color, onOpen: () -> Unit) {
+private fun FocusCard(
+    blocked: List<BlockedNow>,
+    limits: List<FocusAppLimit>,
+    usage: Map<String, Long>,
+    apps: Map<String, InstalledApp>,
+    hasUsageAccess: Boolean,
+    budgetMillis: Long,
+    usedMillis: Long,
+    accent: Color,
+    onOpen: () -> Unit,
+) {
+    AppCard {
+        CardHeader(
+            Icons.Rounded.Timer, accent, "Focus",
+            when {
+                blocked.isNotEmpty() -> "${blocked.size} app${if (blocked.size == 1) "" else "s"} blocked now"
+                budgetMillis > 0 && hasUsageAccess ->
+                    "${FocusUsageTracker.formatUsage(usedMillis)} of ${FocusUsageTracker.formatUsage(budgetMillis)} screen time used"
+                else -> "Block distracting apps"
+            },
+            onOpen,
+        )
+        if (blocked.isEmpty() && limits.isEmpty()) {
+            Spacer(Modifier.height(Spacing.md))
+            EmptyHint("Set a daily limit to get a screen-time budget.", "Open Focus", accent, onOpen)
+            return@AppCard
+        }
+        if (blocked.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.lg))
+            Text("Blocked now", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.extendedColors.textMuted)
+            Spacer(Modifier.height(Spacing.sm))
+            // Each ring drains toward the moment the app opens again.
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                blocked.forEach { item ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 64.dp)) {
+                        CountdownRing(progress = item.progress, color = item.mode.accent, size = 52.dp) {
+                            AppIconOrMonogram(icon = apps[item.packageName]?.icon, label = item.label, packageName = item.packageName)
+                        }
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            item.caption,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = item.mode.accent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+        if (limits.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.lg))
+            if (!hasUsageAccess) {
+                Text(
+                    "Usage access is off, so daily limits can't be measured.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.textMuted,
+                )
+                return@AppCard
+            }
+            Text("Daily limits", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.extendedColors.textMuted)
+            // The limits closest to running out first.
+            limits.sortedByDescending { (usage[it.packageName] ?: 0L).toFloat() / (it.dailyLimitMinutes * 60_000L) }
+                .take(3)
+                .forEach { limit -> LimitRow(limit, apps[limit.packageName], usage[limit.packageName] ?: 0L) }
+        }
+    }
+}
+
+@Composable
+private fun LimitRow(limit: FocusAppLimit, app: InstalledApp?, usedMillis: Long) {
+    val limitMillis = limit.dailyLimitMinutes * 60_000L
+    val exceeded = usedMillis >= limitMillis
+    val color = if (exceeded) MaterialTheme.extendedColors.danger else FocusMode.DailyLimit.accent
+    val label = app?.label ?: limit.packageName
+    Row(Modifier.fillMaxWidth().padding(top = Spacing.md), verticalAlignment = Alignment.CenterVertically) {
+        AppIconOrMonogram(icon = app?.icon, label = label, packageName = limit.packageName)
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(
+                    if (exceeded) "Locked till midnight" else "${FocusUsageTracker.formatUsage(limitMillis - usedMillis)} left",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = color,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            FocusBudgetBar(progress = usedMillis.toFloat() / limitMillis, color = color)
+        }
+    }
+}
+
+@Composable
+private fun PomodoroCard(minutes: List<Long>, labels: List<String>, accent: Color, onOpen: () -> Unit) {
     val total = minutes.sum()
     val activeDays = minutes.count { it > 0 }
     AppCard {
-        CardHeader(Icons.Rounded.Timer, accent, "Focus time", "Pomodoro sessions, last 7 days", onOpen)
+        CardHeader(Icons.Rounded.AutoAwesome, accent, "Pomodoro", "Dayflow work sessions, last 7 days", onOpen)
         Spacer(Modifier.height(Spacing.lg))
         Row(Modifier.fillMaxWidth()) {
             Metric(formatMinutes(minutes.last()), "Today", Modifier.weight(1f), accent)
@@ -624,7 +793,7 @@ private fun FocusCard(minutes: List<Long>, labels: List<String>, accent: Color, 
                 values = minutes.map { it.toFloat() },
                 labels = labels,
                 color = accent,
-                maxValue = maxOf(minutes.max(), FOCUS_GOAL_MINUTES).toFloat(),
+                maxValue = maxOf(minutes.max(), POMODORO_MINUTES).toFloat(),
             )
         }
     }

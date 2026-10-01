@@ -46,13 +46,10 @@ private val PRESETS = listOf(
     DurationPreset("6h", 6 * 60 * 60_000L),
 )
 
-/** The ring is full at this length, so a longer lock visibly weighs more. */
-private const val RING_FULL_MILLIS = 6 * 60 * 60_000L
-
 /**
  * Bottom sheet to start a Lock now block on [appLabel] (one app or an app set).
  *
- * Rather than explaining the rules, it shows the outcome: a coral ring sized to
+ * Rather than explaining the rules, it shows the outcome: a full coral ring around
  * the duration and the wall-clock time the app opens again. The block is
  * irreversible (no early cancel, not even with the PIN), so it commits through
  * [HoldToConfirmButton] rather than a tap. [leading] is the app icon or set
@@ -99,7 +96,8 @@ fun FocusBlockSheet(
 
             Spacer(Modifier.height(Spacing.lg))
             CountdownRing(
-                progress = (durationMillis.toFloat() / RING_FULL_MILLIS).coerceIn(0.04f, 1f),
+                // Full: the whole wait being committed to. It drains on the Focus screen.
+                progress = if (valid) 1f else 0f,
                 color = accent,
                 size = 120.dp,
                 strokeWidth = 8.dp,

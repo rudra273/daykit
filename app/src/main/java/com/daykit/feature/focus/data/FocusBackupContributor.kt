@@ -41,7 +41,8 @@ class FocusBackupContributor(
                     JSONObject()
                         .put("packageName", block.packageName)
                         .put("label", block.label)
-                        .put("lockUntilMillis", block.lockUntilMillis),
+                        .put("lockUntilMillis", block.lockUntilMillis)
+                        .put("startedAtMillis", block.startedAtMillis),
                 )
             }
         }
@@ -155,6 +156,7 @@ class FocusBackupContributor(
                             packageName = packageName,
                             label = row.optString("label", packageName),
                             lockUntilMillis = row.optLong("lockUntilMillis", 0L),
+                            startedAtMillis = row.optLong("startedAtMillis", 0L),
                         ),
                     )
                 }
