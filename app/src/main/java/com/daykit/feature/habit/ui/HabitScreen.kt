@@ -752,7 +752,7 @@ private fun DateStripCell(
             .then(
                 if (selected) Modifier.border(1.dp, accent, MaterialTheme.shapes.large) else Modifier
             )
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, onClick = onClick, role = Role.Tab)
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Text(

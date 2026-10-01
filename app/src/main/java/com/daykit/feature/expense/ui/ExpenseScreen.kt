@@ -2,6 +2,8 @@
 
 package com.daykit.feature.expense.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import com.daykit.core.util.WeekDays
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -1268,7 +1270,7 @@ private fun DueDaySheet(
                                 .height(MinTouchTarget)
                                 .clip(CircleShape)
                                 .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                .clickable { onSelect(day) },
+                                .selectable(selected = isSelected, onClick = { onSelect(day) }, role = Role.RadioButton),
                         ) {
                             Text(
                                 day.toString(),

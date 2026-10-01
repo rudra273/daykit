@@ -1,5 +1,7 @@
 package com.daykit.feature.settings.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -60,13 +62,12 @@ fun AppearanceScreen(onBack: () -> Unit) {
                         headline = label,
                         leadingIcon = iconAccent.first,
                         leadingAccent = iconAccent.second,
-                        onClick = { ThemeModeStore.set(context, value) },
-                        trailing = {
-                            AppRadioButton(
-                                selected = mode == value,
-                                onClick = { ThemeModeStore.set(context, value) },
-                            )
-                        },
+                        modifier = Modifier.selectable(
+                            selected = mode == value,
+                            onClick = { ThemeModeStore.set(context, value) },
+                            role = Role.RadioButton,
+                        ),
+                        trailing = { AppRadioButton(selected = mode == value, onClick = null) },
                     )
                     if (index < options.lastIndex) RowDivider(startIndent = Spacing.lg)
                 }

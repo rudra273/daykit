@@ -1,5 +1,11 @@
 package com.daykit.core.designsystem.components
 
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +43,14 @@ fun PinDots(
     modifier: Modifier = Modifier,
     error: Boolean = false,
 ) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    Row(
+        modifier = modifier.clearAndSetSemantics {
+            contentDescription = "$filledCount of $length digits entered"
+            liveRegion = LiveRegionMode.Polite
+            if (error) this.error("Wrong PIN")
+        },
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         repeat(length) { i ->
             val filled = i < filledCount
             val color = when {
@@ -126,7 +139,7 @@ private fun PadKey(
             .size(72.dp)
             .clip(CircleShape)
             .background(MaterialTheme.extendedColors.inputField)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick, role = Role.Button),
         contentAlignment = Alignment.Center,
     ) { content() }
 }

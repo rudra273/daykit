@@ -2,6 +2,8 @@
 
 package com.daykit.feature.settings.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import com.daykit.core.security.HideOverlayWindows
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Tune
@@ -1434,10 +1436,11 @@ private fun RadioRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppRadioButton(selected = selected, onClick = onClick)
+        AppRadioButton(selected = selected, onClick = null)
         Spacer(Modifier.width(Spacing.sm))
         Text(text, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
     }

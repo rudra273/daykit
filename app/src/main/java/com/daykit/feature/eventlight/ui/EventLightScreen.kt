@@ -1,5 +1,9 @@
 package com.daykit.feature.eventlight.ui
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import android.content.ActivityNotFoundException
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -250,14 +254,15 @@ private fun ColorSwatch(
                 .clip(CircleShape)
                 .background(Color(argb))
                 .border(1.dp, MaterialTheme.extendedColors.divider, CircleShape)
-                .clickable(onClick = onClick),
+                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+                .semantics { contentDescription = label },
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selected) {
                 Icon(
                     Icons.Rounded.Check,
-                    contentDescription = label,
+                    contentDescription = null,
                     tint = if (isColorLight(argb)) Color.Black else Color.White,
                     modifier = Modifier.size(18.dp),
                 )

@@ -1,5 +1,7 @@
 package com.daykit.feature.focus.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import com.daykit.core.util.TimeFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -389,7 +391,7 @@ private fun StrictnessOption(
                     Modifier
                 },
             )
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
             .padding(Spacing.md),
     ) {
         Icon(

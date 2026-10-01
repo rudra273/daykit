@@ -1,5 +1,7 @@
 package com.daykit.core.designsystem.components
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,7 +50,7 @@ fun FilterChipButton(
                     CircleShape,
                 ) else Modifier
             )
-            .clickable(enabled = enabled, onClick = onClick)
+            .selectable(selected = selected, enabled = enabled, onClick = onClick, role = Role.Tab)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {

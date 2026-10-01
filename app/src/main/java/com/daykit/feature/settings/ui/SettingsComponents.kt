@@ -2,6 +2,8 @@
 
 package com.daykit.feature.settings.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import com.daykit.core.security.HideOverlayWindows
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -131,7 +133,7 @@ internal fun <T> OptionSheet(
                     {
                         Icon(
                             imageVector = Icons.Rounded.Check,
-                            contentDescription = "Selected",
+                            contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp),
                         )
@@ -139,7 +141,11 @@ internal fun <T> OptionSheet(
                 } else {
                     null
                 },
-                onClick = { onSelect(option) },
+                modifier = Modifier.selectable(
+                    selected = option == selected,
+                    onClick = { onSelect(option) },
+                    role = Role.RadioButton,
+                ),
             )
         }
     }

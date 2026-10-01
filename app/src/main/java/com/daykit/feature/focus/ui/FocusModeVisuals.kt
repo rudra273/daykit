@@ -1,7 +1,13 @@
 package com.daykit.feature.focus.ui
 
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -320,6 +326,11 @@ fun HoldToConfirmButton(
             .heightIn(min = 48.dp)
             .clip(MaterialTheme.shapes.medium)
             .background(if (enabled) accent.asAccentContainer() else MaterialTheme.extendedColors.inputField)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = "$text. Press and hold for ${holdMillis / 1000} seconds"
+                if (!enabled) disabled()
+            }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures(
@@ -327,13 +338,15 @@ fun HoldToConfirmButton(
                         holding = true
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         val fill = scope.launch {
-                            progress.animateTo(
-                                targetValue = 1f,
-                                animationSpec = tween(
-                                    durationMillis = (holdMillis * (1f - progress.value)).toInt(),
-                                    easing = LinearEasing,
-                                ),
-                            )
+                            // Timed by frame timestamps, not an animation: the system
+                            // "Remove animations" / animator-scale settings shrink
+                            // animations, which would turn this into a plain tap.
+                            val startProgress = progress.value
+                            val startNanos = withFrameNanos { it }
+                            do {
+                                val heldMillis = (withFrameNanos { it } - startNanos) / 1_000_000
+                                progress.snapTo(holdProgress(startProgress, heldMillis, holdMillis))
+                            } while (progress.value < 1f)
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             latestConfirm()
                         }
@@ -366,6 +379,10 @@ fun HoldToConfirmButton(
         )
     }
 }
+
+/** Fill fraction after holding for [heldMillis], resuming from [startProgress]. */
+internal fun holdProgress(startProgress: Float, heldMillis: Long, holdMillis: Int): Float =
+    (startProgress + heldMillis.toFloat() / holdMillis).coerceIn(0f, 1f)
 
 /** A plain tap button in a mode's accent, for the reversible saves (limits, routines). */
 @Composable
@@ -431,7 +448,7 @@ fun FocusSetChip(
             .clip(CircleShape)
             .background(if (selected) color.asAccentContainer() else MaterialTheme.extendedColors.inputField)
             .then(if (selected) Modifier.border(1.dp, color, CircleShape) else Modifier)
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, onClick = onClick, role = Role.Tab)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

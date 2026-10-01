@@ -1,5 +1,7 @@
 package com.daykit.feature.focus.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -229,7 +231,7 @@ private fun SetAppRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 58.dp)
-            .clickable(onClick = onToggle)
+            .toggleable(value = checked, onValueChange = { onToggle() }, role = Role.Checkbox)
             .padding(horizontal = Spacing.lg, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -262,7 +264,7 @@ private fun SetAppRow(
             }
         }
         Spacer(Modifier.width(Spacing.md))
-        AppCheckbox(checked = checked, onCheckedChange = { onToggle() })
+        AppCheckbox(checked = checked, onCheckedChange = null)
     }
 }
 
