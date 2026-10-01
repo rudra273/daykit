@@ -50,13 +50,31 @@ notification. No standard foreground-service type fits these uses, hence
 `specialUse`.
 
 ### Device Admin (`BIND_DEVICE_ADMIN`)
-**Feature:** Uninstall protection (optional).
-**Justification:** DayKit can optionally register as a Device Administrator so it
-cannot be uninstalled without first authenticating, preventing someone with
-physical access from removing the security app to bypass App Lock. It is strictly
-opt-in, uses only the uninstall-protection capability, and requests no policies
-that access personal files, messages, location, or the camera. The user can
-deactivate it at any time from Settings.
+**Feature:** Anti-theft protection (optional, off by default).
+**Justification:** DayKit's App Lock protects the user's apps from someone else
+using their phone. Without anti-theft protection, that person could simply
+uninstall DayKit to get around it. When the user turns this on, DayKit registers
+as a Device Administrator (so it cannot be uninstalled) and locks the system
+Settings app behind the DayKit PIN (so the admin cannot be deactivated by someone
+else). It requests no device-admin policies (`<uses-policies />` is empty) and
+accesses no personal files, messages, location, or camera.
+
+The owner can always remove it:
+- **Normally:** DayKit > Settings > Security & Privacy > Anti-theft Protection,
+  confirmed with the DayKit PIN.
+- **If the PIN is forgotten:** the Settings lock screen shows "Forgot PIN?", which
+  verifies the phone's own screen lock (Android BiometricPrompt with
+  `DEVICE_CREDENTIAL`) and then turns protection off without erasing any data.
+
+Before activation the user sees an in-app disclosure explaining exactly what is
+locked and how to turn it off, then confirms on the system device-admin screen.
+It can't be enabled unless the phone has a screen lock, so the forgot-PIN path
+always works.
+
+**Reviewer notes (paste into App access):** Test PIN: `<fill in>`. To uninstall
+after enabling: open DayKit > Settings > Security & Privacy > turn off
+Anti-theft Protection > enter the PIN. Or open the phone's Settings, tap
+"Forgot PIN?" and confirm the device screen lock.
 
 ### `RECEIVE_BOOT_COMPLETED`
 **Feature:** App Lock persistence.

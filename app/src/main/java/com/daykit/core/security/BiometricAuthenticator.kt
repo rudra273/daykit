@@ -92,6 +92,45 @@ class BiometricAuthenticator(
         prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
     }
 
+    /**
+     * Verifies the phone's own screen lock (PIN/pattern/password, or a strong
+     * biometric) rather than the DayKit credential. Used as the owner's fallback
+     * when the DayKit credential is forgotten.
+     */
+    fun authenticateDeviceCredential(
+        title: String,
+        subtitle: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        val prompt = BiometricPrompt(
+            activity,
+            ContextCompat.getMainExecutor(activity),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    onSuccess()
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                        errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                    ) {
+                        onError(errString.toString())
+                    }
+                }
+            },
+        )
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(title)
+            .setSubtitle(subtitle)
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            )
+            .build()
+        prompt.authenticate(promptInfo)
+    }
+
     private companion object {
         const val AUTHENTICATORS = BiometricManager.Authenticators.BIOMETRIC_STRONG
     }

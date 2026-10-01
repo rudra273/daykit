@@ -94,7 +94,7 @@ fun PrivacyPolicyScreen(
                     "Overlay permission may be used to display a lock challenge over selected locked apps.",
                     "App Lock is a deterrent, not a guarantee. Because Android limits what one app can do to another, a determined person with physical access may bypass App Lock (for example via the recent-apps screen, safe mode, by revoking DayKit's permissions, or during the brief moment an app opens). App Lock does not encrypt the locked apps' own data. For strongest protection, also use your device's screen lock and, where available, per-app protections such as Secure Folder.",
                     "Notification permission is used for reminders, habits, and app alerts when the user enables those features.",
-                    "Device Admin is optional and is used only for uninstall protection. It does not give DayKit access to personal files or messages.",
+                    "Device Admin is optional and is used only for anti-theft protection, so someone else cannot uninstall DayKit. It does not give DayKit access to personal files or messages.",
                 ),
             )
             PolicySection(

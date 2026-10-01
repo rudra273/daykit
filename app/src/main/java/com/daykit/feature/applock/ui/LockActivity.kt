@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -56,6 +57,8 @@ import com.daykit.core.security.CredentialKind
 import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.errorMessageOrNull
 import com.daykit.core.session.AppLockSessionManager
+import com.daykit.feature.applock.domain.AntiTheftProtection
+import com.daykit.feature.applock.domain.SettingsPackageResolver
 import com.daykit.feature.focus.ui.formatFocusRemaining
 import com.daykit.feature.lock.ui.LockChallengeContent
 import kotlinx.coroutines.Dispatchers
@@ -126,6 +129,21 @@ class LockActivity : FragmentActivity() {
                     appIcon = resolveIcon(lockedPackageName),
                     credentialRepository = container.credentialRepository,
                     settings = container.secureSettingRepository,
+                    // Forgot-PIN escape for anti-theft only: without it a forgotten PIN
+                    // would leave the owner unable to reach Settings or uninstall DayKit.
+                    onTurnOffAntiTheft = if (
+                        lockedPackageName == SettingsPackageResolver.resolve(this) &&
+                        AntiTheftProtection.isActive(this)
+                    ) {
+                        {
+                            AntiTheftProtection.disable(applicationContext, container.appLockRepository)
+                            Toast.makeText(this, "Anti-theft protection turned off", Toast.LENGTH_LONG).show()
+                            AppLockSessionManager.allow(lockedPackageName)
+                            finish()
+                        }
+                    } else {
+                        null
+                    },
                     onUnlocked = {
                         // Belt-and-suspenders: never let a PIN grant open an app
                         // held by a manual block, a scheduled session, or a daily usage limit.
@@ -188,6 +206,7 @@ private fun LockChallengeScreen(
     appIcon: Drawable?,
     credentialRepository: com.daykit.core.security.CredentialRepository,
     settings: SecureSettingRepository,
+    onTurnOffAntiTheft: (suspend () -> Unit)?,
     onUnlocked: () -> Unit,
 ) {
     // Swallow back — the locked app must not be reachable without unlocking.
@@ -221,6 +240,21 @@ private fun LockChallengeScreen(
         if (enabled) {
             tryBiometric(enabled)
         }
+    }
+
+    // Gated on the phone's own screen lock, never on nothing: the owner knows it,
+    // whoever grabbed the unlocked phone usually doesn't.
+    fun forgotCredential(turnOff: suspend () -> Unit) {
+        if (!AntiTheftProtection.isDeviceSecure(activity)) {
+            error = "No screen lock is set. Restart in safe mode to remove DayKit."
+            return
+        }
+        biometricAuthenticator.authenticateDeviceCredential(
+            title = "Turn off anti-theft protection",
+            subtitle = "Confirm your phone's screen lock",
+            onSuccess = { scope.launch { turnOff() } },
+            onError = { error = it },
+        )
     }
 
     fun submit() {
@@ -267,6 +301,7 @@ private fun LockChallengeScreen(
                     pin = CredentialRepository.sanitize(it, credentialKind)
                     error = null
                 },
+                onForgotCredential = onTurnOffAntiTheft?.let { turnOff -> { forgotCredential(turnOff) } },
             )
         }
     }

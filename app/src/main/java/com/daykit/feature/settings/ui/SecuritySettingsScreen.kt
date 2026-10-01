@@ -17,8 +17,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
@@ -76,66 +74,13 @@ import com.daykit.core.security.CredentialKind
 import com.daykit.core.security.LockGracePeriod
 import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.label
-import com.daykit.core.security.DayKitDeviceAdmin
 import com.daykit.core.security.PinVerifyResult
 import com.daykit.core.security.errorMessageOrNull
+import com.daykit.feature.applock.domain.AntiTheftProtection
 import com.daykit.feature.applock.domain.SettingsPackageResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-private const val SETTINGS_LABEL = "Settings"
-
-private fun deviceAdminComponent(context: Context) =
-    ComponentName(context, DayKitDeviceAdmin::class.java)
-
-private fun isDeviceAdminActive(context: Context): Boolean {
-    val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-    return dpm.isAdminActive(deviceAdminComponent(context))
-}
-
-private fun deviceAdminIntent(context: Context): Intent {
-    return Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-        putExtra(
-            DevicePolicyManager.EXTRA_DEVICE_ADMIN,
-            deviceAdminComponent(context),
-        )
-        putExtra(
-            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-            "Enable to protect DayKit from being uninstalled without your PIN.",
-        )
-    }
-}
-
-private fun removeDeviceAdmin(context: Context) {
-    val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-    val component = deviceAdminComponent(context)
-    if (dpm.isAdminActive(component)) {
-        dpm.removeActiveAdmin(component)
-    }
-}
-
-private suspend fun setSettingsLocked(
-    container: AppContainer,
-    settingsPackage: String,
-    locked: Boolean,
-) {
-    container.appLockRepository.getLockedApps()
-        .filter { app -> app.label == SETTINGS_LABEL && app.packageName != settingsPackage }
-        .forEach { app ->
-            container.appLockRepository.setLocked(
-                packageName = app.packageName,
-                label = app.label,
-                locked = false,
-            )
-        }
-
-    container.appLockRepository.setLocked(
-        packageName = settingsPackage,
-        label = SETTINGS_LABEL,
-        locked = locked,
-    )
-}
 
 @Composable
 fun SecuritySettingsScreen(
@@ -159,7 +104,8 @@ fun SecuritySettingsScreen(
     val settingsLoaded = biometricEnabled != null && screenshotProtection != null
 
     val settingsPackage = remember(context) { SettingsPackageResolver.resolve(context) }
-    var isAdminActive by remember { mutableStateOf(isDeviceAdminActive(context)) }
+    var isAdminActive by remember { mutableStateOf(AntiTheftProtection.isActive(context)) }
+    var showAntiTheftDisclosure by remember { mutableStateOf(false) }
 
     var credentialKind by remember { mutableStateOf(container.credentialRepository.credentialKind()) }
     var showChangePin by remember { mutableStateOf(false) }
@@ -249,10 +195,10 @@ fun SecuritySettingsScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 failedAttempts = container.credentialRepository.failedAttemptLog()
                 val wasAdmin = isAdminActive
-                isAdminActive = isDeviceAdminActive(context)
+                isAdminActive = AntiTheftProtection.isActive(context)
                 if (!wasAdmin && isAdminActive) {
                     scope.launch {
-                        setSettingsLocked(container, settingsPackage, locked = true)
+                        AntiTheftProtection.setSettingsLocked(container.appLockRepository, settingsPackage, locked = true)
                     }
                 }
             }
@@ -429,9 +375,9 @@ fun SecuritySettingsScreen(
             item { SectionHeader("Protection") }
             item {
                 AppCard(contentPadding = PaddingValues(0.dp)) {
-                    // Uninstall protection
+                    // Anti-theft: device admin + Settings locked behind the PIN.
                     AppListRow(
-                        headline = "Uninstall Protection",
+                        headline = "Anti-theft Protection",
                         leadingIcon = Icons.Rounded.Shield,
                         leadingAccent = accents.red,
                         trailing = {
@@ -444,7 +390,7 @@ fun SecuritySettingsScreen(
                                     checked = isAdminActive,
                                     onCheckedChange = { enable ->
                                         if (enable) {
-                                            context.startActivity(deviceAdminIntent(context))
+                                            showAntiTheftDisclosure = true
                                         } else {
                                             adminDisableError = null
                                             showAdminDisableConfirm = true
@@ -456,8 +402,9 @@ fun SecuritySettingsScreen(
                     )
                     if (isAdminActive) {
                         Text(
-                            text = "The Settings app is locked to prevent admin deactivation. " +
-                                "Enter your PIN to disable this protection.",
+                            text = "DayKit can't be uninstalled and the Settings app is locked. " +
+                                "Forgot your ${credentialKind.label}? Open Settings and tap " +
+                                "\"Forgot ${credentialKind.label}?\" to turn this off with your phone's screen lock.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.extendedColors.textMuted,
                             modifier = Modifier.padding(
@@ -669,12 +616,25 @@ fun SecuritySettingsScreen(
         )
     }
 
-    // ---- Uninstall protection disable confirm ----
+    // ---- Anti-theft disclosure: consent before the system admin prompt ----
+    if (showAntiTheftDisclosure) {
+        AntiTheftDisclosureSheet(
+            credentialLabel = credentialKind.label,
+            deviceSecure = AntiTheftProtection.isDeviceSecure(context),
+            onDismiss = { showAntiTheftDisclosure = false },
+            onContinue = {
+                showAntiTheftDisclosure = false
+                context.startActivity(AntiTheftProtection.activationIntent(context))
+            },
+        )
+    }
+
+    // ---- Anti-theft protection disable confirm ----
     if (showAdminDisableConfirm) {
         ConfirmPinSheet(
             credentialKind = credentialKind,
-            title = "Turn off uninstall protection",
-            message = "Enter your master ${credentialKind.label} to disable uninstall protection.",
+            title = "Turn off anti-theft protection",
+            message = "Enter your master ${credentialKind.label} to turn off anti-theft protection.",
             error = adminDisableError,
             onDismiss = {
                 showAdminDisableConfirm = false
@@ -686,8 +646,7 @@ fun SecuritySettingsScreen(
                         container.credentialRepository.verify(pin.toCharArray())
                     }
                     if (result is PinVerifyResult.Success) {
-                        setSettingsLocked(container, settingsPackage, locked = false)
-                        removeDeviceAdmin(context)
+                        AntiTheftProtection.disable(context, container.appLockRepository)
                         isAdminActive = false
                         showAdminDisableConfirm = false
                         adminDisableError = null
@@ -913,5 +872,68 @@ private fun formatAttemptTime(millis: Long): String {
         today -> "Today, $time"
         today.minusDays(1) -> "Yesterday, $time"
         else -> "${date.format(DateTimeFormatter.ofPattern("d MMM yyyy"))}, $time"
+    }
+}
+
+@Composable
+private fun AntiTheftDisclosureSheet(
+    credentialLabel: String,
+    deviceSecure: Boolean,
+    onDismiss: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    AppBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                text = "Anti-theft Protection",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Stops someone holding your unlocked phone from removing DayKit to get around App Lock.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.extendedColors.textMuted,
+            )
+            listOf(
+                "DayKit is registered as a device admin, so it can't be uninstalled.",
+                "The Settings app is locked behind your DayKit $credentialLabel.",
+                "Turn it off any time in Security & Privacy with your $credentialLabel.",
+                "Forgot your $credentialLabel? Open Settings and tap \"Forgot $credentialLabel?\" " +
+                    "to turn it off with your phone's screen lock.",
+            ).forEach { line ->
+                Text(
+                    text = "• $line",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Text(
+                text = "Restarting in safe mode or factory-resetting the phone still removes any app. " +
+                    "For full theft protection, also turn on Android's Theft Protection and Find My Device.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.extendedColors.textMuted,
+            )
+            if (!deviceSecure) {
+                Text(
+                    text = "Set a screen lock on your phone first. It's how you turn this off if you forget your $credentialLabel.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            PrimaryButton(
+                text = "Continue",
+                enabled = deviceSecure,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onContinue,
+            )
+            SecondaryButton(
+                text = "Not now",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onDismiss,
+            )
+        }
     }
 }

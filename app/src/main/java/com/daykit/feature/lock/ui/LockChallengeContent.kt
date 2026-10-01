@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.PinDots
 import com.daykit.core.designsystem.components.PinPad
@@ -49,6 +50,7 @@ import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.CredentialKind
+import com.daykit.core.security.label
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -64,6 +66,8 @@ import kotlin.math.roundToInt
  * For a [CredentialKind.Password] the pad is replaced by a password field: the
  * length is unknown, so it submits from the keyboard's Done key or the Unlock
  * button instead, and edits arrive through [onTextChange].
+ *
+ * [onForgotCredential], when set, adds a "Forgot PIN?" link under the input.
  */
 @Composable
 fun LockChallengeContent(
@@ -81,6 +85,7 @@ fun LockChallengeContent(
     onBiometric: (() -> Unit)? = null,
     credentialKind: CredentialKind = CredentialKind.Pin,
     onTextChange: (String) -> Unit = {},
+    onForgotCredential: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -180,6 +185,14 @@ fun LockChallengeContent(
                 onDigit = onDigit,
                 onBackspace = onBackspace,
                 onBiometric = onBiometric,
+            )
+        }
+        if (onForgotCredential != null) {
+            Spacer(Modifier.height(Spacing.md))
+            AppTextButton(
+                text = "Forgot ${credentialKind.label}?",
+                color = MaterialTheme.extendedColors.textMuted,
+                onClick = onForgotCredential,
             )
         }
     }
