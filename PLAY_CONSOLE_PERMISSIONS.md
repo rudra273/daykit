@@ -87,10 +87,12 @@ sensitive work on a spoofed intent.
 **Justification:** Shows a full-screen reminder/alarm UI (with screen-on) for
 time-critical reminders the user created, matching alarm-clock behavior.
 
-### `USE_BIOMETRIC`, `POST_NOTIFICATIONS`, `INTERNET`
-Standard runtime permissions. Biometric = optional unlock for locked tools.
+### `USE_BIOMETRIC`, `POST_NOTIFICATIONS`, `INTERNET`, `HIDE_OVERLAY_WINDOWS`
+Standard permissions. Biometric = optional unlock for locked tools.
 Notifications = reminders/habits/app alerts (user-enabled). Internet = Google
-Drive backup/restore only.
+Drive backup/restore only. Hide overlay windows = while a PIN or password prompt
+is on screen, DayKit hides other apps' overlays so they cannot draw a fake
+keypad over it (normal permission, granted at install, no declaration needed).
 
 ---
 
@@ -102,7 +104,7 @@ analytics. No advertising ID. No data sold.
 **Data handling:**
 - All user content (Key Store, Secure Notes, Expenses, Habits, App Lock list,
   File Vault media) is stored locally, encrypted (SQLCipher DB; File Vault files
-  AES-256-GCM with per-file keys wrapped by Android Keystore).
+  AES-256-GCM with per-file keys wrapped by a key derived from the user's PIN).
 - The only data that leaves the device is an **encrypted backup file** the user
   chooses to upload to **their own Google Drive**. It is encrypted on-device with
   a user-chosen password before upload; DayKit uploads no plaintext content.
@@ -111,6 +113,9 @@ analytics. No advertising ID. No data sold.
 **Encryption in transit:** Yes (Google Drive APIs over HTTPS).
 **Encryption at rest:** Yes (see above).
 **Data deletion:** User can delete data in-app, clear app data, or uninstall.
+Deleted notes, Key Store entries and vault files go to an on-device "Recently
+deleted" bin (still encrypted) and are erased for good after 30 days, or
+immediately if the user empties the bin.
 Drive backup files are deleted by the user from their Drive (or via retention,
 which keeps only recent backups).
 
@@ -126,4 +131,4 @@ app-created backup files) for the optional backup feature.
 - [ ] Data safety form completed per section 2.
 - [ ] Permission declarations submitted per section 1 (expect manual review for
       exact alarms + special-use FGS + usage access).
-- [ ] `versionCode` / `versionName` bumped as intended (currently 6 / "1.0.5").
+- [ ] `versionCode` / `versionName` bumped as intended (currently 9 / "1.0.8").

@@ -1,5 +1,11 @@
 package com.daykit.feature.filelocker.ui
 
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Movie
+import com.daykit.core.designsystem.components.showUndo
+import com.daykit.core.designsystem.components.TrashItem
+import com.daykit.core.designsystem.components.RecentlyDeletedSheet
+import com.daykit.core.designsystem.components.RecentlyDeletedAction
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -78,7 +84,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
-import com.daykit.core.designsystem.components.AppAlertDialog
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppExtendedFab
 import com.daykit.core.designsystem.components.AppTopBar
@@ -109,10 +114,10 @@ fun FileLockerScreen(
     var working by remember { mutableStateOf(false) }
     var pendingExportIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var previewItem by remember { mutableStateOf<FileLockerPreviewItem?>(null) }
-    // Non-null while the delete confirm is showing; holds the count being deleted.
-    var confirmDeleteCount by remember { mutableStateOf<Int?>(null) }
+    var showTrash by remember { mutableStateOf(false) }
 
     val files by repository.observeFiles().collectAsStateWithLifecycle(initialValue = emptyList())
+    val trashedFiles by repository.observeTrash().collectAsStateWithLifecycle(initialValue = emptyList())
     val selectionMode = selectedIds.isNotEmpty()
     val gridState = rememberLazyGridState()
 
@@ -249,13 +254,32 @@ fun FileLockerScreen(
                             )
                         }
                     },
-                    onDelete = { confirmDeleteCount = selectedIds.size },
+                    onDelete = {
+                        val toDelete = selectedIds.toList()
+                        errors.launchGuarded(
+                            failureMessage = "Delete failed. Some files may still be in the vault.",
+                            onFailure = { working = false },
+                        ) {
+                            working = true
+                            withContext(Dispatchers.IO) {
+                                toDelete.forEach { repository.delete(it) }
+                            }
+                            selectedIds.clear()
+                            working = false
+                            scope.launch {
+                                snackbarHostState.showUndo("${toDelete.size} file(s) moved to Recently deleted") {
+                                    toDelete.forEach { repository.restoreFromTrash(it) }
+                                }
+                            }
+                        }
+                    },
                     actionsEnabled = !working,
                 )
             } else {
                 AppTopBar(
                     title = "File Vault",
                     onBack = onBack,
+                    actions = { RecentlyDeletedAction(onClick = { showTrash = true }) },
                 )
             }
         },
@@ -377,32 +401,35 @@ fun FileLockerScreen(
         }
     }
 
-    // Vault deletes are permanent: the plaintext original was removed from Gallery on
-    // import, and vault files are excluded from backup unless the user opted in.
-    confirmDeleteCount?.let { count ->
-        AppAlertDialog(
-            onDismissRequest = { confirmDeleteCount = null },
-            title = if (count == 1) "Delete this file?" else "Delete $count files?",
-            text = "This permanently erases the encrypted " +
-                (if (count == 1) "copy" else "copies") +
-                " from the vault. It cannot be undone. " +
-                "To keep a copy elsewhere, cancel and use Unlock or Export instead.",
-            confirmText = "Delete",
-            destructiveConfirm = true,
-            onConfirm = {
-                val toDelete = selectedIds.toList()
-                confirmDeleteCount = null
-                errors.launchGuarded(
-                    failureMessage = "Delete failed. Some files may still be in the vault.",
-                    onFailure = { working = false },
-                ) {
-                    working = true
-                    withContext(Dispatchers.IO) {
-                        toDelete.forEach { repository.delete(it) }
-                    }
-                    selectedIds.clear()
-                    working = false
-                    snack("${toDelete.size} file(s) deleted from the vault.")
+    // Deleting only moves files to Recently deleted. Deleting forever there is
+    // permanent: the plaintext original was removed from Gallery on import, and
+    // vault files are excluded from backup unless the user opted in.
+    if (showTrash) {
+        RecentlyDeletedSheet(
+            items = trashedFiles.map { file ->
+                TrashItem(
+                    id = file.fileId,
+                    title = file.name,
+                    deletedAtMillis = file.deletedAtMillis ?: 0L,
+                    icon = when {
+                        file.isVideo -> Icons.Rounded.Movie
+                        file.isImage -> Icons.Rounded.Image
+                        else -> Icons.Rounded.Description
+                    },
+                )
+            },
+            onDismiss = { showTrash = false },
+            onRestore = { item ->
+                errors.launchGuarded("Couldn't restore that file.") { repository.restoreFromTrash(item.id) }
+            },
+            onDeleteForever = { item ->
+                errors.launchGuarded("Couldn't delete that file.") {
+                    withContext(Dispatchers.IO) { repository.deleteForever(item.id) }
+                }
+            },
+            onEmpty = {
+                errors.launchGuarded("Couldn't empty Recently deleted.") {
+                    withContext(Dispatchers.IO) { repository.emptyTrash() }
                 }
             },
         )

@@ -9,4 +9,5 @@ data class SecureNote(
     val version: Int,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
+    val deletedAtMillis: Long? = null,
 )

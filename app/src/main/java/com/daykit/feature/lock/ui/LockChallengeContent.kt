@@ -1,5 +1,6 @@
 package com.daykit.feature.lock.ui
 
+import com.daykit.core.security.HideOverlayWindows
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
@@ -87,6 +88,7 @@ fun LockChallengeContent(
     onTextChange: (String) -> Unit = {},
     onForgotCredential: (() -> Unit)? = null,
 ) {
+    HideOverlayWindows()
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val shake = remember { Animatable(0f) }

@@ -7,6 +7,7 @@ data class VaultFile(
     val mimeType: String,
     val sizeBytes: Long,
     val createdAtMillis: Long,
+    val deletedAtMillis: Long? = null,
 ) {
     val isVideo: Boolean get() = mimeType.startsWith("video/")
     val isImage: Boolean get() = mimeType.startsWith("image/")

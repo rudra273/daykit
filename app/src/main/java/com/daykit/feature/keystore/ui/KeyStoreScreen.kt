@@ -2,6 +2,11 @@
 
 package com.daykit.feature.keystore.ui
 
+import androidx.compose.material.icons.rounded.Key
+import com.daykit.core.designsystem.components.showUndo
+import com.daykit.core.designsystem.components.TrashItem
+import com.daykit.core.designsystem.components.RecentlyDeletedSheet
+import com.daykit.core.designsystem.components.RecentlyDeletedAction
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,7 +69,6 @@ import com.daykit.core.util.SensitiveClipboard
 import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
-import com.daykit.core.designsystem.components.AppAlertDialog
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
@@ -101,7 +105,10 @@ fun KeyStoreScreen(
         .collectAsStateWithLifecycle(initialValue = null)
     var editorState by remember { mutableStateOf<KeyEditorState?>(null) }
     var actionEntry by remember { mutableStateOf<KeyStoreEntry?>(null) }
-    var confirmDeleteEntry by remember { mutableStateOf<KeyStoreEntry?>(null) }
+    var showTrash by remember { mutableStateOf(false) }
+    val trashedEntries by container.keyStoreRepository
+        .observeTrash()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
     var query by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
     var selectedLabel by remember { mutableStateOf<String?>(null) }
@@ -153,6 +160,7 @@ fun KeyStoreScreen(
                 onSearchActiveChange = { searchActive = it; if (!it) query = "" },
                 onBack = onBack,
                 searchPlaceholder = "Search name or label",
+                actions = { RecentlyDeletedAction(onClick = { showTrash = true }) },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -268,22 +276,42 @@ fun KeyStoreScreen(
             },
             onDelete = {
                 actionEntry = null
-                confirmDeleteEntry = entry
+                errors.launchGuarded("Couldn't delete that key.") {
+                    container.keyStoreRepository.deleteEntry(entry.entryId)
+                    scope.launch {
+                        snackbarHostState.showUndo("\"${entry.name}\" moved to Recently deleted") {
+                            container.keyStoreRepository.restoreEntry(entry.entryId)
+                        }
+                    }
+                }
             },
         )
     }
 
-    confirmDeleteEntry?.let { entry ->
-        AppAlertDialog(
-            onDismissRequest = { confirmDeleteEntry = null },
-            title = "Delete key",
-            text = "Remove \"${entry.name}\"?",
-            confirmText = "Delete",
-            destructiveConfirm = true,
-            onConfirm = {
-                confirmDeleteEntry = null
+    if (showTrash) {
+        RecentlyDeletedSheet(
+            items = trashedEntries.map { entry ->
+                TrashItem(
+                    id = entry.entryId,
+                    title = entry.name,
+                    deletedAtMillis = entry.deletedAtMillis ?: 0L,
+                    icon = Icons.Rounded.Key,
+                )
+            },
+            onDismiss = { showTrash = false },
+            onRestore = { item ->
+                errors.launchGuarded("Couldn't restore that key.") {
+                    container.keyStoreRepository.restoreEntry(item.id)
+                }
+            },
+            onDeleteForever = { item ->
                 errors.launchGuarded("Couldn't delete that key.") {
-                    container.keyStoreRepository.deleteEntry(entry.entryId)
+                    container.keyStoreRepository.deleteEntryForever(item.id)
+                }
+            },
+            onEmpty = {
+                errors.launchGuarded("Couldn't empty Recently deleted.") {
+                    container.keyStoreRepository.emptyTrash()
                 }
             },
         )

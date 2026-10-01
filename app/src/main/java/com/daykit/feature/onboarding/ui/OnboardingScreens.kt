@@ -1,5 +1,6 @@
 package com.daykit.feature.onboarding.ui
 
+import com.daykit.core.security.HideOverlayWindows
 import android.content.ActivityNotFoundException
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -133,6 +134,7 @@ private fun OnboardingScaffold(
 fun SetupCredentialScreen(
     onCredentialReady: (secret: String, kind: CredentialKind) -> Unit,
 ) {
+    HideOverlayWindows()
     // Two-phase flow: enter, then confirm.
     var kind by remember { mutableStateOf(CredentialKind.Pin) }
     var firstPin by remember { mutableStateOf<String?>(null) }

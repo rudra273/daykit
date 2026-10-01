@@ -6,6 +6,11 @@
 
 package com.daykit.feature.notes.ui
 
+import androidx.compose.material.icons.rounded.Description
+import com.daykit.core.designsystem.components.showUndo
+import com.daykit.core.designsystem.components.TrashItem
+import com.daykit.core.designsystem.components.RecentlyDeletedSheet
+import com.daykit.core.designsystem.components.RecentlyDeletedAction
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -77,7 +82,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBackButton
-import com.daykit.core.designsystem.components.AppAlertDialog
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
@@ -114,7 +118,8 @@ fun SecureNotesScreen(
     val errors = rememberErrorReporter()
     var editorState by remember { mutableStateOf<NoteEditorState?>(null) }
     var actionNote by remember { mutableStateOf<SecureNote?>(null) }
-    var confirmDeleteNote by remember { mutableStateOf<SecureNote?>(null) }
+    var showTrash by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
     var selectedLabel by remember { mutableStateOf<String?>(null) }
@@ -124,6 +129,9 @@ fun SecureNotesScreen(
     val imagesByNote by container.secureNoteRepository
         .observeImagesByNote()
         .collectAsStateWithLifecycle(initialValue = emptyMap())
+    val trashedNotes by container.secureNoteRepository
+        .observeTrash()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
     BackHandler {
         when {
@@ -183,6 +191,7 @@ fun SecureNotesScreen(
                 onSearchActiveChange = { searchActive = it; if (!it) query = "" },
                 onBack = onBack,
                 searchPlaceholder = "Search notes",
+                actions = { RecentlyDeletedAction(onClick = { showTrash = true }) },
             )
         },
         floatingActionButton = {
@@ -284,24 +293,44 @@ fun SecureNotesScreen(
                 destructive = true,
                 onClick = {
                     actionNote = null
-                    confirmDeleteNote = note
+                    errors.launchGuarded("Couldn't delete that note.") {
+                        container.secureNoteRepository.deleteNote(note.noteId)
+                        scope.launch {
+                            errors.host.showUndo("Moved to Recently deleted") {
+                                container.secureNoteRepository.restoreNote(note.noteId)
+                            }
+                        }
+                    }
                 },
             )
             Spacer(Modifier.height(Spacing.sm))
         }
     }
 
-    confirmDeleteNote?.let { note ->
-        AppAlertDialog(
-            onDismissRequest = { confirmDeleteNote = null },
-            title = "Delete note",
-            text = "Remove this note?",
-            confirmText = "Delete",
-            destructiveConfirm = true,
-            onConfirm = {
-                confirmDeleteNote = null
+    if (showTrash) {
+        RecentlyDeletedSheet(
+            items = trashedNotes.map { note ->
+                TrashItem(
+                    id = note.noteId,
+                    title = note.title.ifBlank { note.content.lineSequence().firstOrNull().orEmpty() },
+                    deletedAtMillis = note.deletedAtMillis ?: 0L,
+                    icon = Icons.Rounded.Description,
+                )
+            },
+            onDismiss = { showTrash = false },
+            onRestore = { item ->
+                errors.launchGuarded("Couldn't restore that note.") {
+                    container.secureNoteRepository.restoreNote(item.id)
+                }
+            },
+            onDeleteForever = { item ->
                 errors.launchGuarded("Couldn't delete that note.") {
-                    container.secureNoteRepository.deleteNote(note.noteId)
+                    container.secureNoteRepository.deleteNoteForever(item.id)
+                }
+            },
+            onEmpty = {
+                errors.launchGuarded("Couldn't empty Recently deleted.") {
+                    container.secureNoteRepository.emptyTrash()
                 }
             },
         )

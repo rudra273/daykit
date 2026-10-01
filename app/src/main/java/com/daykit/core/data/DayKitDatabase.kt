@@ -57,7 +57,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         DayflowDayEntity::class,
         PomodoroSessionEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -126,6 +126,14 @@ abstract class DayKitDatabase : RoomDatabase() {
                         db.execSQL(
                             "CREATE UNIQUE INDEX IF NOT EXISTS index_focus_app_limits_packageName ON focus_app_limits (`packageName`)"
                         )
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(6, 7) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        // Recently deleted: a nullable stamp, so existing rows stay live.
+                        db.execSQL("ALTER TABLE secure_notes ADD COLUMN deletedAtMillis INTEGER")
+                        db.execSQL("ALTER TABLE key_store_entries ADD COLUMN deletedAtMillis INTEGER")
+                        db.execSQL("ALTER TABLE vault_files ADD COLUMN deletedAtMillis INTEGER")
                     }
                 })
                 .build()

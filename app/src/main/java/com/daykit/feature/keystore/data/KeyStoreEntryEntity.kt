@@ -21,4 +21,6 @@ data class KeyStoreEntryEntity(
     val version: Int,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
+    /** Set while the item sits in Recently deleted; see [com.daykit.core.data.RecentlyDeleted]. */
+    val deletedAtMillis: Long? = null,
 )

@@ -7,13 +7,13 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SecureNoteDao {
-    @Query("SELECT * FROM secure_notes ORDER BY updatedAtMillis DESC")
+    @Query("SELECT * FROM secure_notes WHERE deletedAtMillis IS NULL ORDER BY updatedAtMillis DESC")
     fun observeAll(): Flow<List<SecureNoteEntity>>
 
     @Query("SELECT * FROM secure_notes WHERE noteId = :noteId LIMIT 1")
     suspend fun getByNoteId(noteId: String): SecureNoteEntity?
 
-    @Query("SELECT * FROM secure_notes")
+    @Query("SELECT * FROM secure_notes WHERE deletedAtMillis IS NULL")
     suspend fun getAll(): List<SecureNoteEntity>
 
     @Upsert
@@ -21,6 +21,18 @@ interface SecureNoteDao {
 
     @Query("DELETE FROM secure_notes WHERE noteId = :noteId")
     suspend fun deleteByNoteId(noteId: String)
+
+    @Query("SELECT * FROM secure_notes WHERE deletedAtMillis IS NOT NULL ORDER BY deletedAtMillis DESC")
+    fun observeTrash(): Flow<List<SecureNoteEntity>>
+
+    @Query("UPDATE secure_notes SET deletedAtMillis = :deletedAtMillis WHERE noteId = :noteId")
+    suspend fun setDeletedAt(noteId: String, deletedAtMillis: Long?)
+
+    @Query("SELECT noteId FROM secure_notes WHERE deletedAtMillis IS NOT NULL AND deletedAtMillis < :cutoffMillis")
+    suspend fun trashedBefore(cutoffMillis: Long): List<String>
+
+    @Query("SELECT noteId FROM secure_notes WHERE deletedAtMillis IS NOT NULL")
+    suspend fun trashedIds(): List<String>
 
     // --- Images ---
 

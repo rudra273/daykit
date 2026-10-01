@@ -21,7 +21,10 @@ class KeyUnavailableException(
     cause: Throwable?,
 ) : Exception(message, cause)
 
-class AndroidKeyStoreCrypto {
+/** [keyAlias] is overridable only so instrumented tests never touch the real key. */
+class AndroidKeyStoreCrypto(
+    private val keyAlias: String = KEY_ALIAS,
+) {
     private val keyStore: KeyStore by lazy {
         KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
     }
@@ -70,7 +73,7 @@ class AndroidKeyStoreCrypto {
 
     private fun existingKey(): SecretKey? {
         return runCatching {
-            (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+            (keyStore.getEntry(keyAlias, null) as? KeyStore.SecretKeyEntry)?.secretKey
         }.getOrNull()
     }
 
@@ -79,7 +82,7 @@ class AndroidKeyStoreCrypto {
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         val spec = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
+            keyAlias,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
         )
             .setKeySize(256)

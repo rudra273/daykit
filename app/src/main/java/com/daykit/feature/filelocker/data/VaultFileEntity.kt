@@ -9,7 +9,7 @@ import androidx.room.PrimaryKey
  *
  * The file bytes themselves live in app-private storage at
  * `filesDir/vault/<storedFileName>`, encrypted with a per-file data key (DEK).
- * The DEK is wrapped by the Android Keystore master key and stored here as
+ * The DEK is wrapped by the PIN-derived session key (`SessionValueCipher`) and stored here as
  * [wrappedDekCiphertext] + [wrappedDekIv] — it is never persisted in the clear.
  *
  * Display name and mime type are AES-GCM encrypted at the app layer (on top of
@@ -29,10 +29,12 @@ data class VaultFileEntity(
     val nameIv: ByteArray,
     val mimeCiphertext: ByteArray,
     val mimeIv: ByteArray,
-    /** Per-file DEK, wrapped (encrypted) by the Keystore KEK. */
+    /** Per-file DEK, wrapped (encrypted) by the session key. */
     val wrappedDekCiphertext: ByteArray,
     val wrappedDekIv: ByteArray,
     /** Plaintext byte size of the original file (for display only). */
     val sizeBytes: Long,
     val createdAtMillis: Long,
+    /** Set while the item sits in Recently deleted; see [com.daykit.core.data.RecentlyDeleted]. */
+    val deletedAtMillis: Long? = null,
 )

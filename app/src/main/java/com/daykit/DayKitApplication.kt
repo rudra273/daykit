@@ -98,6 +98,15 @@ class DayKitApplication : Application() {
             }.onFailure { error ->
                 Log.w(TAG, "Warm-up failed to open secure storage", error)
             }
+            // Recently deleted: drop anything past the 30-day window. Row deletes
+            // need no MSK, so this works before the user unlocks.
+            runCatching {
+                container.secureNoteRepository.purgeExpiredTrash()
+                container.keyStoreRepository.purgeExpiredTrash()
+                container.vaultFileRepository.purgeExpiredTrash()
+            }.onFailure { error ->
+                Log.w(TAG, "Could not purge Recently deleted", error)
+            }
         }
         applicationScope.launch {
             runCatching { container.installedAppProvider.loadLaunchableApps() }

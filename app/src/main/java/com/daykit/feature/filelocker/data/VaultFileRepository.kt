@@ -1,5 +1,6 @@
 package com.daykit.feature.filelocker.data
 
+import com.daykit.core.data.RecentlyDeleted
 import com.daykit.core.backup.BackupLimits
 import android.content.ContentValues
 import android.content.Context
@@ -162,7 +163,33 @@ class VaultFileRepository(
         return true
     }
 
+    /** Moves the file to Recently deleted; the encrypted blob stays on disk until purged. */
     suspend fun delete(fileId: String) {
+        dao.setDeletedAt(fileId, clock())
+    }
+
+    /** Not to be confused with [restoreToGallery]: this only takes the file out of Recently deleted. */
+    suspend fun restoreFromTrash(fileId: String) {
+        dao.setDeletedAt(fileId, null)
+    }
+
+    fun observeTrash(): Flow<List<VaultFile>> =
+        dao.observeTrash().map { list -> list.map { it.toVaultFile() } }
+            .catch { error ->
+                if (error is SensitiveDataLockedException) emit(emptyList()) else throw error
+            }
+
+    suspend fun emptyTrash() {
+        dao.trashedIds().forEach { deleteForever(it) }
+    }
+
+    /** Purges files past the retention window. Needs no key, so it can run before unlock. */
+    suspend fun purgeExpiredTrash(nowMillis: Long = clock()) {
+        dao.trashedBefore(RecentlyDeleted.purgeCutoff(nowMillis)).forEach { deleteForever(it) }
+    }
+
+    /** Permanently removes the row and its encrypted blob. */
+    suspend fun deleteForever(fileId: String) {
         val entity = dao.getByFileId(fileId) ?: return
         // A database failure leaves the encrypted source intact. Failed file cleanup
         // leaves only an orphan, not an unreadable row pointing at a missing source.
@@ -258,6 +285,7 @@ class VaultFileRepository(
             mimeType = cipher.decryptString(CipherPayload(mimeCiphertext, mimeIv), fileId),
             sizeBytes = sizeBytes,
             createdAtMillis = createdAtMillis,
+            deletedAtMillis = deletedAtMillis,
         )
     }
 

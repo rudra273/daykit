@@ -2,6 +2,7 @@
 
 package com.daykit.feature.settings.ui
 
+import com.daykit.core.security.HideOverlayWindows
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.activity.compose.BackHandler
@@ -223,6 +224,7 @@ internal fun CredentialField(
     isError: Boolean = false,
     supportingText: String? = null,
 ) {
+    HideOverlayWindows()
     AppTextField(
         value = value,
         onValueChange = { onValueChange(CredentialRepository.sanitize(it, kind)) },

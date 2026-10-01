@@ -1,5 +1,6 @@
 package com.daykit.feature.notes.data
 
+import com.daykit.core.data.RecentlyDeleted
 import com.daykit.core.security.CipherPayload
 import com.daykit.core.security.SensitiveDataLockedException
 import com.daykit.core.security.ValueCipher
@@ -62,9 +63,36 @@ class SecureNoteRepository(
         )
     }
 
+    /** Moves the note to Recently deleted; it stays encrypted and can be restored. */
     suspend fun deleteNote(noteId: String) {
+        dao.setDeletedAt(noteId, System.currentTimeMillis())
+    }
+
+    suspend fun restoreNote(noteId: String) {
+        dao.setDeletedAt(noteId, null)
+    }
+
+    /** Permanently removes the note and its images. */
+    suspend fun deleteNoteForever(noteId: String) {
         dao.deleteImagesForNote(noteId)
         dao.deleteByNoteId(noteId)
+    }
+
+    fun observeTrash(): Flow<List<SecureNote>> {
+        return dao.observeTrash().map { entities ->
+            entities.mapNotNull { entity -> entity.toDomainOrNull() }
+        }.catch { error ->
+            if (error is SensitiveDataLockedException) emit(emptyList()) else throw error
+        }
+    }
+
+    suspend fun emptyTrash() {
+        dao.trashedIds().forEach { deleteNoteForever(it) }
+    }
+
+    /** Purges notes past the retention window. Needs no key, so it can run before unlock. */
+    suspend fun purgeExpiredTrash(nowMillis: Long = System.currentTimeMillis()) {
+        dao.trashedBefore(RecentlyDeleted.purgeCutoff(nowMillis)).forEach { deleteNoteForever(it) }
     }
 
     /** Emits the decrypted images for every note, keyed by noteId. */
@@ -188,6 +216,7 @@ class SecureNoteRepository(
                 version = version,
                 createdAtMillis = createdAtMillis,
                 updatedAtMillis = updatedAtMillis,
+                deletedAtMillis = deletedAtMillis,
             )
         }.getOrNull()
     }

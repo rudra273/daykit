@@ -2,6 +2,7 @@
 
 package com.daykit.feature.settings.ui
 
+import com.daykit.core.security.HideOverlayWindows
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Lightbulb
@@ -1449,6 +1450,7 @@ private fun BackupPasswordField(
     label: String,
     isError: Boolean = false,
 ) {
+    HideOverlayWindows()
     var visible by remember { mutableStateOf(false) }
     AppTextField(
         value = value,

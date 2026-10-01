@@ -14,9 +14,12 @@ import javax.crypto.spec.SecretKeySpec
  * than silently using a stale key. This is what makes the vault / key store /
  * secure notes undecryptable without the PIN.
  */
-class SessionValueCipher(
-    private val keyManager: SensitiveKeyManager,
+class SessionValueCipher internal constructor(
+    /** Returns a copy of the MSK the cipher may zero, or throws when locked. */
+    private val requireKey: () -> ByteArray,
 ) : ValueCipher {
+
+    constructor(keyManager: SensitiveKeyManager) : this(keyManager::requireKey)
 
     override fun encryptString(value: String, aad: String): CipherPayload =
         encrypt(value.toByteArray(StandardCharsets.UTF_8), aad)
@@ -32,7 +35,7 @@ class SessionValueCipher(
 
     private fun encrypt(plaintext: ByteArray, aad: String): CipherPayload {
         // requireKey() returns a copy we own; zero it once the cipher is keyed.
-        val key = keyManager.requireKey()
+        val key = requireKey()
         try {
             val iv = ByteArray(IV_BYTES).also(secureRandom::nextBytes)
             val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -45,7 +48,7 @@ class SessionValueCipher(
     }
 
     private fun decrypt(payload: CipherPayload, aad: String): ByteArray {
-        val key = keyManager.requireKey()
+        val key = requireKey()
         try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, KEY_ALGORITHM), GCMParameterSpec(GCM_TAG_BITS, payload.iv))
