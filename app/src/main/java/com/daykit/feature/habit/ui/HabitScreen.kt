@@ -50,12 +50,16 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EventBusy
 import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import com.daykit.core.designsystem.components.AppCheckbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -112,6 +116,7 @@ import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
+import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.components.StatTile
 import com.daykit.feature.habit.data.Habit
 import com.daykit.feature.habit.data.HabitDashboard
@@ -125,13 +130,6 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
-
-private enum class HabitTab {
-    CheckIn,
-    Habits,
-    Progress,
-    Quit,
-}
 
 private val quotes = listOf(
     "What are you capable of?",
@@ -159,7 +157,8 @@ fun HabitScreen(
     val dashboard by container.habitRepository
         .observeDashboard()
         .collectAsStateWithLifecycle(initialValue = null)
-    var selectedTab by remember { mutableStateOf(HabitTab.CheckIn) }
+    var progressOpen by remember { mutableStateOf(false) }
+    var quitDetailId by remember { mutableStateOf<String?>(null) }
     var addOpen by remember { mutableStateOf(false) }
     var addKind by remember { mutableStateOf(HabitKind.Build) }
     var editHabit by remember { mutableStateOf<Habit?>(null) }
@@ -169,7 +168,8 @@ fun HabitScreen(
     var progressPeriod by remember { mutableStateOf(ProgressPeriod.Month) }
     var progressAnchor by remember { mutableStateOf(LocalDate.now()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    val nestedUiOpen = addOpen || editHabit != null || deleteHabit != null || logHabit != null || relapseHabit != null
+    val nestedUiOpen = addOpen || editHabit != null || deleteHabit != null || logHabit != null ||
+        relapseHabit != null || progressOpen || quitDetailId != null
 
     BackHandler(enabled = !nestedUiOpen, onBack = onBack)
 
@@ -249,19 +249,12 @@ fun HabitScreen(
             }
         }
 
-        else -> HabitHome(
-            snackbarHostState = errors.host,
+        progressOpen -> HabitProgressPage(
             dashboard = dashboard,
-            selectedTab = selectedTab,
-            onTabChange = { selectedTab = it },
-            onBack = onBack,
-            selectedDate = selectedDate,
-            onPreviousDate = { selectedDate = selectedDate.minusDays(1) },
-            onNextDate = { selectedDate = selectedDate.plusDays(1) },
-            onSelectDate = { selectedDate = it },
-            progressPeriod = progressPeriod,
-            progressAnchor = progressAnchor,
-            onProgressPeriodChange = { period ->
+            period = progressPeriod,
+            anchor = progressAnchor,
+            onBack = { progressOpen = false },
+            onPeriodChange = { period ->
                 progressPeriod = period
                 // Switching Week <-> Month can land the anchor outside the navigable range.
                 val current = dashboard
@@ -269,30 +262,32 @@ fun HabitScreen(
                     progressAnchor = clampAnchor(progressAnchor, earliestHistoryDate(current), current.today)
                 }
             },
-            onProgressPrevious = {
+            onPrevious = {
                 progressAnchor = when (progressPeriod) {
                     ProgressPeriod.Week -> progressAnchor.minusWeeks(1)
                     ProgressPeriod.Month -> progressAnchor.minusMonths(1)
                 }
             },
-            onProgressNext = {
+            onNext = {
                 progressAnchor = when (progressPeriod) {
                     ProgressPeriod.Week -> progressAnchor.plusWeeks(1)
                     ProgressPeriod.Month -> progressAnchor.plusMonths(1)
                 }
             },
+        )
+
+        else -> HabitHome(
+            snackbarHostState = errors.host,
+            dashboard = dashboard,
+            onBack = onBack,
+            selectedDate = selectedDate,
+            onSelectDate = { selectedDate = it },
+            onOpenProgress = { progressOpen = true },
             onAdd = {
-                addKind = if (selectedTab == HabitTab.Quit) HabitKind.Quit else HabitKind.Build
-                addOpen = true
-            },
-            onAddBuild = {
                 addKind = HabitKind.Build
                 addOpen = true
             },
-            onAddQuit = {
-                addKind = HabitKind.Quit
-                addOpen = true
-            },
+            onOpenQuit = { quitDetailId = it.habitId },
             onLog = { habit ->
                 if (habit.goalType == HabitGoalType.Check) {
                     val existing = dashboard?.logFor(habit.habitId, selectedDate)
@@ -314,7 +309,30 @@ fun HabitScreen(
             },
             onEdit = { editHabit = it },
             onDelete = { deleteHabit = it },
-            onRelapse = { relapseHabit = it },
+        )
+    }
+
+    val current = dashboard
+    val quitDetail = quitDetailId?.let { id -> current?.habits?.firstOrNull { it.habitId == id } }
+    if (quitDetail != null && current != null) {
+        QuitDetailSheet(
+            habit = quitDetail,
+            cleanDays = quitCleanDays(quitDetail, current.logs, current.today),
+            best = bestQuitStreak(quitDetail, current.logs, current.today),
+            relapses = current.relapsesFor(quitDetail.habitId).size,
+            onDismiss = { quitDetailId = null },
+            onRelapse = {
+                quitDetailId = null
+                relapseHabit = quitDetail
+            },
+            onEdit = {
+                quitDetailId = null
+                editHabit = quitDetail
+            },
+            onDelete = {
+                quitDetailId = null
+                deleteHabit = quitDetail
+            },
         )
     }
 
@@ -382,36 +400,34 @@ fun HabitScreen(
 private fun HabitHome(
     snackbarHostState: SnackbarHostState,
     dashboard: HabitDashboard?,
-    selectedTab: HabitTab,
-    onTabChange: (HabitTab) -> Unit,
     onBack: () -> Unit,
     selectedDate: LocalDate,
-    onPreviousDate: () -> Unit,
-    onNextDate: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
-    progressPeriod: ProgressPeriod,
-    progressAnchor: LocalDate,
-    onProgressPeriodChange: (ProgressPeriod) -> Unit,
-    onProgressPrevious: () -> Unit,
-    onProgressNext: () -> Unit,
+    onOpenProgress: () -> Unit,
     onAdd: () -> Unit,
-    onAddBuild: () -> Unit,
-    onAddQuit: () -> Unit,
+    onOpenQuit: (Habit) -> Unit,
     onLog: (Habit) -> Unit,
     onEdit: (Habit) -> Unit,
     onDelete: (Habit) -> Unit,
-    onRelapse: (Habit) -> Unit,
 ) {
     val listState = rememberLazyListState()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = { AppTopBar(title = "Habits", onBack = onBack) },
+        topBar = {
+            AppTopBar(title = "Habits", onBack = onBack) {
+                IconButton(onClick = onOpenProgress, modifier = Modifier.size(MinTouchTarget)) {
+                    Icon(
+                        Icons.Rounded.Insights,
+                        contentDescription = "Progress",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        },
         floatingActionButton = {
-            val emptyBuildState = dashboard?.buildHabits?.isEmpty() == true &&
-                selectedTab in setOf(HabitTab.CheckIn, HabitTab.Habits)
-            if (!emptyBuildState) {
+            if (dashboard?.habits?.isNotEmpty() == true) {
                 AppFab(
                     icon = Icons.Rounded.Add,
                     contentDescription = "Add habit",
@@ -420,120 +436,85 @@ private fun HabitHome(
             }
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            when (val current = dashboard) {
-                null -> Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    LoadingIndicator()
-                }
+        when (val current = dashboard) {
+            null -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                LoadingIndicator()
+            }
 
-                else -> LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = innerPadding.calculateTopPadding() + Spacing.md,
-                        start = Spacing.lg,
-                        end = Spacing.lg,
-                        bottom = innerPadding.calculateBottomPadding() + 96.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    item(key = "tabs") {
-                        HabitTabs(selectedTab = selectedTab, onTabChange = onTabChange)
-                    }
-                    when (selectedTab) {
-                        HabitTab.CheckIn -> checkInItems(
-                            dashboard = current,
-                            selectedDate = selectedDate,
-                            onSelectDate = onSelectDate,
-                            onLog = onLog,
-                            onAdd = onAddBuild,
-                        )
-                        HabitTab.Habits -> habitsItems(
-                            dashboard = current,
-                            onAdd = onAddBuild,
-                            onEdit = onEdit,
-                            onDelete = onDelete,
-                        )
-                        HabitTab.Progress -> progressItems(
-                            dashboard = current,
-                            period = progressPeriod,
-                            anchor = progressAnchor,
-                            onPeriodChange = onProgressPeriodChange,
-                            onPrevious = onProgressPrevious,
-                            onNext = onProgressNext,
-                        )
-                        HabitTab.Quit -> quitItems(
-                            dashboard = current,
-                            onAdd = onAddQuit,
-                            onRelapse = onRelapse,
-                            onEdit = onEdit,
-                        )
-                    }
-                }
+            else -> LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding() + Spacing.md,
+                    start = Spacing.lg,
+                    end = Spacing.lg,
+                    bottom = innerPadding.calculateBottomPadding() + 96.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                todayItems(
+                    dashboard = current,
+                    selectedDate = selectedDate,
+                    onSelectDate = onSelectDate,
+                    onLog = onLog,
+                    onAdd = onAdd,
+                            onOpenQuit = onOpenQuit,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                )
             }
         }
     }
 }
 
-@Composable
-private fun HabitTabs(selectedTab: HabitTab, onTabChange: (HabitTab) -> Unit) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        HabitTab.values().forEach { tab ->
-            FilterChipButton(
-                text = tab.title,
-                selected = selectedTab == tab,
-                modifier = Modifier.weight(1f),
-                onClick = { onTabChange(tab) },
-            )
-        }
-    }
-}
-
-private val HabitTab.title: String
-    get() = when (this) {
-        HabitTab.CheckIn -> "Check In"
-        HabitTab.Habits -> "Habits"
-        HabitTab.Progress -> "Progress"
-        HabitTab.Quit -> "Quit"
-    }
-
 // ---------------------------------------------------------------------------
-// CHECK-IN TAB
+// TODAY: check-in, breaking (quit) and paused habits on one page
 // ---------------------------------------------------------------------------
 
-private fun androidx.compose.foundation.lazy.LazyListScope.checkInItems(
+private fun androidx.compose.foundation.lazy.LazyListScope.todayItems(
     dashboard: HabitDashboard,
     selectedDate: LocalDate,
     onSelectDate: (LocalDate) -> Unit,
     onLog: (Habit) -> Unit,
     onAdd: () -> Unit,
+    onOpenQuit: (Habit) -> Unit,
+    onEdit: (Habit) -> Unit,
+    onDelete: (Habit) -> Unit,
 ) {
-    if (dashboard.buildHabits.isEmpty()) {
+    if (dashboard.habits.isEmpty()) {
         item(key = "empty") {
             EmptyState(
                 modifier = Modifier.padding(top = Spacing.xxl),
                 icon = Icons.Rounded.Flag,
                 title = "No habits yet",
-                description = "Add coding, gym, reading, math, building, or anything you want to repeat.",
+                description = "Build one you want to repeat, like coding, gym or reading, or break one you want to stop.",
                 actionText = "Add Habit",
                 onAction = onAdd,
             )
         }
-    } else {
-        item(key = "quote") { QuoteCard(dashboard = dashboard) }
+        return
+    }
+
+    item(key = "quote") { QuoteCard(dashboard = dashboard) }
+
+    if (dashboard.buildHabits.isNotEmpty()) {
         item(key = "datestrip") {
             DateStrip(
                 dashboard = dashboard,
                 selectedDate = selectedDate,
                 onSelectDate = onSelectDate,
+            )
+        }
+        item(key = "daySummary") {
+            DaySummaryHeader(
+                dashboard = dashboard,
+                selectedDate = selectedDate,
+                onBackToToday = { onSelectDate(dashboard.today) },
             )
         }
         items(dashboard.buildHabits, key = { it.habitId }) { habit ->
@@ -542,7 +523,160 @@ private fun androidx.compose.foundation.lazy.LazyListScope.checkInItems(
                 log = dashboard.logFor(habit.habitId, selectedDate),
                 streak = buildStreak(habit, dashboard.logs, selectedDate),
                 onClick = { onLog(habit) },
+                onEdit = { onEdit(habit) },
+                onDelete = { onDelete(habit) },
             )
+        }
+    }
+
+    if (dashboard.quitHabits.isNotEmpty()) {
+        item(key = "breakingHeader") { SectionHeader(text = "Breaking") }
+        items(dashboard.quitHabits.chunked(2), key = { row -> "quit-" + row.first().habitId }) { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md), modifier = Modifier.fillMaxWidth()) {
+                row.forEach { habit ->
+                    QuitHabitTile(
+                        habit = habit,
+                        cleanDays = quitCleanDays(habit, dashboard.logs, dashboard.today),
+                        best = bestQuitStreak(habit, dashboard.logs, dashboard.today),
+                        onClick = { onOpenQuit(habit) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+
+    val paused = dashboard.habits.filterNot { it.active }
+    if (paused.isNotEmpty()) {
+        item(key = "pausedHeader") { SectionHeader(text = "Paused") }
+        items(paused, key = { "paused-" + it.habitId }) { habit ->
+            PausedHabitRow(
+                habit = habit,
+                onEdit = { onEdit(habit) },
+                onDelete = { onDelete(habit) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DaySummaryHeader(
+    dashboard: HabitDashboard,
+    selectedDate: LocalDate,
+    onBackToToday: () -> Unit,
+) {
+    val habits = dashboard.buildHabits
+    val done = habits.count { isLogComplete(it, dashboard.logFor(it.habitId, selectedDate)) }
+    val isToday = selectedDate == dashboard.today
+    val label = when (selectedDate) {
+        dashboard.today -> "Today"
+        dashboard.today.minusDays(1) -> "Yesterday"
+        else -> selectedDate.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = Spacing.xs)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                label,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "  ·  $done of ${habits.size} done",
+                color = MaterialTheme.extendedColors.textMuted,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            if (!isToday) {
+                FilterChipButton(text = "Back to today", selected = false, onClick = onBackToToday)
+            }
+        }
+        LinearProgressIndicator(
+            progress = { dayProgress(dashboard, selectedDate) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(99.dp)),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.extendedColors.inputField,
+        )
+    }
+}
+
+@Composable
+private fun HabitOverflowMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, modifier = Modifier.size(MinTouchTarget)) {
+            Icon(
+                Icons.Rounded.MoreVert,
+                contentDescription = "More options",
+                tint = MaterialTheme.extendedColors.textMuted,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.extendedColors.card,
+        ) {
+            DropdownMenuItem(
+                text = { Text("Edit") },
+                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                onClick = {
+                    expanded = false
+                    onEdit()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Delete", color = MaterialTheme.extendedColors.danger) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Rounded.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.extendedColors.danger,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PausedHabitRow(habit: Habit, onEdit: () -> Unit, onDelete: () -> Unit) {
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onEdit,
+        contentPadding = PaddingValues(start = Spacing.md, top = Spacing.xs, bottom = Spacing.xs),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(habitColor(habit.colorIndex).copy(alpha = 0.5f)),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    habit.name,
+                    color = MaterialTheme.extendedColors.textMuted,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (habit.kind == HabitKind.Quit) "Breaking" else habitGoalText(habit),
+                    color = MaterialTheme.extendedColors.textMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            HabitOverflowMenu(onEdit = onEdit, onDelete = onDelete)
         }
     }
 }
@@ -647,11 +781,17 @@ private fun DailyHabitRow(
     log: HabitLog?,
     streak: Int,
     onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val completed = isLogComplete(habit, log)
     val progress = habitProgress(habit, log)
     val color = habitColor(habit.colorIndex)
-    AppCard(modifier = Modifier.fillMaxWidth(), onClick = onClick, contentPadding = PaddingValues(Spacing.md)) {
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        contentPadding = PaddingValues(start = Spacing.md, top = Spacing.md, bottom = Spacing.md),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Box(
                 modifier = Modifier
@@ -713,116 +853,62 @@ private fun DailyHabitRow(
                     }
                 }
             }
+            HabitOverflowMenu(onEdit = onEdit, onDelete = onDelete)
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// HABITS TAB
+// PROGRESS PAGE
 // ---------------------------------------------------------------------------
-
-private fun androidx.compose.foundation.lazy.LazyListScope.habitsItems(
-    dashboard: HabitDashboard,
-    onAdd: () -> Unit,
-    onEdit: (Habit) -> Unit,
-    onDelete: (Habit) -> Unit,
-) {
-    if (dashboard.buildHabits.isEmpty()) {
-        item(key = "empty") {
-            EmptyState(
-                modifier = Modifier.padding(top = Spacing.xxl),
-                icon = Icons.Rounded.Flag,
-                title = "No habits yet",
-                description = "Add coding, gym, reading, math, building, or anything you want to repeat.",
-                actionText = "Add Habit",
-                onAction = onAdd,
-            )
-        }
-    } else {
-        item(key = "add") {
-            PrimaryButton(
-                text = "Add Habit",
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                },
-                onClick = onAdd,
-            )
-        }
-        items(dashboard.buildHabits, key = { it.habitId }) { habit ->
-            HabitManageCard(
-                habit = habit,
-                logs = dashboard.logs,
-                today = dashboard.today,
-                onEdit = { onEdit(habit) },
-                onDelete = { onDelete(habit) },
-            )
-        }
-    }
-}
 
 @Composable
-private fun HabitManageCard(
-    habit: Habit,
-    logs: List<HabitLog>,
-    today: LocalDate,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
+private fun HabitProgressPage(
+    dashboard: HabitDashboard?,
+    period: ProgressPeriod,
+    anchor: LocalDate,
+    onBack: () -> Unit,
+    onPeriodChange: (ProgressPeriod) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
 ) {
-    val streak = buildStreak(habit, logs, today)
-    AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(Spacing.md)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            AccentIconTile(icon = Icons.Rounded.Flag, accent = habitColor(habit.colorIndex))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        habit.name,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (habit.reminderEnabled) {
-                        Text(
-                            timeText(habit.reminderHour, habit.reminderMinute),
-                            color = MaterialTheme.extendedColors.textMuted,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-                Text(
-                    "${habitGoalText(habit)} • $streak day streak",
-                    color = MaterialTheme.extendedColors.textMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+    BackHandler(onBack = onBack)
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { AppTopBar(title = "Progress", onBack = onBack) },
+    ) { innerPadding ->
+        when (dashboard) {
+            null -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                LoadingIndicator()
             }
-            IconButton(onClick = onEdit, modifier = Modifier.size(MinTouchTarget)) {
-                Icon(
-                    Icons.Rounded.Edit,
-                    contentDescription = "Edit",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            IconButton(onClick = onDelete, modifier = Modifier.size(MinTouchTarget)) {
-                Icon(
-                    Icons.Rounded.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.extendedColors.danger,
-                    modifier = Modifier.size(20.dp),
+
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding() + Spacing.md,
+                    start = Spacing.lg,
+                    end = Spacing.lg,
+                    bottom = innerPadding.calculateBottomPadding() + Spacing.xl,
+                ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                progressItems(
+                    dashboard = dashboard,
+                    period = period,
+                    anchor = anchor,
+                    onPeriodChange = onPeriodChange,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
                 )
             }
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// PROGRESS TAB
-// ---------------------------------------------------------------------------
 
 private fun androidx.compose.foundation.lazy.LazyListScope.progressItems(
     dashboard: HabitDashboard,
@@ -1530,84 +1616,98 @@ private fun HabitLegend(habits: List<Habit>) {
 // QUIT TAB
 // ---------------------------------------------------------------------------
 
-private fun androidx.compose.foundation.lazy.LazyListScope.quitItems(
-    dashboard: HabitDashboard,
-    onAdd: () -> Unit,
-    onRelapse: (Habit) -> Unit,
-    onEdit: (Habit) -> Unit,
+@Composable
+private fun QuitHabitTile(
+    habit: Habit,
+    cleanDays: Int,
+    best: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    if (dashboard.quitHabits.isEmpty()) {
-        item(key = "empty") {
-            EmptyState(
-                modifier = Modifier.padding(top = Spacing.xxl),
-                icon = Icons.Rounded.EventBusy,
-                title = "Leave a bad habit",
-                description = "Track clean days for smoking, porn, junk food, alcohol, or any loop you want to break.",
-                actionText = "Quit Habit",
-                onAction = onAdd,
+    val color = habitColor(habit.colorIndex)
+    AppCard(modifier = modifier, onClick = onClick, contentPadding = PaddingValues(Spacing.md)) {
+        Text(
+            habit.name,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                cleanDays.toString(),
+                color = color,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                if (cleanDays == 1) "day clean" else "days clean",
+                color = MaterialTheme.extendedColors.textMuted,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(bottom = 6.dp),
             )
         }
-    } else {
-        items(dashboard.quitHabits, key = { it.habitId }) { habit ->
-            QuitHabitCard(
-                habit = habit,
-                cleanDays = quitCleanDays(habit, dashboard.logs, dashboard.today),
-                best = bestQuitStreak(habit, dashboard.logs, dashboard.today),
-                relapses = dashboard.relapsesFor(habit.habitId).size,
-                onRelapse = { onRelapse(habit) },
-                onEdit = { onEdit(habit) },
-            )
-        }
+        Text(
+            "Best $best",
+            color = MaterialTheme.extendedColors.textMuted,
+            style = MaterialTheme.typography.labelSmall,
+        )
     }
 }
 
 @Composable
-private fun QuitHabitCard(
+private fun QuitDetailSheet(
     habit: Habit,
     cleanDays: Int,
     best: Int,
     relapses: Int,
+    onDismiss: () -> Unit,
     onRelapse: () -> Unit,
     onEdit: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val color = habitColor(habit.colorIndex)
-    AppCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            AccentIconTile(icon = Icons.Rounded.LocalFireDepartment, accent = color)
-            Text(
-                habit.name,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurface)
+    AppBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                AccentIconTile(icon = Icons.Rounded.LocalFireDepartment, accent = color)
+                Text(
+                    habit.name,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                HabitOverflowMenu(onEdit = onEdit, onDelete = onDelete)
             }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    cleanDays.toString(),
+                    color = color,
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "days clean",
+                    color = MaterialTheme.extendedColors.textMuted,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                StatTile(label = "Best streak", value = best.toString(), accent = color, modifier = Modifier.weight(1f))
+                StatTile(label = "Relapses", value = relapses.toString(), accent = MaterialTheme.extendedColors.accents.red, modifier = Modifier.weight(1f))
+            }
+            SecondaryButton(text = "Log relapse", modifier = Modifier.fillMaxWidth(), onClick = onRelapse)
         }
-        Spacer(Modifier.height(Spacing.md))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                cleanDays.toString(),
-                color = color,
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "days clean",
-                color = MaterialTheme.extendedColors.textMuted,
-                style = MaterialTheme.typography.titleSmall,
-            )
-        }
-        Spacer(Modifier.height(Spacing.md))
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-            StatTile(label = "Best streak", value = best.toString(), accent = color, modifier = Modifier.weight(1f))
-            StatTile(label = "Relapses", value = relapses.toString(), accent = MaterialTheme.extendedColors.accents.red, modifier = Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(Spacing.md))
-        SecondaryButton(text = "Log relapse", modifier = Modifier.fillMaxWidth(), onClick = onRelapse)
     }
 }
 
