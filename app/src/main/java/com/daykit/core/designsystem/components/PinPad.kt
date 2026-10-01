@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -28,10 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.extendedColors
 
@@ -154,32 +152,25 @@ fun FrostedLockBackground(
     content: @Composable () -> Unit,
 ) {
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(60.dp),
-        ) {
+        // Dithered smoothstep glows rather than blurred radial gradients, which band
+        // on 8-bit panels. Boxes are larger than the old blobs to cover their blur
+        // spread, and offset so the glow centers stay where they were.
+        Box(modifier = Modifier.fillMaxSize()) {
             val primary = MaterialTheme.colorScheme.primary
             val accent = MaterialTheme.extendedColors.accents.indigo
             Box(
                 modifier = Modifier
-                    .size(300.dp)
-                    .padding(24.dp)
                     .align(Alignment.TopEnd)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(listOf(primary.copy(alpha = 0.35f), Color.Transparent))
-                    ),
+                    .offset(x = 40.dp, y = (-40).dp)
+                    .size(380.dp)
+                    .ditheredGlow(primary, alpha = 0.30f, center = Offset(0.5f, 0.5f), radius = 0.5f),
             )
             Box(
                 modifier = Modifier
-                    .size(320.dp)
-                    .padding(24.dp)
                     .align(Alignment.BottomStart)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(listOf(accent.copy(alpha = 0.30f), Color.Transparent))
-                    ),
+                    .offset(x = (-40).dp, y = 40.dp)
+                    .size(400.dp)
+                    .ditheredGlow(accent, alpha = 0.26f, center = Offset(0.5f, 0.5f), radius = 0.5f),
             )
         }
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.30f)))
