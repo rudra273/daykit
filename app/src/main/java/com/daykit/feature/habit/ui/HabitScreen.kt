@@ -43,6 +43,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -54,13 +56,14 @@ import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Numbers
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.SelfImprovement
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import com.daykit.core.designsystem.components.AppCheckbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -68,8 +71,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.daykit.core.designsystem.components.AppSlider
 import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -109,6 +115,7 @@ import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
 import com.daykit.core.designsystem.components.AppTextField
+import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
@@ -209,6 +216,10 @@ fun HabitScreen(
                     habit = habit,
                     initialKind = habit.kind,
                     onDismiss = { editHabit = null },
+                    onDelete = {
+                        editHabit = null
+                        deleteHabit = habit
+                    },
                     onSave = { draft ->
                         errors.launchGuarded(
                             failureMessage = "Couldn't save your changes.",
@@ -340,6 +351,7 @@ fun HabitScreen(
         ProgressSheet(
             habit = habit,
             selectedDate = selectedDate,
+            today = dashboard?.today ?: LocalDate.now(),
             existing = dashboard?.logFor(habit.habitId, selectedDate),
             onDismiss = { logHabit = null },
             onSave = { minutes, count, note ->
@@ -569,11 +581,7 @@ private fun DaySummaryHeader(
     val habits = dashboard.buildHabits
     val done = habits.count { isLogComplete(it, dashboard.logFor(it.habitId, selectedDate)) }
     val isToday = selectedDate == dashboard.today
-    val label = when (selectedDate) {
-        dashboard.today -> "Today"
-        dashboard.today.minusDays(1) -> "Yesterday"
-        else -> selectedDate.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
-    }
+    val label = dayLabel(selectedDate, dashboard.today)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = Spacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -1729,10 +1737,12 @@ private data class HabitDraft(
     val active: Boolean,
 )
 
-private enum class DayPeriod {
-    AM,
-    PM,
-}
+private val buildNameSuggestions = listOf("Gym", "Read", "Meditate", "Water", "Walk", "Code", "Journal", "Stretch")
+private val quitNameSuggestions = listOf("Smoking", "Junk food", "Doomscrolling", "Alcohol", "Sugar", "Late nights")
+private val minutePresets = listOf(15, 30, 45, 60)
+
+// Display order only; the enum order is left alone.
+private val goalTypeOrder = listOf(HabitGoalType.Check, HabitGoalType.Count, HabitGoalType.Time)
 
 @Composable
 private fun SegmentedRow(
@@ -1755,19 +1765,25 @@ private fun SegmentOption(
     text: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
     onClick: () -> Unit,
 ) {
-    Box(
+    val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.extendedColors.textMuted
+    Row(
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
             .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
             .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+        }
         Text(
             text = text,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.extendedColors.textMuted,
+            color = content,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
@@ -1776,56 +1792,47 @@ private fun SegmentOption(
 }
 
 @Composable
-private fun DayPeriodSegmentedControl(
-    selected: DayPeriod,
-    onSelected: (DayPeriod) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .height(56.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.extendedColors.inputField)
-            .padding(3.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        DayPeriodOption(
-            text = "AM",
-            selected = selected == DayPeriod.AM,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            onClick = { onSelected(DayPeriod.AM) },
-        )
-        DayPeriodOption(
-            text = "PM",
-            selected = selected == DayPeriod.PM,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            onClick = { onSelected(DayPeriod.PM) },
-        )
-    }
-}
-
-@Composable
-private fun DayPeriodOption(
-    text: String,
+private fun KindOption(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    Box(
+    val accent = MaterialTheme.colorScheme.primary
+    Column(
         modifier = modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+            .clip(MaterialTheme.shapes.large)
+            .background(if (selected) accent.asAccentContainer() else MaterialTheme.extendedColors.card)
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) accent else MaterialTheme.extendedColors.divider,
+                shape = MaterialTheme.shapes.large,
+            )
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+            .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(
-            text = text,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.extendedColors.textMuted,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (selected) accent else MaterialTheme.extendedColors.textMuted,
+            modifier = Modifier.size(22.dp),
         )
+        Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+        Text(subtitle, color = MaterialTheme.extendedColors.textMuted, style = MaterialTheme.typography.bodySmall)
     }
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(
+        text,
+        color = MaterialTheme.extendedColors.textMuted,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+    )
 }
 
 @Composable
@@ -1834,45 +1841,40 @@ private fun HabitEditorPage(
     initialKind: HabitKind,
     onDismiss: () -> Unit,
     onSave: (HabitDraft) -> Unit,
+    onDelete: (() -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var name by remember { mutableStateOf(habit?.name ?: "") }
     var kind by remember { mutableStateOf(habit?.kind ?: initialKind) }
-    var goalType by remember { mutableStateOf(habit?.goalType ?: HabitGoalType.Time) }
-    var targetMinutes by remember { mutableStateOf((habit?.targetMinutes ?: 60).takeIf { it > 0 }?.toString() ?: "") }
-    var targetCount by remember { mutableStateOf((habit?.targetCount ?: 1).takeIf { it > 0 }?.toString() ?: "") }
+    var goalType by remember { mutableStateOf(habit?.goalType ?: HabitGoalType.Check) }
+    var targetMinutes by remember { mutableStateOf(habit?.targetMinutes?.takeIf { it > 0 } ?: 30) }
+    var targetCount by remember { mutableStateOf(habit?.targetCount?.takeIf { it > 0 } ?: 1) }
     var unitLabel by remember { mutableStateOf(habit?.unitLabel ?: "times") }
     var colorIndex by remember { mutableStateOf(habit?.colorIndex ?: 0) }
     var reminderEnabled by remember { mutableStateOf(habit?.reminderEnabled ?: false) }
-    val initialReminderHour = habit?.reminderHour ?: 20
-    var reminderHour by remember { mutableStateOf(hour12(initialReminderHour).toString()) }
-    var reminderMinute by remember { mutableStateOf((habit?.reminderMinute ?: 0).toString().padStart(2, '0')) }
-    var reminderPeriod by remember { mutableStateOf(if (initialReminderHour < 12) DayPeriod.AM else DayPeriod.PM) }
+    var reminderHour by remember { mutableStateOf(habit?.reminderHour ?: 20) }
+    var reminderMinute by remember { mutableStateOf(habit?.reminderMinute ?: 0) }
     var active by remember { mutableStateOf(habit?.active ?: true) }
+    var timePickerOpen by remember { mutableStateOf(false) }
     var inputFocused by remember { mutableStateOf(false) }
     val inputModifier = Modifier.onFocusChanged { inputFocused = it.isFocused }
     val canSave = name.trim().isNotBlank()
+    val draft = HabitDraft(
+        name = name,
+        kind = kind,
+        goalType = if (kind == HabitKind.Quit) HabitGoalType.Check else goalType,
+        targetMinutes = targetMinutes,
+        targetCount = targetCount,
+        unitLabel = unitLabel,
+        colorIndex = colorIndex,
+        reminderEnabled = reminderEnabled,
+        reminderHour = reminderHour,
+        reminderMinute = reminderMinute,
+        active = active,
+    )
     fun saveDraft() {
-        if (!canSave) return
-        onSave(
-            HabitDraft(
-                name = name,
-                kind = kind,
-                goalType = if (kind == HabitKind.Quit) HabitGoalType.Check else goalType,
-                targetMinutes = targetMinutes.toIntOrNull() ?: 0,
-                targetCount = targetCount.toIntOrNull() ?: 0,
-                unitLabel = unitLabel,
-                colorIndex = colorIndex,
-                reminderEnabled = reminderEnabled,
-                reminderHour = hour24(
-                    hour = reminderHour.toIntOrNull() ?: 8,
-                    period = reminderPeriod,
-                ),
-                reminderMinute = reminderMinute.toIntOrNull() ?: 0,
-                active = active,
-            ),
-        )
+        if (canSave) onSave(draft)
     }
 
     BackHandler {
@@ -1889,7 +1891,7 @@ private fun HabitEditorPage(
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize()) {
             AppTopBar(
-                title = if (habit == null) "Add Habit" else "Edit Habit",
+                title = if (habit == null) "New habit" else "Edit habit",
                 onBack = onDismiss,
             )
             LazyColumn(
@@ -1901,28 +1903,25 @@ private fun HabitEditorPage(
                     top = Spacing.sm,
                     bottom = Spacing.lg,
                 ),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                item("basics") {
-                    EditorSection(title = "Basics") {
-                        AppTextField(
-                            value = name,
-                            onValueChange = { name = it.take(40) },
-                            label = "Name",
-                            modifier = inputModifier,
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                        )
-                        if (habit == null) {
-                            Spacer(Modifier.height(Spacing.sm))
-                            SegmentedRow {
-                                SegmentOption(
-                                    text = "Build",
+                if (habit == null) {
+                    item("kind") {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            FieldLabel("I want to")
+                            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                KindOption(
+                                    title = "Start doing",
+                                    subtitle = "Build a daily habit",
+                                    icon = Icons.Rounded.AddCircleOutline,
                                     selected = kind == HabitKind.Build,
                                     modifier = Modifier.weight(1f),
                                     onClick = { kind = HabitKind.Build },
                                 )
-                                SegmentOption(
-                                    text = "Quit",
+                                KindOption(
+                                    title = "Stop doing",
+                                    subtitle = "Count clean days",
+                                    icon = Icons.Rounded.Block,
                                     selected = kind == HabitKind.Quit,
                                     modifier = Modifier.weight(1f),
                                     onClick = { kind = HabitKind.Quit },
@@ -1932,44 +1931,30 @@ private fun HabitEditorPage(
                     }
                 }
 
-                if (kind == HabitKind.Build) {
-                    item("goal") {
-                        EditorSection(title = "Goal") {
-                            SegmentedRow {
-                                HabitGoalType.values().forEach { type ->
-                                    SegmentOption(
-                                        text = type.name,
-                                        selected = goalType == type,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { goalType = type },
-                                    )
-                                }
-                            }
-                            if (goalType == HabitGoalType.Time) {
-                                Spacer(Modifier.height(Spacing.sm))
-                                AppTextField(
-                                    value = targetMinutes,
-                                    onValueChange = { targetMinutes = it.filter(Char::isDigit).take(4) },
-                                    label = "Daily minutes",
-                                    modifier = inputModifier,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                )
-                            }
-                            if (goalType == HabitGoalType.Count) {
-                                Spacer(Modifier.height(Spacing.sm))
-                                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                                    AppTextField(
-                                        value = targetCount,
-                                        onValueChange = { targetCount = it.filter(Char::isDigit).take(4) },
-                                        label = "Daily target",
-                                        modifier = Modifier.weight(1f).onFocusChanged { inputFocused = it.isFocused },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    )
-                                    AppTextField(
-                                        value = unitLabel,
-                                        onValueChange = { unitLabel = it.take(16) },
-                                        label = "Unit",
-                                        modifier = Modifier.weight(1f).onFocusChanged { inputFocused = it.isFocused },
+                item("name") {
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        AppTextField(
+                            value = name,
+                            onValueChange = { name = it.take(40) },
+                            label = "Name",
+                            modifier = inputModifier,
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Words,
+                                imeAction = ImeAction.Done,
+                            ),
+                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                        )
+                        if (habit == null) {
+                            val suggestions = if (kind == HabitKind.Quit) quitNameSuggestions else buildNameSuggestions
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                                items(suggestions, key = { it }) { suggestion ->
+                                    FilterChipButton(
+                                        text = suggestion,
+                                        selected = name == suggestion,
+                                        onClick = {
+                                            name = suggestion
+                                            focusManager.clearFocus()
+                                        },
                                     )
                                 }
                             }
@@ -1977,38 +1962,104 @@ private fun HabitEditorPage(
                     }
                 }
 
-                item("color") {
-                    EditorSection(title = "Color") {
+                if (kind == HabitKind.Build) {
+                    item("goal") {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                            habitPalette.indices.chunked(5).forEach { row ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                                    row.forEach { index ->
-                                        // 36dp swatch centred in a 48dp touch target.
-                                        Box(
-                                            modifier = Modifier
-                                                .size(MinTouchTarget)
-                                                .selectable(
-                                                    selected = colorIndex == index,
-                                                    onClick = { colorIndex = index },
-                                                    role = Role.RadioButton,
-                                                )
-                                                .semantics { contentDescription = "Color ${index + 1}" },
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .clip(CircleShape)
-                                                    .then(
-                                                        if (colorIndex == index) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier
-                                                    )
-                                                    .background(habitColor(index)),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                if (colorIndex == index) {
-                                                    Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                                }
-                                            }
+                            FieldLabel("Daily goal")
+                            SegmentedRow {
+                                goalTypeOrder.forEach { type ->
+                                    SegmentOption(
+                                        text = type.label,
+                                        icon = type.icon,
+                                        selected = goalType == type,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { goalType = type },
+                                    )
+                                }
+                            }
+                            Text(
+                                goalType.hint,
+                                color = MaterialTheme.extendedColors.textMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            when (goalType) {
+                                HabitGoalType.Time -> {
+                                    Stepper(
+                                        label = "minutes a day",
+                                        value = targetMinutes,
+                                        step = 5,
+                                        onValueChange = { targetMinutes = it.coerceIn(1, 1440) },
+                                        onGoal = null,
+                                        goalLabel = null,
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        minutePresets.forEach { preset ->
+                                            FilterChipButton(
+                                                text = formatMinutes(preset),
+                                                selected = targetMinutes == preset,
+                                                modifier = Modifier.weight(1f),
+                                                onClick = { targetMinutes = preset },
+                                            )
+                                        }
+                                    }
+                                }
+                                HabitGoalType.Count -> {
+                                    Stepper(
+                                        label = "${unitLabel.ifBlank { "times" }} a day",
+                                        value = targetCount,
+                                        step = 1,
+                                        onValueChange = { targetCount = it.coerceIn(1, 9999) },
+                                        onGoal = null,
+                                        goalLabel = null,
+                                    )
+                                    AppTextField(
+                                        value = unitLabel,
+                                        onValueChange = { unitLabel = it.take(16) },
+                                        label = "Unit",
+                                        placeholder = "glasses, pages, pushups…",
+                                        modifier = inputModifier,
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                    )
+                                }
+                                HabitGoalType.Check -> Unit
+                            }
+                        }
+                    }
+                }
+
+                item("color") {
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        FieldLabel("Color")
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            items(habitPalette.indices.toList(), key = { it }) { index ->
+                                // 36dp swatch centred in a 48dp touch target.
+                                Box(
+                                    modifier = Modifier
+                                        .size(MinTouchTarget)
+                                        .selectable(
+                                            selected = colorIndex == index,
+                                            onClick = { colorIndex = index },
+                                            role = Role.RadioButton,
+                                        )
+                                        .semantics { contentDescription = "Color ${index + 1}" },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .then(
+                                                if (colorIndex == index) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier
+                                            )
+                                            .background(habitColor(index)),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (colorIndex == index) {
+                                            Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                                         }
                                     }
                                 }
@@ -2018,106 +2069,200 @@ private fun HabitEditorPage(
                 }
 
                 item("reminder") {
-                    EditorSection(title = "Reminder") {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.Notifications, contentDescription = null, tint = MaterialTheme.extendedColors.textMuted, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(Spacing.sm))
-                            Text("Daily reminder", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                            AppSwitch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
-                        }
-                        if (reminderEnabled) {
-                            Spacer(Modifier.height(Spacing.sm))
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                AppTextField(
-                                    value = reminderHour,
-                                    onValueChange = { value -> reminderHour = value.filter(Char::isDigit).take(2) },
-                                    label = "Hour",
-                                    modifier = Modifier.weight(1f).onFocusChanged { inputFocused = it.isFocused },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                )
-                                AppTextField(
-                                    value = reminderMinute,
-                                    onValueChange = { reminderMinute = it.filter(Char::isDigit).take(2) },
-                                    label = "Minute",
-                                    modifier = Modifier.weight(1f).onFocusChanged { inputFocused = it.isFocused },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                )
-                                DayPeriodSegmentedControl(
-                                    selected = reminderPeriod,
-                                    onSelected = { reminderPeriod = it },
-                                    modifier = Modifier.width(58.dp),
+                    AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.sm)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            Icon(
+                                Icons.Rounded.Notifications,
+                                contentDescription = null,
+                                tint = MaterialTheme.extendedColors.textMuted,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Text("Remind me", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                            if (reminderEnabled) {
+                                FilterChipButton(
+                                    text = timeText(reminderHour, reminderMinute),
+                                    selected = true,
+                                    onClick = { timePickerOpen = true },
                                 )
                             }
+                            AppSwitch(
+                                checked = reminderEnabled,
+                                onCheckedChange = { enabled ->
+                                    reminderEnabled = enabled
+                                    if (enabled) timePickerOpen = true
+                                },
+                            )
                         }
                     }
                 }
 
                 if (habit != null) {
-                    item("active") {
-                        EditorSection(title = "Status") {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Active", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                                AppCheckbox(checked = active, onCheckedChange = { active = it })
+                    item("status") {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.sm)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Pause this habit", color = MaterialTheme.colorScheme.onSurface)
+                                        Text(
+                                            "Moves it to Paused. History is kept.",
+                                            color = MaterialTheme.extendedColors.textMuted,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                    AppSwitch(checked = !active, onCheckedChange = { active = !it })
+                                }
+                            }
+                            if (onDelete != null) {
+                                AppTextButton(
+                                    text = "Delete habit",
+                                    color = MaterialTheme.extendedColors.danger,
+                                    onClick = onDelete,
+                                )
                             }
                         }
                     }
                 }
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .padding(bottom = innerPadding.calculateBottomPadding() + Spacing.md, top = Spacing.sm),
             ) {
-                SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = onDismiss)
-                PrimaryButton(text = "Save", modifier = Modifier.weight(1f), enabled = canSave, onClick = ::saveDraft)
+                if (canSave) {
+                    Text(
+                        habitSummary(draft),
+                        color = MaterialTheme.extendedColors.textMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                PrimaryButton(
+                    text = if (habit == null) "Create habit" else "Save",
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canSave,
+                    onClick = ::saveDraft,
+                )
             }
         }
     }
+
+    if (timePickerOpen) {
+        HabitTimePickerDialog(
+            initialHour = reminderHour,
+            initialMinute = reminderMinute,
+            onDismiss = { timePickerOpen = false },
+            onConfirm = { hour, minute ->
+                reminderHour = hour
+                reminderMinute = minute
+                timePickerOpen = false
+            },
+        )
+    }
+}
+
+private val HabitGoalType.label: String
+    get() = when (this) {
+        HabitGoalType.Check -> "Tick"
+        HabitGoalType.Time -> "Minutes"
+        HabitGoalType.Count -> "Count"
+    }
+
+private val HabitGoalType.icon: ImageVector
+    get() = when (this) {
+        HabitGoalType.Check -> Icons.Rounded.Check
+        HabitGoalType.Time -> Icons.Rounded.Timer
+        HabitGoalType.Count -> Icons.Rounded.Numbers
+    }
+
+private val HabitGoalType.hint: String
+    get() = when (this) {
+        HabitGoalType.Check -> "Tick it off once a day."
+        HabitGoalType.Time -> "Spend a set time on it, like 30 min of reading."
+        HabitGoalType.Count -> "Reach a number, like 8 glasses of water."
+    }
+
+private fun habitSummary(draft: HabitDraft): String {
+    val name = draft.name.trim()
+    val goal = when {
+        draft.kind == HabitKind.Quit -> "Stay away from $name and count clean days"
+        draft.goalType == HabitGoalType.Time -> "$name for ${formatMinutes(draft.targetMinutes)} every day"
+        draft.goalType == HabitGoalType.Count -> "$name ${draft.targetCount} ${draft.unitLabel.ifBlank { "times" }} every day"
+        else -> "$name every day"
+    }
+    val reminder = if (draft.reminderEnabled) ", reminder at ${timeText(draft.reminderHour, draft.reminderMinute)}" else ""
+    return goal + reminder
 }
 
 @Composable
-private fun EditorSection(
-    title: String,
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+private fun HabitTimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit,
 ) {
-    AppCard(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            title,
-            color = MaterialTheme.extendedColors.textMuted,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        content()
-    }
+    val state = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = TimeFormat.is24Hour(),
+    )
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.extendedColors.card,
+        shape = MaterialTheme.shapes.large,
+        title = { Text("Reminder time", style = MaterialTheme.typography.titleLarge) },
+        text = {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TimePicker(state = state)
+            }
+        },
+        confirmButton = {
+            AppTextButton(text = "Set", onClick = { onConfirm(state.hour, state.minute) })
+        },
+        dismissButton = {
+            AppTextButton(text = "Cancel", color = MaterialTheme.extendedColors.textMuted, onClick = onDismiss)
+        },
+    )
 }
 
 // ---------------------------------------------------------------------------
 // SHEETS
 // ---------------------------------------------------------------------------
 
+// Only Minutes and Count habits open this sheet; Tick habits toggle straight from the row.
 @Composable
 private fun ProgressSheet(
     habit: Habit,
     selectedDate: LocalDate,
+    today: LocalDate,
     existing: HabitLog?,
     onDismiss: () -> Unit,
     onSave: (Int, Int, String) -> Unit,
 ) {
-    var minutes by remember { mutableStateOf(existing?.minutes?.takeIf { it > 0 }?.toString() ?: "") }
-    var count by remember { mutableStateOf(existing?.progressCount?.takeIf { it > 0 }?.toString() ?: "") }
-    var checked by remember { mutableStateOf(existing?.completed ?: true) }
+    val isTime = habit.goalType == HabitGoalType.Time
+    var value by remember {
+        mutableStateOf(if (isTime) existing?.minutes ?: 0 else existing?.progressCount ?: 0)
+    }
     var note by remember { mutableStateOf(existing?.note ?: "") }
-    val parsedMinutes = minutes.toIntOrNull() ?: 0
-    val parsedCount = count.toIntOrNull() ?: 0
-    val derivedCompleted = isGoalComplete(habit, parsedMinutes, parsedCount, checked)
+    var noteOpen by remember { mutableStateOf(note.isNotBlank()) }
+    val minutes = if (isTime) value else 0
+    val count = if (isTime) 0 else value
+    val target = if (isTime) habit.targetMinutes else habit.targetCount
+    val completed = isGoalComplete(habit, minutes, count, checked = true)
     val color = habitColor(habit.colorIndex)
+    val unit = if (isTime) "min" else habit.unitLabel.ifBlank { "times" }
+    val quickAdds = if (isTime) listOf(5, 15, 30) else listOf(1, 5)
+    fun format(amount: Int) = if (isTime) formatMinutes(amount) else "$amount"
+    // Room past the goal so overshooting is possible by drag; values beyond it pin the thumb to the end.
+    val sliderMax = remember {
+        val base = if (target > 0) target * 2 else if (isTime) 120 else 20
+        maxOf(base, existing?.let { if (isTime) it.minutes else it.progressCount } ?: 0)
+    }
+    val sliderSnap = if (isTime && sliderMax > 60) 5 else 1
+    fun formatWithUnit(amount: Int) = if (isTime) formatMinutes(amount) else "$amount $unit"
 
     AppBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -2127,73 +2272,99 @@ private fun ProgressSheet(
                 .padding(bottom = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Column {
-                Text(habit.name, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(color),
+                )
                 Text(
-                    selectedDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                    habit.name,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    dayLabel(selectedDate, today),
                     color = MaterialTheme.extendedColors.textMuted,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
 
-            if (habit.goalType == HabitGoalType.Time) {
-                Stepper(
-                    label = "Minutes",
-                    value = parsedMinutes,
-                    step = 5,
-                    onValueChange = { minutes = it.coerceAtLeast(0).toString() },
-                    onGoal = if (habit.targetMinutes > 0) {
-                        { minutes = habit.targetMinutes.toString() }
-                    } else null,
-                    goalLabel = if (habit.targetMinutes > 0) "Goal ${formatMinutes(habit.targetMinutes)}" else null,
-                )
-                Text(
-                    "${(habitProgress(habit, temporaryLog(habit, parsedMinutes, parsedCount, derivedCompleted)) * 100).roundToInt()}% complete",
-                    color = MaterialTheme.extendedColors.textMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (habit.goalType == HabitGoalType.Count) {
-                Stepper(
-                    label = habit.unitLabel.ifBlank { "Count" },
-                    value = parsedCount,
-                    step = 1,
-                    onValueChange = { count = it.coerceAtLeast(0).toString() },
-                    onGoal = if (habit.targetCount > 0) {
-                        { count = habit.targetCount.toString() }
-                    } else null,
-                    goalLabel = if (habit.targetCount > 0) "Goal ${habit.targetCount}" else null,
-                )
-                Text(
-                    "${(habitProgress(habit, temporaryLog(habit, parsedMinutes, parsedCount, derivedCompleted)) * 100).roundToInt()}% complete",
-                    color = MaterialTheme.extendedColors.textMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (habit.goalType == HabitGoalType.Check) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Mark complete", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                    AppCheckbox(checked = checked, onCheckedChange = { checked = it })
-                }
-            } else {
-                Text(
-                    if (derivedCompleted) "This will check today's habit." else "Saved as partial progress.",
-                    color = if (derivedCompleted) color else MaterialTheme.extendedColors.textMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-
-            AppTextField(
-                value = note,
-                onValueChange = { note = it.take(160) },
-                label = "Note (optional)",
-                singleLine = false,
+            Stepper(
+                label = if (target > 0) "of ${formatWithUnit(target)}" else unit,
+                value = value,
+                step = if (isTime) 5 else 1,
+                onValueChange = { value = it.coerceAtLeast(0) },
+                onGoal = null,
+                goalLabel = null,
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md), modifier = Modifier.fillMaxWidth()) {
-                SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = onDismiss)
-                PrimaryButton(text = "Save", modifier = Modifier.weight(1f), onClick = { onSave(parsedMinutes, parsedCount, note) })
+            Column {
+                AppSlider(
+                    value = value.coerceAtMost(sliderMax).toFloat(),
+                    onValueChange = { raw ->
+                        value = when {
+                            // Snap onto the goal so dragging can always land on it exactly.
+                            target > 0 && kotlin.math.abs(raw - target) < sliderSnap / 2f -> target
+                            else -> (raw / sliderSnap).roundToInt() * sliderSnap
+                        }
+                    },
+                    valueRange = 0f..sliderMax.toFloat(),
+                    color = color,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    when {
+                        completed -> "Goal reached"
+                        target > 0 -> "${formatWithUnit(target - value)} to go"
+                        else -> "Any amount completes it"
+                    },
+                    color = if (completed) color else MaterialTheme.extendedColors.textMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = if (completed) FontWeight.SemiBold else FontWeight.Normal,
+                )
             }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                quickAdds.forEach { amount ->
+                    FilterChipButton(
+                        text = "+${format(amount)}",
+                        selected = false,
+                        modifier = Modifier.weight(1f),
+                        onClick = { value += amount },
+                    )
+                }
+                if (target > 0) {
+                    FilterChipButton(
+                        text = "Goal",
+                        selected = value == target,
+                        modifier = Modifier.weight(1f),
+                        onClick = { value = target },
+                    )
+                }
+            }
+
+            if (noteOpen) {
+                AppTextField(
+                    value = note,
+                    onValueChange = { note = it.take(160) },
+                    label = "Note",
+                    singleLine = false,
+                )
+            } else {
+                AppTextButton(text = "Add a note", onClick = { noteOpen = true })
+            }
+
+            PrimaryButton(
+                text = "Save",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onSave(minutes, count, note) },
+            )
         }
     }
 }
@@ -2351,21 +2522,6 @@ private fun isLogComplete(habit: Habit, log: HabitLog?): Boolean {
         minutes = log.minutes,
         count = log.progressCount,
         checked = log.completed,
-    )
-}
-
-private fun temporaryLog(habit: Habit, minutes: Int, count: Int, completed: Boolean): HabitLog {
-    return HabitLog(
-        logId = "preview",
-        habitId = habit.habitId,
-        date = LocalDate.now().toString(),
-        minutes = minutes,
-        progressCount = count,
-        completed = completed,
-        relapse = false,
-        note = "",
-        createdAtMillis = 0L,
-        updatedAtMillis = 0L,
     )
 }
 
@@ -2737,6 +2893,12 @@ private fun windowCompletionPercent(
     return (total.toFloat() / (elapsed.size * habits.size)).roundToInt().coerceIn(0, 100)
 }
 
+private fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
+    today -> "Today"
+    today.minusDays(1) -> "Yesterday"
+    else -> date.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
+}
+
 private fun formatMinutes(minutes: Int): String {
     if (minutes <= 0) return "0m"
     val hours = minutes / 60
@@ -2749,21 +2911,6 @@ private fun formatMinutes(minutes: Int): String {
 }
 
 private fun timeText(hour: Int, minute: Int): String = TimeFormat.format(hour, minute)
-
-private fun hour12(hour: Int): Int {
-    return when (val value = hour.coerceIn(0, 23) % 12) {
-        0 -> 12
-        else -> value
-    }
-}
-
-private fun hour24(hour: Int, period: DayPeriod): Int {
-    val normalized = hour.coerceIn(1, 12)
-    return when (period) {
-        DayPeriod.AM -> if (normalized == 12) 0 else normalized
-        DayPeriod.PM -> if (normalized == 12) 12 else normalized + 12
-    }
-}
 
 private val habitPalette = listOf(
     Color(0xFF22C55E),

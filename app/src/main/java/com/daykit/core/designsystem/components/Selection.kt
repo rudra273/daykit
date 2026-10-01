@@ -10,6 +10,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import com.daykit.core.designsystem.extendedColors
 
 /** Compact radio button — sized and colored to sit in dense list rows next to [AppSwitch]. */
@@ -60,6 +61,7 @@ fun AppSlider(
     modifier: Modifier = Modifier,
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     enabled: Boolean = true,
+    color: Color = MaterialTheme.colorScheme.primary,
 ) {
     Slider(
         value = value,
@@ -67,8 +69,8 @@ fun AppSlider(
         valueRange = valueRange,
         enabled = enabled,
         colors = SliderDefaults.colors(
-            thumbColor = MaterialTheme.colorScheme.primary,
-            activeTrackColor = MaterialTheme.colorScheme.primary,
+            thumbColor = color,
+            activeTrackColor = color,
             inactiveTrackColor = MaterialTheme.extendedColors.divider,
         ),
         modifier = modifier,
