@@ -2,6 +2,12 @@
 
 package com.daykit.feature.settings.ui
 
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import android.app.Activity
 import android.accounts.Account
 import android.accounts.AccountManager
@@ -703,9 +709,10 @@ fun BackupRestoreScreen(
                     )
                 }
 
+                val accents = MaterialTheme.extendedColors.accents
                 SectionHeader(text = "What's included")
                 Text(
-                    "Key Store, Secure Notes, Focus, and Dayflow are always included. All optional utilities below are off by default and apply to local, manual Drive, and automatic backups.",
+                    "Key Store, Secure Notes, Focus and Dayflow are always included. Pick what else to add; this applies to every backup.",
                     color = MaterialTheme.extendedColors.textMuted,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(
@@ -715,71 +722,26 @@ fun BackupRestoreScreen(
                     ),
                 )
                 BackupContentOptions(
-                    includeExpenses = includeExpenses == true,
-                    includeHabits = includeHabits == true,
-                    includeVault = includeVault == true,
-                    onExpensesChange = { enabled ->
-                        scope.launch {
-                            container.secureSettingRepository.putBoolean(
-                                SecureSettingRepository.KEY_BACKUP_INCLUDE_EXPENSES,
-                                enabled,
-                            )
-                        }
-                    },
-                    onHabitsChange = { enabled ->
-                        scope.launch {
-                            container.secureSettingRepository.putBoolean(
-                                SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS,
-                                enabled,
-                            )
-                        }
-                    },
-                    onVaultChange = { enabled ->
-                        scope.launch {
-                            container.secureSettingRepository.putBoolean(
-                                SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT,
-                                enabled,
-                            )
-                        }
+                    options = listOf(
+                        BackupOption("Expenses", Icons.Rounded.Payments, accents.pink, includeExpenses == true, SecureSettingRepository.KEY_BACKUP_INCLUDE_EXPENSES),
+                        BackupOption("Habits", Icons.Rounded.TrackChanges, accents.green, includeHabits == true, SecureSettingRepository.KEY_BACKUP_INCLUDE_HABITS),
+                        BackupOption("Reminders", Icons.Rounded.NotificationsActive, accents.orange, includeReminders == true, SecureSettingRepository.KEY_BACKUP_INCLUDE_REMINDERS),
+                        BackupOption("App Lock selections", Icons.Rounded.Lock, accents.indigo, includeAppLock == true, SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_LOCK),
+                        BackupOption("Event Light", Icons.Rounded.Lightbulb, accents.teal, includeEventLight == true, SecureSettingRepository.KEY_BACKUP_INCLUDE_EVENT_LIGHT),
+                        BackupOption("App preferences", Icons.Rounded.Tune, accents.blue, includeAppPreferences == true, SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_PREFERENCES),
+                        BackupOption("Vault files", Icons.Rounded.Folder, accents.purple, includeVault == true, SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT),
+                    ),
+                    onChange = { key, enabled ->
+                        scope.launch { container.secureSettingRepository.putBoolean(key, enabled) }
                     },
                 )
-
-                AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValuesZero) {
-                    AppListRow(
-                        headline = "Reminders",
-                        supporting = "One-time reminders, repeat schedules, and completion state.",
-                        trailing = { AppSwitch(checked = includeReminders == true, onCheckedChange = { enabled ->
-                            scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_REMINDERS, enabled) }
-                        }) },
-                    )
-                    RowDivider(startIndent = Spacing.lg)
-                    AppListRow(
-                        headline = "App Lock selections",
-                        supporting = "Selected apps only. Set up a PIN and permissions on the new device.",
-                        trailing = { AppSwitch(checked = includeAppLock == true, onCheckedChange = { enabled ->
-                            scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_LOCK, enabled) }
-                        }) },
-                    )
-                    RowDivider(startIndent = Spacing.lg)
-                    AppListRow(
-                        headline = "Event Light",
-                        supporting = "Color, brightness, borders, and opacity. Does not switch the light on.",
-                        trailing = { AppSwitch(checked = includeEventLight == true, onCheckedChange = { enabled ->
-                            scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_EVENT_LIGHT, enabled) }
-                        }) },
-                    )
-                    RowDivider(startIndent = Spacing.lg)
-                    AppListRow(
-                        headline = "App preferences",
-                        supporting = "Theme, widgets, region, reminders and Home layout. Security settings are not included.",
-                        trailing = { AppSwitch(checked = includeAppPreferences == true, onCheckedChange = { enabled ->
-                            scope.launch { container.secureSettingRepository.putBoolean(SecureSettingRepository.KEY_BACKUP_INCLUDE_APP_PREFERENCES, enabled) }
-                        }) },
-                    )
-                }
-                Text("DNS is managed by Android; editor files stay in the locations where you save them.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.extendedColors.textMuted,
-                    modifier = Modifier.padding(horizontal = Spacing.lg))
+                Text(
+                    "App Lock restores only which apps are locked; set up your PIN and permissions on the new phone. " +
+                        "App preferences never include security settings. DNS stays with Android, and editor files stay where you saved them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
 
                 SectionHeader(text = "Local file")
                 ManualBackupCard(
@@ -972,48 +934,40 @@ private fun driveErrorReason(error: Throwable): String = when (error) {
     else -> "please try again"
 }
 
+private data class BackupOption(
+    val title: String,
+    val icon: ImageVector,
+    val accent: Color,
+    val checked: Boolean,
+    val settingKey: String,
+)
+
 @Composable
 private fun BackupContentOptions(
-    includeExpenses: Boolean,
-    includeHabits: Boolean,
-    includeVault: Boolean,
-    onExpensesChange: (Boolean) -> Unit,
-    onHabitsChange: (Boolean) -> Unit,
-    onVaultChange: (Boolean) -> Unit,
+    options: List<BackupOption>,
+    onChange: (settingKey: String, enabled: Boolean) -> Unit,
 ) {
-    val accents = MaterialTheme.extendedColors.accents
     AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValuesZero) {
-        AppListRow(
-            headline = "Expenses",
-            leadingIcon = Icons.Rounded.Payments,
-            leadingAccent = accents.pink,
-            trailing = { AppSwitch(checked = includeExpenses, onCheckedChange = onExpensesChange) },
-        )
-        RowDivider(startIndent = Spacing.lg)
-        AppListRow(
-            headline = "Habits",
-            leadingIcon = Icons.Rounded.TrackChanges,
-            leadingAccent = accents.green,
-            trailing = { AppSwitch(checked = includeHabits, onCheckedChange = onHabitsChange) },
-        )
-        RowDivider(startIndent = Spacing.lg)
-        AppListRow(
-            headline = "Vault files",
-            leadingIcon = Icons.Rounded.Folder,
-            leadingAccent = accents.purple,
-            trailing = { AppSwitch(checked = includeVault, onCheckedChange = onVaultChange) },
-        )
-        if (includeVault) {
-            Text(
-                "Vault files are encrypted with your backup. This format supports up to 4 MiB of vault files in total; larger collections must be exported separately.",
-                color = MaterialTheme.extendedColors.warning,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(
-                    start = Spacing.lg,
-                    end = Spacing.lg,
-                    bottom = Spacing.md,
-                ),
+        options.forEachIndexed { index, option ->
+            AppListRow(
+                headline = option.title,
+                leadingIcon = option.icon,
+                leadingAccent = option.accent,
+                trailing = { AppSwitch(checked = option.checked, onCheckedChange = { onChange(option.settingKey, it) }) },
             )
+            if (option.settingKey == SecureSettingRepository.KEY_BACKUP_INCLUDE_VAULT && option.checked) {
+                Text(
+                    "Vault files are encrypted with your backup. Up to 4 MiB of vault files in total; larger collections must be exported separately.",
+                    color = MaterialTheme.extendedColors.warning,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(
+                        start = Spacing.lg,
+                        end = Spacing.lg,
+                        bottom = Spacing.md,
+                    ),
+                )
+            }
+            if (index < options.lastIndex) RowDivider(startIndent = Spacing.lg)
         }
     }
 }
