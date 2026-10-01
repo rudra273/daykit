@@ -7,8 +7,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
-import com.daykit.core.designsystem.background.CardStyle
-import com.daykit.core.designsystem.background.LocalCardStyle
 import com.daykit.core.designsystem.background.LocalPageBackground
 import com.daykit.core.designsystem.background.frostedBackdrop
 import com.daykit.core.designsystem.background.pageBackground
@@ -38,16 +36,11 @@ fun Modifier.chromeBackground(): Modifier {
 }
 
 /**
- * Background for the top bar. With Liquid glass over a wallpaper, the header has
- * no surface of its own: it paints exactly the page background under it, so it is
- * indistinguishable from the page while still hiding content scrolled beneath it.
- * Otherwise it is the regular [chromeBackground].
+ * Background for the top bar. Over the plain page it is the regular
+ * [chromeBackground] bar. Over a wallpaper the header has no surface of its own:
+ * it paints exactly the page background under it, so it reads as part of the page
+ * while still hiding content scrolled beneath it.
  */
 @Composable
 fun Modifier.headerBackground(): Modifier =
-    if (LocalCardStyle.current == CardStyle.Glass && LocalPageBackground.current.isDecorated) {
-        pageBackground()
-    } else {
-        chromeBackground()
-    }
-
+    if (LocalPageBackground.current.isDecorated) pageBackground() else chromeBackground()
