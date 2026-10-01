@@ -16,6 +16,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.daykit.AppContainer
+import com.daykit.core.designsystem.SolidPage
 import com.daykit.core.designsystem.background.LocalPageBackground
 import com.daykit.core.designsystem.background.pageBackground
 import com.daykit.feature.applock.ui.AppLockScreen
@@ -120,10 +121,13 @@ fun DayKitNavHost(
         opaqueComposable(Routes.TOOL_REMINDERS) { ReminderScreen(container = container, onBack = back) }
         opaqueComposable(Routes.TOOL_EXPENSES) { ExpenseScreen(container = container, onBack = back) }
         opaqueComposable(Routes.TOOL_EDITOR) {
-            EditorScreen(
-                onBack = back,
-                onExpectActivityResult = { container.sensitiveKeyManager.expectingActivityResult = true },
-            )
+            // A typing screen: solid, plain page whatever the wallpaper.
+            SolidPage {
+                EditorScreen(
+                    onBack = back,
+                    onExpectActivityResult = { container.sensitiveKeyManager.expectingActivityResult = true },
+                )
+            }
         }
         opaqueComposable(Routes.TOOL_IMAGE) { ImageToolScreen(container = container, onBack = back) }
         opaqueComposable(Routes.TOOL_SCANNER) { DocumentScannerScreen(container = container, onBack = back) }

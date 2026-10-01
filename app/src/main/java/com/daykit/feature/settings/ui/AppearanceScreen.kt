@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
@@ -79,6 +80,7 @@ import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppRadioButton
 import com.daykit.core.designsystem.components.AppSwitch
+import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.RowDivider
 import com.daykit.core.designsystem.components.SectionHeader
@@ -212,6 +214,10 @@ fun AppearanceScreen(
                 }
 
                 SectionHeader("Card style")
+                if (background != PageBackgroundKind.Plain && cardStyle != CardStyle.Glass) {
+                    GlassSuggestion(onUseGlass = { CardStyleStore.set(context, CardStyle.Glass) })
+                    Spacer(Modifier.height(Spacing.sm))
+                }
                 AppCard(contentPadding = PaddingValues(0.dp)) {
                     styleOptions.forEachIndexed { index, (style, description, iconAccent) ->
                         AppListRow(
@@ -347,4 +353,26 @@ private fun rememberArtThumbnail(kind: PageBackgroundKind, dark: Boolean): Image
         value = withContext(Dispatchers.Default) { GeneratedArt.render(kind, dark, 192, 336).asImageBitmap() }
     }
     return art
+}
+
+/** Shown when a wallpaper is set but cards would hide it: suggests Liquid glass. */
+@Composable
+private fun GlassSuggestion(onUseGlass: () -> Unit) {
+    AppCard(contentPadding = PaddingValues(start = Spacing.lg, end = Spacing.sm, top = Spacing.md, bottom = Spacing.md)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.extendedColors.accents.indigo,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                "This background looks best with Liquid glass cards.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            AppTextButton(text = "Use it", onClick = onUseGlass)
+        }
+    }
 }

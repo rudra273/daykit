@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
@@ -22,7 +23,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
-import com.daykit.core.designsystem.components.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,17 +35,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppListRow
+import com.daykit.core.designsystem.components.AppSwitch
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
+import com.daykit.core.designsystem.components.GroupPosition
 import com.daykit.core.designsystem.components.LoadingIndicator
-import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.SectionHeader
+import com.daykit.core.designsystem.components.glassGroupItem
+import com.daykit.core.designsystem.components.isLiquidGlass
+import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.applock.domain.InstalledApp
 import com.daykit.feature.applock.domain.SamsungSecureFolderSupport
@@ -154,6 +159,7 @@ fun AppLockScreen(
     }
 
     val listState = rememberLazyListState()
+    val glass = isLiquidGlass()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -207,11 +213,15 @@ fun AppLockScreen(
                         top = innerPadding.calculateTopPadding() + Spacing.md,
                         bottom = Spacing.xxl,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    // In Liquid glass mode each group of rows is one glass panel,
+                    // so rows sit flush; the tabs keep their own spacing.
+                    verticalArrangement = Arrangement.spacedBy(if (glass) 0.dp else Spacing.xs),
                 ) {
                     item(key = "tabs") {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = if (glass) Spacing.sm else 0.dp),
                             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
                             FilterChipButton(
@@ -381,7 +391,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.appRows(
     onCheckedChange: (InstalledApp, Boolean) -> Unit,
     onStartFocus: (InstalledApp) -> Unit,
 ) {
-    items(apps, key = { "$prefix-${it.packageName}" }) { app ->
+    itemsIndexed(apps, key = { _, app -> "$prefix-${app.packageName}" }) { index, app ->
         val isLocked = app.packageName in lockedPackages
         val lockDisabled = secureFolderAvailable &&
             app.packageName == SamsungSecureFolderSupport.PACKAGE_NAME
@@ -392,8 +402,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.appRows(
             focusRemainingMillis = focusBlockByPackage[app.packageName]?.let { it - nowMillis }?.takeIf { it > 0 },
             onCheckedChange = { checked -> onCheckedChange(app, checked) },
             onStartFocus = { onStartFocus(app) },
+            modifier = Modifier.glassGroupItem(groupPosition(index, apps.size)),
         )
     }
+}
+
+private fun groupPosition(index: Int, count: Int): GroupPosition = when {
+    count == 1 -> GroupPosition.Single
+    index == 0 -> GroupPosition.First
+    index == count - 1 -> GroupPosition.Last
+    else -> GroupPosition.Middle
 }
 
 @Composable
@@ -404,6 +422,7 @@ private fun AppLockAppRow(
     focusRemainingMillis: Long?,
     onCheckedChange: (Boolean) -> Unit,
     onStartFocus: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val focusActive = focusRemainingMillis != null
     val supporting: String? = when {
@@ -414,6 +433,7 @@ private fun AppLockAppRow(
     AppListRow(
         headline = app.label,
         supporting = supporting,
+        modifier = modifier,
         leading = {
             AppIconOrMonogram(
                 icon = app.icon,

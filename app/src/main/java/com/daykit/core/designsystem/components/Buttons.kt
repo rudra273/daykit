@@ -40,7 +40,7 @@ fun PrimaryButton(
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.height(compactButtonHeight()),
+        modifier = modifier.height(compactButtonHeight()).glassControl(MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.extendedColors.actionFill,
@@ -77,7 +77,7 @@ fun SecondaryButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(compactButtonHeight()),
+        modifier = modifier.height(compactButtonHeight()).glassControl(MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.extendedColors.inputField,
@@ -103,12 +103,17 @@ fun DestructiveButton(
     filled: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val container = if (filled) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.dangerContainer
+    val glass = isLiquidGlass()
+    val container = when {
+        filled -> MaterialTheme.colorScheme.error
+        glass -> MaterialTheme.extendedColors.danger.copy(alpha = 0.16f)
+        else -> MaterialTheme.extendedColors.dangerContainer
+    }
     val content = if (filled) MaterialTheme.colorScheme.onError else MaterialTheme.extendedColors.danger
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(compactButtonHeight()),
+        modifier = modifier.height(compactButtonHeight()).glassControl(MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
@@ -144,7 +149,7 @@ fun AppFab(
 ) {
     FloatingActionButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.glassControl(MaterialTheme.shapes.large),
         shape = MaterialTheme.shapes.large,
         containerColor = MaterialTheme.extendedColors.actionFill,
         contentColor = MaterialTheme.extendedColors.onActionFill,
@@ -163,7 +168,7 @@ fun AppExtendedFab(
 ) {
     androidx.compose.material3.ExtendedFloatingActionButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.glassControl(MaterialTheme.shapes.large),
         shape = MaterialTheme.shapes.large,
         containerColor = MaterialTheme.extendedColors.actionFill,
         contentColor = MaterialTheme.extendedColors.onActionFill,

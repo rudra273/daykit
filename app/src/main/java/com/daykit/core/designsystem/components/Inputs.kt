@@ -1,6 +1,7 @@
 package com.daykit.core.designsystem.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -52,13 +53,13 @@ fun AppTextField(
         keyboardActions = keyboardActions,
         shape = MaterialTheme.shapes.small,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.extendedColors.inputField,
-            unfocusedContainerColor = MaterialTheme.extendedColors.inputField,
-            disabledContainerColor = MaterialTheme.extendedColors.inputField,
-            errorContainerColor = MaterialTheme.extendedColors.inputField,
+            focusedContainerColor = MaterialTheme.extendedColors.fieldFill,
+            unfocusedContainerColor = MaterialTheme.extendedColors.fieldFill,
+            disabledContainerColor = MaterialTheme.extendedColors.fieldFill,
+            errorContainerColor = MaterialTheme.extendedColors.fieldFill,
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.extendedColors.inputField,
-            disabledBorderColor = MaterialTheme.extendedColors.inputField,
+            unfocusedBorderColor = MaterialTheme.extendedColors.fieldFill,
+            disabledBorderColor = MaterialTheme.extendedColors.fieldFill,
             focusedTextColor = MaterialTheme.colorScheme.onSurface,
             unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
             cursorColor = MaterialTheme.colorScheme.primary,
@@ -88,12 +89,12 @@ fun AppSearchBar(
                 }
             }
         } else null,
-        shape = androidx.compose.foundation.shape.CircleShape,
+        shape = CircleShape,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.extendedColors.inputField,
-            unfocusedContainerColor = MaterialTheme.extendedColors.inputField,
+            focusedContainerColor = MaterialTheme.extendedColors.fieldFill,
+            unfocusedContainerColor = MaterialTheme.extendedColors.fieldFill,
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.extendedColors.inputField,
+            unfocusedBorderColor = MaterialTheme.extendedColors.fieldFill,
             focusedTextColor = MaterialTheme.colorScheme.onSurface,
             unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
             focusedLeadingIconColor = MaterialTheme.extendedColors.textMuted,

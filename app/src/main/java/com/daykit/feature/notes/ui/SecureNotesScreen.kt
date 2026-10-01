@@ -76,6 +76,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
+import com.daykit.core.designsystem.SolidPage
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBackButton
 import com.daykit.core.designsystem.components.AppBottomSheet
@@ -164,16 +165,19 @@ fun SecureNotesScreen(
     }
 
     editorState?.let { currentEditor ->
-        NoteEditorPage(
-            state = currentEditor,
-            existingLabels = uniqueLabels,
-            repository = container.secureNoteRepository,
-            onExpectActivityResult = {
-                container.sensitiveKeyManager.expectingActivityResult = true
-            },
-            onResultRequiresUnlock = container.sensitiveKeyManager::runWhenUnlocked,
-            onClose = { editorState = null },
-        )
+        // Writing gets a solid, plain page whatever the wallpaper.
+        SolidPage {
+            NoteEditorPage(
+                state = currentEditor,
+                existingLabels = uniqueLabels,
+                repository = container.secureNoteRepository,
+                onExpectActivityResult = {
+                    container.sensitiveKeyManager.expectingActivityResult = true
+                },
+                onResultRequiresUnlock = container.sensitiveKeyManager::runWhenUnlocked,
+                onClose = { editorState = null },
+            )
+        }
         return
     }
 

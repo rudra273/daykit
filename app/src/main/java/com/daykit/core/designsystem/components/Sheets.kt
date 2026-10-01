@@ -18,16 +18,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
-import com.daykit.core.designsystem.background.LocalPageBackground
-import com.daykit.core.designsystem.background.PageBackground
+import com.daykit.core.designsystem.SolidSurface
 import com.daykit.core.designsystem.extendedColors
 
-/** Modal bottom sheet wrapper: card container, extraLarge top corners, drag handle. */
+/**
+ * Modal bottom sheet wrapper: card container, extraLarge top corners, drag handle.
+ * Always solid: dense content (forms, lists) reads best on an opaque sheet, so
+ * neither the sheet nor anything in it uses the wallpaper or Liquid glass.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppBottomSheet(
@@ -44,8 +46,7 @@ fun AppBottomSheet(
         dragHandle = { BottomSheetDefaults.DragHandle() },
         contentWindowInsets = { WindowInsets.navigationBars },
     ) {
-        // Sheets are opaque; glass inside one frosts over the sheet, not the page behind it.
-        CompositionLocalProvider(LocalPageBackground provides PageBackground.Plain(MaterialTheme.extendedColors.card)) {
+        SolidSurface(page = MaterialTheme.extendedColors.card) {
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())

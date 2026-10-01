@@ -17,11 +17,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
+import com.daykit.core.designsystem.background.CardStyle
 import com.daykit.core.designsystem.background.CardStyleStore
 import com.daykit.core.designsystem.background.LocalCardStyle
 import com.daykit.core.designsystem.background.LocalPageBackground
 import com.daykit.core.designsystem.background.PageBackgroundStore
 import com.daykit.core.designsystem.background.rememberPageBackground
+import com.daykit.core.designsystem.components.forLiquidGlass
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -109,9 +111,11 @@ fun DayKitTheme(content: @Composable () -> Unit) {
     }
 
     val pageBackground = rememberPageBackground(backgroundKind, darkTheme, colorScheme.background)
+    val extendedColors = if (cardStyle == CardStyle.Glass) extended.forLiquidGlass() else extended
 
     CompositionLocalProvider(
-        LocalExtendedColors provides extended,
+        LocalExtendedColors provides extendedColors,
+        LocalSolidColors provides SolidColors(colorScheme, extended),
         LocalCardStyle provides cardStyle,
         LocalPageBackground provides pageBackground,
     ) {
