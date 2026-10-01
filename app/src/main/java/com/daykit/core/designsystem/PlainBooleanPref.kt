@@ -11,7 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 
 /**
  * A boolean in the plain [PREF_APP_PREFS] file, shared by the appearance-type
- * stores ([HapticStore], [ClayStore]). Reads are synchronous, so the first frame
+ * stores (e.g. [HapticStore]). Reads are synchronous, so the first frame
  * is already right, and a change made anywhere propagates live via the listener.
  */
 internal class PlainBooleanPref(private val key: String, private val default: Boolean) {

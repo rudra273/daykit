@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
@@ -17,11 +18,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
+import com.daykit.core.designsystem.background.LocalPageBackground
+import com.daykit.core.designsystem.background.PageBackground
 import com.daykit.core.designsystem.extendedColors
 
 /** Modal bottom sheet wrapper: card container, extraLarge top corners, drag handle. */
@@ -41,12 +44,15 @@ fun AppBottomSheet(
         dragHandle = { BottomSheetDefaults.DragHandle() },
         contentWindowInsets = { WindowInsets.navigationBars },
     ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .imePadding(),
-            content = content,
-        )
+        // Sheets are opaque; glass inside one frosts over the sheet, not the page behind it.
+        CompositionLocalProvider(LocalPageBackground provides PageBackground.Plain(MaterialTheme.extendedColors.card)) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .imePadding(),
+                content = content,
+            )
+        }
     }
 }
 

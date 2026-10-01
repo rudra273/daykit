@@ -17,6 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
+import com.daykit.core.designsystem.background.CardStyleStore
+import com.daykit.core.designsystem.background.LocalCardStyle
+import com.daykit.core.designsystem.background.LocalPageBackground
+import com.daykit.core.designsystem.background.PageBackgroundStore
+import com.daykit.core.designsystem.background.rememberPageBackground
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -80,7 +85,8 @@ val MaterialTheme.extendedColors: ExtendedColors
 @Composable
 fun DayKitTheme(content: @Composable () -> Unit) {
     val mode by ThemeModeStore.rememberThemeMode()
-    val clayCards by ClayStore.rememberClayEnabled()
+    val cardStyle by CardStyleStore.rememberState()
+    val backgroundKind by PageBackgroundStore.rememberState()
     val darkTheme = when (mode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
@@ -102,9 +108,12 @@ fun DayKitTheme(content: @Composable () -> Unit) {
         }
     }
 
+    val pageBackground = rememberPageBackground(backgroundKind, darkTheme, colorScheme.background)
+
     CompositionLocalProvider(
         LocalExtendedColors provides extended,
-        LocalClayCards provides clayCards,
+        LocalCardStyle provides cardStyle,
+        LocalPageBackground provides pageBackground,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

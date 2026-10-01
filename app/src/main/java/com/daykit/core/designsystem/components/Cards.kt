@@ -1,14 +1,5 @@
 package com.daykit.core.designsystem.components
 
-import com.daykit.core.designsystem.isAppInDarkTheme
-import com.daykit.core.designsystem.LocalClayCards
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.addOutline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,17 +18,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.asAccentContainer
+import com.daykit.core.designsystem.background.CardStyle
+import com.daykit.core.designsystem.background.LocalCardStyle
+import com.daykit.core.designsystem.background.frostedBackdrop
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.designsystem.isAppInDarkTheme
 
 /**
  * The core surface primitive. Cards separate from the page by color (white on the
- * light gray page, lighter charcoal on the dark one); with "Clay cards" on (the
- * default, Settings › Appearance) they also get the [clay] lift.
+ * light gray page, lighter charcoal on the dark one), plus the user's card style
+ * (Settings › Appearance): [CardStyle.Clay] adds a soft lift, [CardStyle.Glass]
+ * makes the card see-through to the page background. Default is flat.
  */
 @Composable
 fun AppCard(
@@ -47,12 +53,18 @@ fun AppCard(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val style = LocalCardStyle.current
+    val dark = isAppInDarkTheme()
     val colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.extendedColors.card,
+        containerColor = if (style == CardStyle.Glass) Color.Transparent else MaterialTheme.extendedColors.card,
         contentColor = MaterialTheme.colorScheme.onSurface,
     )
     val elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    val surface = if (LocalClayCards.current) modifier.clay(shape, isAppInDarkTheme()) else modifier
+    val surface = when (style) {
+        CardStyle.Flat -> modifier
+        CardStyle.Clay -> modifier.clay(shape, dark)
+        CardStyle.Glass -> modifier.liquidGlass(shape, dark)
+    }
 
     val body: @Composable ColumnScope.() -> Unit = {
         Column(Modifier.padding(contentPadding), content = content)
@@ -84,26 +96,95 @@ private fun Modifier.clay(shape: Shape, dark: Boolean): Modifier {
             ambientColor = style.shadow.copy(alpha = style.ambientAlpha),
             spotColor = style.shadow.copy(alpha = style.spotAlpha),
         )
-        .drawWithCache {
-            val outline = shape.createOutline(size, layoutDirection, this)
-            val path = Path().apply { addOutline(outline) }
-            // Drawn twice as wide and clipped to the shape, so exactly the inner
-            // half (the bevel width) shows and the edge stays crisp.
-            val stroke = Stroke(width = ClayBevelWidth.toPx() * 2)
-            val bevel = Brush.verticalGradient(
-                0.0f to style.highlight,
-                0.5f to Color.Transparent,
-                1.0f to style.shade,
-            )
-            onDrawWithContent {
-                drawContent()
-                clipPath(path) { drawPath(path, bevel, style = stroke) }
-            }
-        }
+        .innerBevel(shape, Brush.verticalGradient(0.0f to style.highlight, 0.5f to Color.Transparent, 1.0f to style.shade))
 }
 
+/**
+ * Liquid glass: the frosted page background behind the card (see
+ * [frostedBackdrop]), a tint for legibility, a dithered specular sheen across the
+ * top and a bright rim that catches light at the top-left, fading around the card.
+ */
+@Composable
+private fun Modifier.liquidGlass(shape: Shape, dark: Boolean): Modifier {
+    val style = if (dark) DarkGlass else LightGlass
+    return this
+        .shadow(elevation = GlassElevation, shape = shape, clip = false, ambientColor = style.shadow, spotColor = style.shadow)
+        .innerBevel(
+            shape,
+            Brush.linearGradient(
+                0.0f to Color.White.copy(alpha = style.rimLight),
+                0.45f to Color.White.copy(alpha = style.rimLight * 0.15f),
+                1.0f to Color.White.copy(alpha = style.rimShade),
+            ),
+        )
+        .drawWithCache {
+            val sheen = ditheredVerticalFade(Color.White, style.sheen, height = size.height * 0.45f)
+            val outline = shape.createOutline(size, layoutDirection, this)
+            val clip = Path().apply { addOutline(outline) }
+            onDrawWithContent {
+                // Under the content (text stays crisp), over the backdrop.
+                clipPath(clip) {
+                    drawIntoCanvas { it.nativeCanvas.drawRect(0f, 0f, size.width, size.height, sheen) }
+                }
+                drawContent()
+            }
+        }
+        .frostedBackdrop(shape, style.tint)
+}
+
+/**
+ * A 1dp inner edge painted with [brush], drawn over the card. The stroke is twice
+ * the width and clipped to the shape, so exactly the inner half shows and the
+ * edge stays crisp.
+ */
+private fun Modifier.innerBevel(shape: Shape, brush: Brush): Modifier = drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val path = Path().apply { addOutline(outline) }
+    val stroke = Stroke(width = BevelWidth.toPx() * 2)
+    onDrawWithContent {
+        drawContent()
+        clipPath(path) { drawPath(path, brush, style = stroke) }
+    }
+}
+
+/** A dithered top-down fade from [color] at [alpha] to clear over [height]px. */
+private fun ditheredVerticalFade(color: Color, alpha: Float, height: Float) =
+    android.graphics.Paint(android.graphics.Paint.DITHER_FLAG).apply {
+        shader = android.graphics.LinearGradient(
+            0f, 0f, 0f, height.coerceAtLeast(1f),
+            color.copy(alpha = alpha).toArgb(), color.copy(alpha = 0f).toArgb(),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+    }
+
+private val BevelWidth = 1.dp
+private val GlassElevation = 2.dp
+
+private class GlassStyle(
+    val tint: Color,
+    val sheen: Float,
+    val rimLight: Float,
+    val rimShade: Float,
+    val shadow: Color,
+)
+
+private val LightGlass = GlassStyle(
+    tint = Color.White.copy(alpha = 0.45f),
+    sheen = 0.22f,
+    rimLight = 0.85f,
+    rimShade = 0.30f,
+    shadow = Color(0xFF3A4A6B).copy(alpha = 0.18f),
+)
+
+private val DarkGlass = GlassStyle(
+    tint = Color(0xFF16171A).copy(alpha = 0.50f),
+    sheen = 0.08f,
+    rimLight = 0.32f,
+    rimShade = 0.10f,
+    shadow = Color.Black.copy(alpha = 0.35f),
+)
+
 private val ClayElevation = 4.dp
-private val ClayBevelWidth = 1.dp
 
 private class ClayStyle(
     val shadow: Color,

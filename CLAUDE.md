@@ -113,7 +113,9 @@ Non-secret preferences live in `AppPreferences` (plain prefs, same file as theme
 
 Use `core/designsystem/components/*` (`AppCard`, `AppTextField`, `PrimaryButton`, `AppBottomSheet`, `ToolUnlockScreen`, `EmptyState`, `LoadingIndicator`, …) and `Spacing` / `MaterialTheme.extendedColors` rather than raw Material3 widgets and hardcoded dp/colors. `ExtendedColors` is a semantic layer (card, accents, `isDark`) supplied via `LocalExtendedColors` in `DayKitTheme`.
 
-No wide, faint shadows or gradients: on an 8-bit display they band, and the panel's dithering turns the bands into visible grain. `AppCard`'s clay look (toggle: `ClayStore`, provided as `LocalClayCards`) is a tight 4dp shadow plus a 1dp inner bevel; a soft glow uses `Modifier.ditheredGlow`, not `Brush.radialGradient`.
+No wide, faint shadows or gradients: on an 8-bit display they band, and the panel's dithering turns the bands into visible grain. Use the dithered helpers instead (`Modifier.ditheredGlow`, `MeshBlob`'s paint), never `Brush.radialGradient` for large soft areas.
+
+Appearance lives in `core/designsystem/background/`: `CardStyle` (Flat / Clay / Liquid glass, one at a time, default Flat) and `PageBackgroundKind` (Plain, three generated meshes, or the user's photo in `CustomWallpaper`), both plain-prefs `EnumPref`s provided as `LocalCardStyle` / `LocalPageBackground` by `DayKitTheme`. Backgrounds draw in **window coordinates**: `opaqueComposable` paints `Modifier.pageBackground()`, and glass cards and the top/bottom bars use `Modifier.frostedBackdrop`, which samples the frosted background at the element's window position (no live blur). Over a wallpaper, pages' `colorScheme.background` is overridden to transparent, so never use `colorScheme.background` as an opaque fill inside a screen — use `extendedColors.card` or `LocalPageBackground.current.solid`. Plain + Flat renders exactly as before.
 
 ## Background components
 

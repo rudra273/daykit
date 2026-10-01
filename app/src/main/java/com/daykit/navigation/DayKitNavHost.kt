@@ -4,26 +4,29 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.fragment.app.FragmentActivity
-import androidx.navigation.NavHostController
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.daykit.AppContainer
+import com.daykit.core.designsystem.background.LocalPageBackground
+import com.daykit.core.designsystem.background.pageBackground
 import com.daykit.feature.applock.ui.AppLockScreen
-import com.daykit.feature.focus.ui.FocusScreen
 import com.daykit.feature.dayflow.ui.DayflowScreen
-import com.daykit.feature.dns.ui.DnsManagerScreen
 import com.daykit.feature.devicemanager.ui.DeviceManagerScreen
+import com.daykit.feature.dns.ui.DnsManagerScreen
 import com.daykit.feature.editor.ui.EditorScreen
 import com.daykit.feature.eventlight.ui.EventLightScreen
 import com.daykit.feature.expense.ui.ExpenseScreen
 import com.daykit.feature.filelocker.ui.FileLockerScreen
+import com.daykit.feature.focus.ui.FocusScreen
 import com.daykit.feature.habit.ui.HabitScreen
 import com.daykit.feature.home.ui.HomeScreen
 import com.daykit.feature.imagetool.ui.ImageToolScreen
@@ -38,8 +41,8 @@ import com.daykit.feature.settings.ui.DataStorageScreen
 import com.daykit.feature.settings.ui.GeneralSettingsScreen
 import com.daykit.feature.settings.ui.HomeLayoutSettingsScreen
 import com.daykit.feature.settings.ui.NotificationSettingsScreen
-import com.daykit.feature.settings.ui.SecuritySettingsScreen
 import com.daykit.feature.settings.ui.PrivacyPolicyScreen
+import com.daykit.feature.settings.ui.SecuritySettingsScreen
 import com.daykit.feature.settings.ui.SettingsScreen
 import com.daykit.feature.today.ui.TodayScreen
 
@@ -140,17 +143,28 @@ fun DayKitNavHost(
         opaqueComposable(Routes.SETTINGS_NOTIFICATIONS) { NotificationSettingsScreen(onBack = back) }
         opaqueComposable(Routes.SETTINGS_DATA) { DataStorageScreen(container = container, onBack = back) }
         opaqueComposable(Routes.SETTINGS_BACKUP) { BackupRestoreScreen(container = container, onBack = back) }
-        opaqueComposable(Routes.SETTINGS_APPEARANCE) { AppearanceScreen(onBack = back) }
+        opaqueComposable(Routes.SETTINGS_APPEARANCE) { AppearanceScreen(container = container, onBack = back) }
         opaqueComposable(Routes.SETTINGS_ABOUT) { AboutAppScreen(onBack = back) }
         opaqueComposable(Routes.SETTINGS_PRIVACY) { PrivacyPolicyScreen(onBack = back) }
     }
 }
 
-/** Keep predictive-back previews from showing an earlier screen through this destination. */
+/**
+ * Keep predictive-back previews from showing an earlier screen through this
+ * destination: every page paints the (opaque) page background itself. Over a
+ * wallpaper, screens' own `colorScheme.background` fills become transparent so
+ * the wallpaper shows; over a plain page nothing changes.
+ */
 private fun NavGraphBuilder.opaqueComposable(route: String, content: @Composable () -> Unit) {
     composable(route) {
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            content()
+        Box(Modifier.fillMaxSize().pageBackground()) {
+            if (LocalPageBackground.current.isDecorated) {
+                MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(background = Color.Transparent)) {
+                    content()
+                }
+            } else {
+                content()
+            }
         }
     }
 }

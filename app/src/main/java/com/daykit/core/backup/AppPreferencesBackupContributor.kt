@@ -1,6 +1,5 @@
 package com.daykit.core.backup
 
-import com.daykit.core.designsystem.ClayStore
 import android.content.Context
 import com.daykit.core.data.AppPreferences
 import com.daykit.core.data.SecureSettingRepository
@@ -10,6 +9,10 @@ import com.daykit.core.data.WeekStart
 import com.daykit.core.designsystem.HapticStore
 import com.daykit.core.designsystem.ThemeMode
 import com.daykit.core.designsystem.ThemeModeStore
+import com.daykit.core.designsystem.background.CardStyle
+import com.daykit.core.designsystem.background.CardStyleStore
+import com.daykit.core.designsystem.background.PageBackgroundKind
+import com.daykit.core.designsystem.background.PageBackgroundStore
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -39,7 +42,9 @@ class AppPreferencesBackupContributor(
         .put("reminderFullScreen", AppPreferences.reminderFullScreen)
         .put("homeHiddenTools", JSONArray(AppPreferences.homeHiddenTools.toList()))
         .put("homeToolOrder", JSONArray(AppPreferences.homeToolOrder))
-        .put("clayCards", ClayStore.get(context))
+        .put("cardStyle", CardStyleStore.get(context).name)
+        // The photo itself is not backed up, so a custom background restores as plain.
+        .put("pageBackground", PageBackgroundStore.get(context).takeUnless { it == PageBackgroundKind.Custom }?.name ?: PageBackgroundKind.Plain.name)
 
     override suspend fun importJson(payload: JSONObject) {
         val theme = ThemeMode.valueOf(payload.getString("theme"))
@@ -59,7 +64,10 @@ class AppPreferencesBackupContributor(
         enumOrNull<StartTab>(payload.optString("startTab"))?.let { AppPreferences.startTab = it }
         if (payload.has("snoozeMinutes")) AppPreferences.snoozeMinutes = payload.getInt("snoozeMinutes")
         if (payload.has("reminderFullScreen")) AppPreferences.reminderFullScreen = payload.getBoolean("reminderFullScreen")
-        if (payload.has("clayCards")) ClayStore.set(context, payload.getBoolean("clayCards"))
+        enumOrNull<CardStyle>(payload.optString("cardStyle"))?.let { CardStyleStore.set(context, it) }
+        enumOrNull<PageBackgroundKind>(payload.optString("pageBackground"))
+            ?.takeUnless { it == PageBackgroundKind.Custom }
+            ?.let { PageBackgroundStore.set(context, it) }
         payload.optJSONArray("homeHiddenTools")?.let { AppPreferences.homeHiddenTools = it.strings().toSet() }
         payload.optJSONArray("homeToolOrder")?.let { AppPreferences.homeToolOrder = it.strings() }
     }

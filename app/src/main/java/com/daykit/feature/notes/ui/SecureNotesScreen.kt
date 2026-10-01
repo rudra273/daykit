@@ -6,11 +6,6 @@
 
 package com.daykit.feature.notes.ui
 
-import androidx.compose.material.icons.rounded.Description
-import com.daykit.core.designsystem.components.showUndo
-import com.daykit.core.designsystem.components.TrashItem
-import com.daykit.core.designsystem.components.RecentlyDeletedSheet
-import com.daykit.core.designsystem.components.RecentlyDeletedAction
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -44,8 +39,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Label
@@ -58,13 +54,13 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,10 +71,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBackButton
@@ -90,19 +86,23 @@ import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.LoadingIndicator
+import com.daykit.core.designsystem.components.RecentlyDeletedAction
+import com.daykit.core.designsystem.components.RecentlyDeletedSheet
 import com.daykit.core.designsystem.components.SearchAppTopBar
+import com.daykit.core.designsystem.components.TrashItem
 import com.daykit.core.designsystem.components.rememberErrorReporter
+import com.daykit.core.designsystem.components.showUndo
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.notes.data.SecureNote
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 private sealed interface NoteEditorState {
     data object Add : NoteEditorState
@@ -731,7 +731,7 @@ private fun EditorImageThumbnail(
         androidx.compose.material3.Surface(
             onClick = onDelete,
             shape = androidx.compose.foundation.shape.CircleShape,
-            color = MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
+            color = MaterialTheme.extendedColors.card.copy(alpha = 0.7f),
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .align(Alignment.TopEnd)
