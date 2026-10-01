@@ -31,10 +31,6 @@ import kotlinx.coroutines.withContext
 object CustomWallpaper {
     /** Longest edge kept; enough for a sharp full-screen page on current phones. */
     private const val MAX_EDGE = 2400
-    /** The frosted copy is blurred at this fraction of the size; cheap and smoother. */
-    private const val FROST_SCALE = 0.125f
-    private const val FROST_RADIUS = 10
-    private const val FROST_SATURATION = 1.35f
 
     private fun file(context: Context) = File(File(context.filesDir, "wallpaper"), "custom.jpg")
 
@@ -112,24 +108,40 @@ object CustomWallpaper {
             val decoded = BitmapFactory.decodeFile(photo.path) ?: return@withContext null
             val sharp = decoded.copy(Bitmap.Config.ARGB_8888, true)
             decoded.recycle()
+            Frosting.toImageBackground(sharp, solid, scrim)
+        }
+}
 
-            val blurred = Bitmap.createScaledBitmap(
-                sharp,
-                (sharp.width * FROST_SCALE).roundToInt().coerceAtLeast(1),
-                (sharp.height * FROST_SCALE).roundToInt().coerceAtLeast(1),
-                true,
-            ).let { small ->
-                val vivid = Bitmap.createBitmap(small.width, small.height, Bitmap.Config.ARGB_8888)
-                Canvas(vivid).drawBitmap(small, 0f, 0f, saturationPaint(FROST_SATURATION))
-                if (small !== sharp) small.recycle()
-                StackBlur.blur(vivid, FROST_RADIUS)
-                vivid
-            }
+/** Turns a full-size page bitmap into a drawable [PageBackground.Image]. */
+internal object Frosting {
+    /** The frosted copy is blurred at this fraction of the size; cheap and smoother. */
+    private const val SCALE = 0.125f
+    private const val RADIUS = 10
+    /** Glass picks up color; a little extra saturation keeps the frost from looking grey. */
+    private const val SATURATION = 1.35f
 
+    /**
+     * Makes the blurred copy of [sharp] (which it takes ownership of) and bakes
+     * [scrim] into both, so text drawn on the page stays legible.
+     */
+    fun toImageBackground(sharp: Bitmap, solid: Color, scrim: Color): PageBackground.Image {
+        val small = Bitmap.createScaledBitmap(
+            sharp,
+            (sharp.width * SCALE).roundToInt().coerceAtLeast(1),
+            (sharp.height * SCALE).roundToInt().coerceAtLeast(1),
+            true,
+        )
+        val blurred = Bitmap.createBitmap(small.width, small.height, Bitmap.Config.ARGB_8888)
+        Canvas(blurred).drawBitmap(small, 0f, 0f, saturationPaint(SATURATION))
+        if (small !== sharp) small.recycle()
+        StackBlur.blur(blurred, RADIUS)
+
+        if (scrim.alpha > 0f) {
             Canvas(sharp).drawColor(scrim.toArgb())
             Canvas(blurred).drawColor(scrim.toArgb())
-            PageBackground.Image(solid = solid, sharp = sharp.asImageBitmap(), blurred = blurred.asImageBitmap())
         }
+        return PageBackground.Image(solid = solid, sharp = sharp.asImageBitmap(), blurred = blurred.asImageBitmap())
+    }
 
     private fun saturationPaint(saturation: Float) = Paint(Paint.FILTER_BITMAP_FLAG).apply {
         colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) })

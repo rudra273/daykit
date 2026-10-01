@@ -69,6 +69,7 @@ import com.daykit.core.designsystem.ThemeModeStore
 import com.daykit.core.designsystem.background.CardStyle
 import com.daykit.core.designsystem.background.CardStyleStore
 import com.daykit.core.designsystem.background.CustomWallpaper
+import com.daykit.core.designsystem.background.GeneratedArt
 import com.daykit.core.designsystem.background.PageBackground
 import com.daykit.core.designsystem.background.PageBackgroundKind
 import com.daykit.core.designsystem.background.PageBackgroundStore
@@ -278,6 +279,11 @@ private fun BackgroundSwatch(
                 .drawBehind { with(preview) { drawRegion(Offset.Zero, size, frosted = false) } }
                 .border(if (selected) 2.dp else 1.dp, outline, shape),
         ) {
+            if (GeneratedArt.isGenerated(kind)) {
+                rememberArtThumbnail(kind, dark)?.let { art ->
+                    Image(art, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                }
+            }
             if (kind == PageBackgroundKind.Custom) {
                 val thumbnail = rememberPhotoThumbnail(hasPhoto, photoRevision)
                 if (thumbnail != null) {
@@ -323,4 +329,13 @@ private fun rememberPhotoThumbnail(hasPhoto: Boolean, revision: Long): ImageBitm
         }
     }
     return thumbnail
+}
+
+/** A small render of a generated background at the swatch's size (2× for sharpness). */
+@Composable
+private fun rememberArtThumbnail(kind: PageBackgroundKind, dark: Boolean): ImageBitmap? {
+    val art by produceState<ImageBitmap?>(null, kind, dark) {
+        value = withContext(Dispatchers.Default) { GeneratedArt.render(kind, dark, 192, 336).asImageBitmap() }
+    }
+    return art
 }

@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
@@ -98,13 +99,29 @@ sealed interface PageBackground {
             if (window.minDimension <= 0f) return
             val image = if (frosted) blurred else sharp
             val region = imageRegion(origin, size, window, IntSize(image.width, image.height)) ?: return
-            drawImage(
-                image = image,
-                srcOffset = region.srcOffset,
-                srcSize = region.srcSize,
-                dstOffset = region.dstOffset,
-                dstSize = region.dstSize,
-            )
+            // Native draw so the upscaled frost is both filtered and dithered (no banding).
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawBitmap(
+                    image.asAndroidBitmap(),
+                    android.graphics.Rect(
+                        region.srcOffset.x,
+                        region.srcOffset.y,
+                        region.srcOffset.x + region.srcSize.width,
+                        region.srcOffset.y + region.srcSize.height,
+                    ),
+                    android.graphics.RectF(
+                        region.dstOffset.x.toFloat(),
+                        region.dstOffset.y.toFloat(),
+                        (region.dstOffset.x + region.dstSize.width).toFloat(),
+                        (region.dstOffset.y + region.dstSize.height).toFloat(),
+                    ),
+                    imagePaint,
+                )
+            }
+        }
+
+        private companion object {
+            val imagePaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
         }
     }
 }
@@ -236,5 +253,6 @@ fun meshPalette(kind: PageBackgroundKind, dark: Boolean): MeshPalette? = when (k
             ),
         )
     }
-    PageBackgroundKind.Plain, PageBackgroundKind.Custom -> null
+    PageBackgroundKind.Plain, PageBackgroundKind.Waves, PageBackgroundKind.Orbit,
+    PageBackgroundKind.Contour, PageBackgroundKind.Custom -> null
 }

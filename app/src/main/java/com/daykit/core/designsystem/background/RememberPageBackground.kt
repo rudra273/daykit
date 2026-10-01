@@ -5,6 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -20,6 +21,16 @@ internal fun rememberPageBackground(kind: PageBackgroundKind, dark: Boolean, pla
         PageBackgroundKind.Plain -> fallback
         PageBackgroundKind.Aurora, PageBackgroundKind.Dusk, PageBackgroundKind.Lagoon ->
             remember(kind, dark) { meshPalette(kind, dark)?.let(PageBackground::Mesh) } ?: fallback
+        PageBackgroundKind.Waves, PageBackgroundKind.Orbit, PageBackgroundKind.Contour -> {
+            val metrics = LocalContext.current.resources.displayMetrics
+            // Display size, not this window's: the art is drawn to cover, so small
+            // differences (system bars, split screen) only crop, never distort.
+            val window = Size(metrics.widthPixels.toFloat(), metrics.heightPixels.toFloat())
+            val art by produceState<PageBackground?>(null, kind, dark, window) {
+                value = runCatching { GeneratedArt.load(kind, dark, window) }.getOrNull()
+            }
+            art ?: fallback
+        }
         PageBackgroundKind.Custom -> {
             val context = LocalContext.current
             val revision by CustomWallpaper.revision.collectAsState()

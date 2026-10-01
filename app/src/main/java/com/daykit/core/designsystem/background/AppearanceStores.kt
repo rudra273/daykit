@@ -24,6 +24,9 @@ enum class PageBackgroundKind(val label: String) {
     Aurora("Aurora"),
     Dusk("Dusk"),
     Lagoon("Lagoon"),
+    Waves("Waves"),
+    Orbit("Orbit"),
+    Contour("Contour"),
     Custom("Your photo"),
 }
 
