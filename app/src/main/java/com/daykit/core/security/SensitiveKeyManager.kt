@@ -1,6 +1,9 @@
 package com.daykit.core.security
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Base64
 import androidx.core.content.edit
 import java.security.SecureRandom
@@ -47,6 +50,10 @@ class SensitiveKeyManager(
     /** Set while DayKit expects a result from an external activity. */
     @Volatile
     var expectingActivityResult: Boolean = false
+
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+    private val backgroundDeadline = BackgroundLockDeadline()
+    private val lockAfterGrace = Runnable { lock() }
 
     private val pendingActionLock = Any()
     private val pendingUnlockActions = mutableListOf<() -> Unit>()
@@ -162,8 +169,36 @@ class SensitiveKeyManager(
     fun requireKey(): ByteArray =
         keyCache.copy() ?: throw SensitiveDataLockedException()
 
-    /** Wipes the MSK from memory. Called on lock / background. */
+    /**
+     * Called when DayKit leaves the foreground. Keeps the MSK for [graceSeconds]
+     * (see [LockGracePeriod]) and then wipes it; 0 wipes immediately. The delayed
+     * wipe may not run while the process is frozen, so [onForegrounded] also
+     * checks the deadline against the elapsed-realtime clock.
+     */
+    fun onBackgrounded(graceSeconds: Int) {
+        if (graceSeconds <= 0 || !isUnlocked()) {
+            lock()
+            return
+        }
+        val graceMillis = graceSeconds * 1000L
+        mainHandler.removeCallbacks(lockAfterGrace)
+        backgroundDeadline.start(SystemClock.elapsedRealtime(), graceMillis)
+        mainHandler.postDelayed(lockAfterGrace, graceMillis)
+    }
+
+    /**
+     * Called when DayKit returns to the foreground, before any activity result is
+     * delivered. Wipes the MSK if the grace window elapsed while backgrounded.
+     */
+    fun onForegrounded() {
+        mainHandler.removeCallbacks(lockAfterGrace)
+        if (backgroundDeadline.expiredOnReturn(SystemClock.elapsedRealtime())) lock()
+    }
+
+    /** Wipes the MSK from memory immediately, cancelling any grace window. */
     fun lock() {
+        mainHandler.removeCallbacks(lockAfterGrace)
+        backgroundDeadline.clear()
         keyCache.clear()
     }
 

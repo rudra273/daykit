@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Info
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -78,6 +80,7 @@ import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.security.BiometricAuthenticator
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.security.CredentialKind
+import com.daykit.core.security.LockGracePeriod
 import com.daykit.core.security.CredentialRepository
 import com.daykit.core.security.label
 import com.daykit.core.security.DayKitDeviceAdmin
@@ -157,6 +160,13 @@ fun SettingsScreen(
     val biometricAuthenticator = remember(activity) { BiometricAuthenticator(activity) }
     var biometricEnabled by remember { mutableStateOf<Boolean?>(null) }
     var screenshotProtection by remember { mutableStateOf<Boolean?>(null) }
+    var lockGraceSeconds by remember {
+        mutableStateOf(
+            LockGracePeriod.sanitize(
+                container.settingFlagCache.getInt(SecureSettingRepository.KEY_LOCK_GRACE_SECONDS),
+            ),
+        )
+    }
     val settingsLoaded = biometricEnabled != null && screenshotProtection != null
 
     val settingsPackage = remember(context) { SettingsPackageResolver.resolve(context) }
@@ -172,6 +182,10 @@ fun SettingsScreen(
     var biometricDisableError by remember { mutableStateOf<String?>(null) }
     var showScreenshotDisableConfirm by remember { mutableStateOf(false) }
     var screenshotDisableError by remember { mutableStateOf<String?>(null) }
+    var showLockGracePicker by remember { mutableStateOf(false) }
+    // A longer window weakens the lock, so it needs the PIN; shorter applies at once.
+    var pendingLockGraceSeconds by remember { mutableStateOf<Int?>(null) }
+    var lockGraceError by remember { mutableStateOf<String?>(null) }
     var showAdminDisableConfirm by remember { mutableStateOf(false) }
     var adminDisableError by remember { mutableStateOf<String?>(null) }
 
@@ -187,6 +201,12 @@ fun SettingsScreen(
         container.secureSettingRepository
             .observeBoolean(SecureSettingRepository.KEY_SCREENSHOT_PROTECTION)
             .collect { enabled -> screenshotProtection = enabled != false }
+    }
+
+    LaunchedEffect(Unit) {
+        container.secureSettingRepository
+            .observeInt(SecureSettingRepository.KEY_LOCK_GRACE_SECONDS)
+            .collect { seconds -> lockGraceSeconds = LockGracePeriod.sanitize(seconds) }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -319,6 +339,16 @@ fun SettingsScreen(
                                 },
                             )
                         },
+                    )
+                    RowDivider(startIndent = Spacing.lg)
+                    // Lock grace window after leaving the app
+                    AppListRow(
+                        headline = "Auto-Lock",
+                        supporting = LockGracePeriod.label(lockGraceSeconds),
+                        leadingIcon = Icons.Rounded.Timer,
+                        leadingAccent = accents.orange,
+                        trailing = { NavChevron() },
+                        onClick = { showLockGracePicker = true },
                     )
                     RowDivider(startIndent = Spacing.lg)
                     // Screenshot protection
@@ -546,6 +576,60 @@ fun SettingsScreen(
         )
     }
 
+    // ---- Auto-lock picker ----
+    if (showLockGracePicker) {
+        LockGraceSheet(
+            selectedSeconds = lockGraceSeconds,
+            onDismiss = { showLockGracePicker = false },
+            onSelect = { seconds ->
+                showLockGracePicker = false
+                if (seconds > lockGraceSeconds) {
+                    lockGraceError = null
+                    pendingLockGraceSeconds = seconds
+                } else if (seconds != lockGraceSeconds) {
+                    scope.launch {
+                        container.secureSettingRepository.putInt(
+                            SecureSettingRepository.KEY_LOCK_GRACE_SECONDS,
+                            seconds,
+                        )
+                    }
+                }
+            },
+        )
+    }
+
+    // ---- Auto-lock lengthen confirm ----
+    pendingLockGraceSeconds?.let { seconds ->
+        ConfirmPinSheet(
+            credentialKind = credentialKind,
+            title = "Lock later",
+            message = "Enter your master ${credentialKind.label} to lock DayKit " +
+                "${LockGracePeriod.label(seconds).replaceFirstChar { it.lowercase() }} instead.",
+            error = lockGraceError,
+            onDismiss = {
+                pendingLockGraceSeconds = null
+                lockGraceError = null
+            },
+            onConfirm = { pin ->
+                scope.launch {
+                    val result = withContext(Dispatchers.Default) {
+                        container.credentialRepository.verify(pin.toCharArray())
+                    }
+                    if (result is PinVerifyResult.Success) {
+                        container.secureSettingRepository.putInt(
+                            SecureSettingRepository.KEY_LOCK_GRACE_SECONDS,
+                            seconds,
+                        )
+                        pendingLockGraceSeconds = null
+                        lockGraceError = null
+                    } else {
+                        lockGraceError = result.errorMessageOrNull(credentialKind)
+                    }
+                }
+            },
+        )
+    }
+
     // ---- Uninstall protection disable confirm ----
     if (showAdminDisableConfirm) {
         ConfirmPinSheet(
@@ -576,6 +660,54 @@ fun SettingsScreen(
         )
     }
 
+}
+
+@Composable
+private fun LockGraceSheet(
+    selectedSeconds: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit,
+) {
+    AppBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.padding(
+                start = Spacing.lg,
+                end = Spacing.lg,
+                bottom = Spacing.sm,
+            ),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = "Auto-Lock",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "How long DayKit stays unlocked after you switch to another app. " +
+                    "Turning the screen off always locks it immediately.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.extendedColors.textMuted,
+            )
+        }
+        LockGracePeriod.OPTIONS_SECONDS.forEach { seconds ->
+            AppListRow(
+                headline = LockGracePeriod.label(seconds),
+                trailing = if (seconds == selectedSeconds) {
+                    {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                } else {
+                    null
+                },
+                onClick = { onSelect(seconds) },
+            )
+        }
+    }
 }
 
 @Composable

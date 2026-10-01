@@ -31,6 +31,21 @@ class SecureSettingRepository(
             .distinctUntilChanged()
     }
 
+    suspend fun getInt(key: String): Int? = withContext(Dispatchers.Default) {
+        val value = dao.get(key)?.decrypt()?.toIntOrNull()
+        flagCache.putInt(key, value)
+        value
+    }
+
+    fun observeInt(key: String): Flow<Int?> {
+        return dao.observe(key)
+            .map { it?.decrypt()?.toIntOrNull() }
+            .onEach { flagCache.putInt(key, it) }
+            .flowOn(Dispatchers.Default)
+            .onStart { if (flagCache.contains(key)) emit(flagCache.getInt(key)) }
+            .distinctUntilChanged()
+    }
+
     suspend fun getString(key: String): String? = withContext(Dispatchers.Default) {
         dao.get(key)?.decrypt()
     }
@@ -44,6 +59,11 @@ class SecureSettingRepository(
     suspend fun putBoolean(key: String, value: Boolean) {
         putString(key, value.toString())
         flagCache.put(key, value)
+    }
+
+    suspend fun putInt(key: String, value: Int) {
+        putString(key, value.toString())
+        flagCache.putInt(key, value)
     }
 
     suspend fun putString(key: String, value: String) = withContext(Dispatchers.Default) {
@@ -97,6 +117,11 @@ class SecureSettingRepository(
         const val KEY_BACKUP_INCLUDE_EVENT_LIGHT = "backup.include.event_light"
         const val KEY_BACKUP_INCLUDE_APP_PREFERENCES = "backup.include.app_preferences"
         const val KEY_SCREENSHOT_PROTECTION = "privacy.screenshot_protection"
+        /**
+         * Seconds the MSK survives after DayKit is backgrounded (LockGracePeriod).
+         * Int setting, mirrored in SettingFlagCache so ON_STOP can read it synchronously.
+         */
+        const val KEY_LOCK_GRACE_SECONDS = "privacy.lock_grace_seconds"
         const val KEY_WIDGET_EXPENSES = "dashboard_widget.expenses"
         const val KEY_WIDGET_HABITS = "dashboard_widget.habits"
     }

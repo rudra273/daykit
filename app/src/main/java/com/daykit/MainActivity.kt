@@ -38,6 +38,7 @@ import androidx.fragment.app.FragmentActivity
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.permissions.AppLockPermissionChecker
 import com.daykit.core.permissions.AppLockPermissionState
+import com.daykit.core.security.LockGracePeriod
 import com.daykit.core.security.BiometricAuthenticator
 import com.daykit.core.security.PinVerifyResult
 import com.daykit.core.security.errorMessageOrNull
@@ -218,10 +219,18 @@ private fun DayKitApp(
 
     DisposableEffect(lifecycleOwner) {
         // ON_STOP fires when the user leaves, during rotation, and for external
-        // activities such as file pickers. Every non-configuration stop wipes
-        // the key; picker work waits behind the same unlock gate.
+        // activities such as file pickers. Every non-configuration stop starts
+        // the user's lock grace window (LockGracePeriod); once it elapses the key
+        // is wiped and picker work waits behind the unlock gate. Screen-off and
+        // task removal still wipe immediately.
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_START -> {
+                    // Before activity results are delivered, so a result arriving
+                    // after the window elapsed is held behind the gate.
+                    container.sensitiveKeyManager.onForegrounded()
+                    sensitiveUnlocked = container.sensitiveKeyManager.isUnlocked()
+                }
                 Lifecycle.Event.ON_RESUME -> {
                     container.sensitiveKeyManager.expectingActivityResult = false
                     permissions = AppLockPermissionChecker.check(context)
@@ -232,11 +241,14 @@ private fun DayKitApp(
                 Lifecycle.Event.ON_STOP -> {
                     if (activity.isChangingConfigurations) return@LifecycleEventObserver
                     // Preserve the screen only to receive its pending result.
-                    // The key is always wiped, including while a picker is open.
+                    // The grace window applies while a picker is open, too.
                     preserveContentForActivityResult =
                         container.sensitiveKeyManager.expectingActivityResult
-                    container.sensitiveKeyManager.lock()
-                    sensitiveUnlocked = false
+                    val graceSeconds = LockGracePeriod.sanitize(
+                        container.settingFlagCache.getInt(SecureSettingRepository.KEY_LOCK_GRACE_SECONDS),
+                    )
+                    container.sensitiveKeyManager.onBackgrounded(graceSeconds)
+                    sensitiveUnlocked = container.sensitiveKeyManager.isUnlocked()
                 }
                 else -> {}
             }
