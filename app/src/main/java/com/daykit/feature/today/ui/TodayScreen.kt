@@ -51,7 +51,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -362,20 +361,10 @@ private fun HeroCard(
     rings: List<Ring>,
     legend: List<Triple<Color, String, String>>,
 ) {
-    val glow = MaterialTheme.colorScheme.primary
     AppCard(contentPadding = PaddingValues(0.dp)) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .drawBehind {
-                    drawRect(
-                        Brush.radialGradient(
-                            listOf(glow.copy(alpha = 0.16f), Color.Transparent),
-                            center = Offset(size.width, 0f),
-                            radius = size.width * 0.9f,
-                        ),
-                    )
-                }
                 .padding(Spacing.lg),
         ) {
             Text(greeting, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
