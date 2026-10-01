@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material3.AlertDialog
@@ -27,13 +26,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppTextButton
-import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.applock.domain.InstalledApp
@@ -76,16 +73,10 @@ fun FocusAppLimitSheet(
     val initialCustom = existingLimit?.takeIf { initialPreset == null }?.dailyLimitMinutes
     var selectedPreset by remember { mutableStateOf(initialPreset?.minutes ?: 30) }
     var customOpen by remember { mutableStateOf(initialCustom != null) }
-    var customHours by remember {
-        mutableStateOf(initialCustom?.let { it / 60 }?.takeIf { it > 0 }?.toString().orEmpty())
-    }
-    var customMinutes by remember {
-        mutableStateOf(initialCustom?.let { it % 60 }?.takeIf { it > 0 }?.toString().orEmpty())
-    }
+    var customMinutes by remember { mutableStateOf(initialCustom ?: 30) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val customTotalMinutes = (customHours.toIntOrNull() ?: 0) * 60 + (customMinutes.toIntOrNull() ?: 0)
-    val totalMinutes = if (customOpen) customTotalMinutes else selectedPreset
+    val totalMinutes = if (customOpen) customMinutes else selectedPreset
     val isValid = totalMinutes > 0
     val limitMillis = totalMinutes * 60_000L
     val leftMillis = (limitMillis - usedTodayMillis).coerceAtLeast(0L)
@@ -164,7 +155,10 @@ fun FocusAppLimitSheet(
                         },
                     )
                 }
-                FilterChipButton(text = "Custom", selected = customOpen, onClick = { customOpen = true })
+                FilterChipButton(text = "Custom", selected = customOpen, onClick = {
+                    if (!customOpen) customMinutes = selectedPreset
+                    customOpen = true
+                })
             }
             formatDailyAverage(weekUsageMillis)?.let { average ->
                 Spacer(Modifier.height(Spacing.sm))
@@ -177,22 +171,11 @@ fun FocusAppLimitSheet(
 
             if (customOpen) {
                 Spacer(Modifier.height(Spacing.md))
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    AppTextField(
-                        value = customHours,
-                        onValueChange = { customHours = it.filter(Char::isDigit).take(2) },
-                        label = "Hours",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    AppTextField(
-                        value = customMinutes,
-                        onValueChange = { customMinutes = it.filter(Char::isDigit).take(2) },
-                        label = "Minutes",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                FocusDurationStepper(
+                    minutes = customMinutes,
+                    onMinutesChange = { customMinutes = it },
+                    maxMinutes = 24 * 60,
+                )
             }
 
             Spacer(Modifier.height(Spacing.lg))

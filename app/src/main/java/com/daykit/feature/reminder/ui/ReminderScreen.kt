@@ -56,6 +56,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.Remove
+import com.daykit.core.designsystem.MinTouchTarget
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -89,7 +96,6 @@ import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.feature.focus.ui.FocusWeekdayPicker
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.ui.text.input.KeyboardType
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -551,7 +557,8 @@ private fun ReminderFormSheet(
     var timeOpen by remember { mutableStateOf(false) }
 
     var frequency by remember { mutableStateOf(initial?.recurrence?.frequency) }
-    var intervalText by remember { mutableStateOf((initial?.recurrence?.interval ?: 1).toString()) }
+    var interval by remember { mutableStateOf(initial?.recurrence?.interval ?: 1) }
+    var detailsOpen by remember { mutableStateOf(false) }
     var weekdays by remember { mutableStateOf(initial?.recurrence?.weekdays?.takeIf { it != 0 } ?: (1 shl (date.dayOfWeek.value - 1))) }
     var endDate by remember { mutableStateOf(initial?.recurrence?.untilEpochDay?.let(LocalDate::ofEpochDay)) }
     var endOpen by remember { mutableStateOf(false) }
@@ -560,8 +567,8 @@ private fun ReminderFormSheet(
         runCatching {
             val old = initial?.recurrence
             val anchor = if (initial?.scheduledAtMillis == startMillis && old?.frequency == selected &&
-                old.interval == intervalText.toIntOrNull() && old.weekdays == weekdays) old.anchorMillis else startMillis
-            ReminderRecurrence(selected, intervalText.toInt(), weekdays, endDate?.toEpochDay(), zone.id, anchor)
+                old.interval == interval && old.weekdays == weekdays) old.anchorMillis else startMillis
+            ReminderRecurrence(selected, interval, weekdays, endDate?.toEpochDay(), zone.id, anchor)
         }.getOrNull()
     }
     val scheduledAtMillis = if (frequency == null) startMillis else recurrence?.nextAfter(startMillis - 1)
@@ -618,34 +625,88 @@ private fun ReminderFormSheet(
                         selected = frequency == option, onClick = { frequency = option })
                 }
             }
-            if (frequency != null) {
-                Spacer(Modifier.height(Spacing.xs))
-                AppTextField(value = intervalText, onValueChange = { intervalText = it.filter(Char::isDigit).take(3) },
-                    label = "Repeat every ${frequency!!.intervalUnit()} (1–999)",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                if (frequency == ReminderFrequency.WEEKLY) {
+            frequency?.let { selected ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text("Every", color = MaterialTheme.colorScheme.onSurface)
+                    IntervalButton(Icons.Rounded.Remove, "Fewer", enabled = interval > 1) { interval -= 1 }
+                    Text(
+                        interval.toString(),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.widthIn(min = 32.dp),
+                    )
+                    IntervalButton(Icons.Rounded.Add, "More", enabled = interval < 999) { interval += 1 }
+                    Text(
+                        if (interval == 1) selected.intervalUnit().removeSuffix("s") else selected.intervalUnit(),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                if (selected == ReminderFrequency.WEEKLY) {
                     FocusWeekdayPicker(daysMask = weekdays, onDaysMaskChange = { weekdays = it })
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    TextButton(onClick = { endOpen = true }) { Text(endDate?.let { "Ends $it" } ?: "Ends: Never") }
-                    if (endDate != null) TextButton(onClick = { endDate = null }) { Text("No end date") }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text("Ends", color = MaterialTheme.colorScheme.onSurface)
+                    FilterChipButton(text = "Never", selected = endDate == null, onClick = { endDate = null })
+                    FilterChipButton(
+                        text = endDate?.format(DateTimeFormatter.ofPattern("d MMM yyyy")) ?: "On a date",
+                        selected = endDate != null,
+                        onClick = { endOpen = true },
+                    )
                 }
-                Text(recurrence?.describe() ?: "Enter a valid interval, weekdays, and end date.", style = MaterialTheme.typography.bodySmall)
-                Text("Time zone: ${zone.id}. Completing acknowledges one occurrence; delete to stop the series.", style = MaterialTheme.typography.bodySmall)
-                if (frequency == ReminderFrequency.MONTHLY || frequency == ReminderFrequency.YEARLY) {
-                    Text("If the date is missing, use the last day of that month.", style = MaterialTheme.typography.bodySmall)
+                AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(Spacing.md)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                recurrence?.describe() ?: "Pick at least one day.",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            scheduledAtMillis?.let {
+                                Text(
+                                    "Next: ${it.toAbsoluteText()}",
+                                    color = MaterialTheme.extendedColors.textMuted,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                        IconButton(onClick = { detailsOpen = !detailsOpen }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Outlined.Info,
+                                contentDescription = if (detailsOpen) "Hide details" else "How repeating works",
+                                tint = MaterialTheme.extendedColors.textMuted,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                    if (detailsOpen) {
+                        Spacer(Modifier.height(Spacing.sm))
+                        Text(
+                            buildString {
+                                append("Completing a reminder ticks off one occurrence; delete it to stop the series.")
+                                if (selected == ReminderFrequency.MONTHLY || selected == ReminderFrequency.YEARLY) {
+                                    append(" If a month is too short, it uses the last day.")
+                                }
+                                append(" Time zone: ${zone.id}.")
+                            },
+                            color = MaterialTheme.extendedColors.textMuted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
-                scheduledAtMillis?.let { Text("Next: ${it.toAbsoluteText()}", style = MaterialTheme.typography.bodySmall) }
+            }
+            val problem = when {
+                title.trim().isBlank() -> null
+                recurrence == null && frequency != null -> "Pick at least one day, and an end date after the start."
+                scheduledAtMillis == null || scheduledAtMillis <= System.currentTimeMillis() -> "That time has already passed. Pick a later one."
+                else -> null
             }
             Text(
-                text = when {
-                    title.trim().isBlank() -> "Enter what you want to remember."
-                    recurrence == null && frequency != null -> "Choose a valid repeat rule."
-                    scheduledAtMillis == null || scheduledAtMillis <= System.currentTimeMillis() -> "Choose a future date and time."
-                    else -> "Alerts 10 minutes before and stays until you tap complete."
-                },
+                text = problem ?: "Alerts 10 minutes before and stays until you tap complete.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.extendedColors.textMuted,
+                color = if (problem != null) MaterialTheme.colorScheme.error else MaterialTheme.extendedColors.textMuted,
             )
             PrimaryButton(
                 text = confirmText,
@@ -764,6 +825,25 @@ private fun requestNotificationPermissionIfNeeded(activity: Activity?) {
     if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
     if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
     ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 51)
+}
+
+@Composable
+private fun IntervalButton(icon: ImageVector, contentDescription: String, enabled: Boolean, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(MinTouchTarget)
+            .clip(CircleShape)
+            .background(MaterialTheme.extendedColors.inputField),
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.extendedColors.textMuted,
+            modifier = Modifier.size(20.dp),
+        )
+    }
 }
 
 private fun ReminderFrequency.displayName(): String = when (this) {

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,12 +25,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AppBottomSheet
-import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.focus.data.FocusRecurrence
@@ -72,14 +69,9 @@ fun FocusBlockSheet(
     val accent = FocusMode.LockNow.accent
     var selectedPreset by remember { mutableStateOf(PRESETS[2].millis) }
     var customOpen by remember { mutableStateOf(false) }
-    var customHours by remember { mutableStateOf("") }
-    var customMinutes by remember { mutableStateOf("") }
+    var customMinutes by remember { mutableStateOf(60) }
 
-    val customMillis = run {
-        val h = customHours.toLongOrNull() ?: 0L
-        val m = customMinutes.toLongOrNull() ?: 0L
-        (h * 60 + m) * 60_000L
-    }
+    val customMillis = customMinutes * 60_000L
     val durationMillis = if (customOpen) customMillis else selectedPreset
     val valid = durationMillis > 0L
 
@@ -150,28 +142,20 @@ fun FocusBlockSheet(
                 FilterChipButton(
                     text = "Custom",
                     selected = customOpen,
-                    onClick = { customOpen = true },
+                    onClick = {
+                        if (!customOpen) customMinutes = (selectedPreset / 60_000L).toInt().coerceAtLeast(5)
+                        customOpen = true
+                    },
                 )
             }
 
             if (customOpen) {
                 Spacer(Modifier.height(Spacing.md))
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    AppTextField(
-                        value = customHours,
-                        onValueChange = { customHours = it.filter(Char::isDigit).take(2) },
-                        label = "Hours",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    AppTextField(
-                        value = customMinutes,
-                        onValueChange = { customMinutes = it.filter(Char::isDigit).take(2) },
-                        label = "Minutes",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                FocusDurationStepper(
+                    minutes = customMinutes,
+                    onMinutesChange = { customMinutes = it },
+                    maxMinutes = 99 * 60,
+                )
             }
 
             Spacer(Modifier.height(Spacing.lg))

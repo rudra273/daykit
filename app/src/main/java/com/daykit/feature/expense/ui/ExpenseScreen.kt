@@ -4,10 +4,8 @@ package com.daykit.feature.expense.ui
 
 import com.daykit.core.util.WeekDays
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +36,6 @@ import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.Subscriptions
-import com.daykit.core.designsystem.components.AppCheckbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
@@ -69,6 +66,17 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
+import com.daykit.core.designsystem.MinTouchTarget
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
 import com.daykit.core.designsystem.Spacing
@@ -141,12 +149,10 @@ fun ExpenseScreen(
     var manageBillsOpen by remember { mutableStateOf(false) }
     var chartMode by remember { mutableStateOf(ExpenseChartMode.Daily) }
     var limitOpen by remember { mutableStateOf(false) }
-    var actionEntry by remember { mutableStateOf<ExpenseEntry?>(null) }
     var editEntry by remember { mutableStateOf<ExpenseEntry?>(null) }
     var deleteEntry by remember { mutableStateOf<ExpenseEntry?>(null) }
     var stopBill by remember { mutableStateOf<MonthlyBill?>(null) }
     var editBill by remember { mutableStateOf<MonthlyBill?>(null) }
-    var updateBillAmount by remember { mutableStateOf<MonthlyBill?>(null) }
 
     BackHandler {
         if (manageBillsOpen) {
@@ -205,7 +211,13 @@ fun ExpenseScreen(
             }
         },
         floatingActionButton = {
-            if (!manageBillsOpen) {
+            if (manageBillsOpen) {
+                AppFab(
+                    icon = Icons.Rounded.Add,
+                    contentDescription = "Add bill",
+                    onClick = { addBillOpen = true },
+                )
+            } else {
                 AppFab(
                     icon = Icons.Rounded.Add,
                     contentDescription = "Add expense",
@@ -223,11 +235,8 @@ fun ExpenseScreen(
                 ManageBillsContent(
                     bills = allBills,
                     listState = manageBillsListState,
-                    addBillOpen = addBillOpen,
-                    onToggleAddBill = { addBillOpen = !addBillOpen },
+                    onAddBill = { addBillOpen = true },
                     onEditBill = { editBill = it },
-                    onUpdateAmount = { updateBillAmount = it },
-                    onStopBill = { stopBill = it },
                 )
             } else {
                 when (val currentSummary = summary) {
@@ -243,12 +252,9 @@ fun ExpenseScreen(
                         listState = listState,
                         onChartModeChange = { chartMode = it },
                         onSetLimit = { limitOpen = true },
-                        onManageBills = {
-                            addBillOpen = false
-                            manageBillsOpen = true
-                        },
-                        onEntryLongPress = { actionEntry = it },
-                        onStopBill = { stopBill = it },
+                        onManageBills = { manageBillsOpen = true },
+                        onEditEntry = { editEntry = it },
+                        onDeleteEntry = { deleteEntry = it },
                     )
                 }
             }
@@ -257,12 +263,7 @@ fun ExpenseScreen(
 
     if (addDailyOpen) {
         ExpenseFormSheet(
-            title = "Add Daily Expense",
-            initialName = "",
-            initialAmount = "",
-            initialCategory = DEFAULT_CATEGORY,
-            initialNote = "",
-            initialDate = LocalDate.now().toString(),
+            entry = null,
             onDismiss = { addDailyOpen = false },
             onSave = { title, category, amount, note, expenseDate ->
                 errors.launchGuarded(
@@ -279,12 +280,7 @@ fun ExpenseScreen(
 
     editEntry?.let { entry ->
         ExpenseFormSheet(
-            title = "Update Expense",
-            initialName = entry.title,
-            initialAmount = minorToInput(entry.amountMinor),
-            initialCategory = entry.category,
-            initialNote = entry.note,
-            initialDate = entry.expenseDate,
+            entry = entry,
             onDismiss = { editEntry = null },
             onSave = { title, category, amount, note, expenseDate ->
                 errors.launchGuarded(
@@ -296,12 +292,17 @@ fun ExpenseScreen(
                     editEntry = null
                 }
             },
+            onDelete = {
+                editEntry = null
+                deleteEntry = entry
+            },
         )
     }
 
     if (limitOpen) {
         LimitSheet(
             currentLimit = summary?.limitMinor ?: 0L,
+            month = selectedMonth,
             onDismiss = { limitOpen = false },
             onSave = { amount ->
                 errors.launchGuarded(
@@ -315,23 +316,25 @@ fun ExpenseScreen(
         )
     }
 
-    if (addBillOpen && manageBillsOpen) {
-        BillScheduleSheet(
-            title = "Add Static Monthly Bill",
-            initialName = "",
-            initialCategory = DEFAULT_CATEGORY,
-            initialStartMonth = selectedMonth,
-            initialEndMonth = selectedMonth.plusMonths(6),
-            initialNoEndMonth = false,
-            initialDueDay = LocalDate.now().dayOfMonth.toString(),
-            showAmount = true,
+    if (addBillOpen) {
+        BillFormSheet(
+            bill = null,
+            defaultMonth = selectedMonth,
             onDismiss = { addBillOpen = false },
-            onSave = { title, category, amount, startMonth, endMonth, dueDay ->
+            onSave = { draft ->
                 errors.launchGuarded(
                     failureMessage = "Couldn't add that bill.",
                     onFailure = { addBillOpen = false },
                 ) {
-                    container.expenseRepository.addMonthlyBill(title, category, amount, startMonth, endMonth, dueDay)
+                    container.expenseRepository.addMonthlyBill(
+                        draft.title,
+                        draft.category,
+                        draft.amountMinor,
+                        draft.startMonth.toString(),
+                        draft.endMonth?.toString(),
+                        draft.dueDay,
+                    )
+                    container.expenseRepository.ensureMonth(monthKey)
                     addBillOpen = false
                 }
             },
@@ -339,58 +342,37 @@ fun ExpenseScreen(
     }
 
     editBill?.let { bill ->
-        BillScheduleSheet(
-            title = "Update Bill",
-            initialName = bill.title,
-            initialCategory = bill.category,
-            initialStartMonth = YearMonth.parse(bill.startMonthKey),
-            initialEndMonth = bill.endMonthKey?.let(YearMonth::parse) ?: YearMonth.parse(bill.startMonthKey).plusMonths(6),
-            initialNoEndMonth = bill.endMonthKey == null,
-            initialDueDay = bill.dueDay.toString(),
-            showAmount = false,
+        BillFormSheet(
+            bill = bill,
+            defaultMonth = selectedMonth,
             onDismiss = { editBill = null },
-            onSave = { title, category, _, startMonth, endMonth, dueDay ->
+            onSave = { draft ->
                 errors.launchGuarded(
                     failureMessage = "Couldn't save that bill.",
                     onFailure = { editBill = null },
                 ) {
-                    container.expenseRepository.updateMonthlyBill(bill.billId, title, category, startMonth, endMonth, dueDay)
+                    container.expenseRepository.updateMonthlyBill(
+                        bill.billId,
+                        draft.title,
+                        draft.category,
+                        draft.startMonth.toString(),
+                        draft.endMonth?.toString(),
+                        draft.dueDay,
+                    )
+                    if (draft.amountMinor != bill.amountMinor) {
+                        container.expenseRepository.updateMonthlyBillAmount(
+                            bill.billId,
+                            draft.amountFrom.toString(),
+                            draft.amountMinor,
+                        )
+                    }
                     container.expenseRepository.ensureMonth(monthKey)
                     editBill = null
                 }
             },
-        )
-    }
-
-    updateBillAmount?.let { bill ->
-        BillAmountSheet(
-            bill = bill,
-            defaultMonth = selectedMonth.plusMonths(1),
-            onDismiss = { updateBillAmount = null },
-            onSave = { effectiveMonth, amount ->
-                errors.launchGuarded(
-                    failureMessage = "Couldn't update that amount.",
-                    onFailure = { updateBillAmount = null },
-                ) {
-                    container.expenseRepository.updateMonthlyBillAmount(bill.billId, effectiveMonth, amount)
-                    container.expenseRepository.ensureMonth(monthKey)
-                    updateBillAmount = null
-                }
-            },
-        )
-    }
-
-    actionEntry?.let { entry ->
-        EntryActionSheet(
-            entry = entry,
-            onDismiss = { actionEntry = null },
-            onUpdate = {
-                actionEntry = null
-                editEntry = entry
-            },
-            onDelete = {
-                actionEntry = null
-                deleteEntry = entry
+            onStop = {
+                editBill = null
+                stopBill = bill
             },
         )
     }
@@ -398,8 +380,8 @@ fun ExpenseScreen(
     deleteEntry?.let { entry ->
         AppAlertDialog(
             onDismissRequest = { deleteEntry = null },
-            title = "Delete Expense",
-            text = "Remove ${entry.title} from ${monthLabel(selectedMonth)}?",
+            title = "Delete expense?",
+            text = "Remove ${entry.title} (${Money.format(entry.amountMinor)}) from ${monthLabel(selectedMonth)}?",
             confirmText = "Delete",
             destructiveConfirm = true,
             onConfirm = {
@@ -414,8 +396,8 @@ fun ExpenseScreen(
     stopBill?.let { bill ->
         AppAlertDialog(
             onDismissRequest = { stopBill = null },
-            title = "Stop Monthly Bill",
-            text = "${bill.title} will not be added to future months.",
+            title = "Stop ${bill.title}?",
+            text = "It won't be added to future months. Past months keep it.",
             confirmText = "Stop",
             destructiveConfirm = true,
             onConfirm = {
@@ -429,7 +411,6 @@ fun ExpenseScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ExpenseMainList(
     summary: ExpenseMonthSummary,
@@ -440,14 +421,15 @@ private fun ExpenseMainList(
     onChartModeChange: (ExpenseChartMode) -> Unit,
     onSetLimit: () -> Unit,
     onManageBills: () -> Unit,
-    onEntryLongPress: (ExpenseEntry) -> Unit,
-    onStopBill: (MonthlyBill) -> Unit,
+    onEditEntry: (ExpenseEntry) -> Unit,
+    onDeleteEntry: (ExpenseEntry) -> Unit,
 ) {
     val todayKey = LocalDate.now().toString()
     val todaysBills = summary.entries.filter {
         it.kind == ExpenseEntryKind.MonthlyBill && it.expenseDate == todayKey
     }
     val activeBillCount = summary.monthlyBills.size
+    val billsPerMonth = summary.monthlyBills.sumOf { it.amountMinor }
     val dayGroups = remember(summary.entries) {
         summary.entries
             .groupBy { it.expenseDate }
@@ -482,7 +464,7 @@ private fun ExpenseMainList(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            "$activeBillCount active",
+                            if (activeBillCount == 0) "Rent, subscriptions, internet…" else "$activeBillCount active · ${Money.format(billsPerMonth)} a month",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.extendedColors.textMuted,
                         )
@@ -510,7 +492,11 @@ private fun ExpenseMainList(
         if (todaysBills.isNotEmpty()) {
             item { SectionHeader("Bills due today") }
             items(todaysBills, key = { "today-bill-${it.entryId}" }) { entry ->
-                ExpenseEntryRow(entry = entry, onLongPress = { onEntryLongPress(entry) })
+                ExpenseEntryRow(
+                    entry = entry,
+                    onEdit = { onEditEntry(entry) },
+                    onDelete = { onDeleteEntry(entry) },
+                )
             }
         }
 
@@ -529,24 +515,12 @@ private fun ExpenseMainList(
                     DayHeader(date = date, subtotal = entries.sumOf { it.amountMinor })
                 }
                 items(entries, key = { "month-entry-${it.entryId}" }) { entry ->
-                    ExpenseEntryRow(entry = entry, onLongPress = { onEntryLongPress(entry) })
+                    ExpenseEntryRow(
+                        entry = entry,
+                        onEdit = { onEditEntry(entry) },
+                        onDelete = { onDeleteEntry(entry) },
+                    )
                 }
-            }
-        }
-
-        item { SectionHeader("Static monthly bills · $activeBillCount active") }
-        if (summary.monthlyBills.isEmpty()) {
-            item {
-                Text(
-                    "No active static monthly bills",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
-                    modifier = Modifier.padding(horizontal = Spacing.xs, vertical = Spacing.sm),
-                )
-            }
-        } else {
-            items(summary.monthlyBills, key = { "active-bill-${it.billId}" }) { bill ->
-                MonthlyBillRow(bill = bill, onLongPress = { onStopBill(bill) })
             }
         }
     }
@@ -646,25 +620,21 @@ private fun DayHeader(date: String, subtotal: Long) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ExpenseEntryRow(
     entry: ExpenseEntry,
-    onLongPress: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val isBill = entry.kind == ExpenseEntryKind.MonthlyBill
     val (accent, icon) = categoryStyle(entry.category)
     val displayIcon = if (isBill) Icons.Rounded.CalendarMonth else icon
-    val supporting = if (isBill) {
-        "${entry.category} monthly · ${entry.expenseDate}"
-    } else {
-        "${entry.category} · ${entry.expenseDate}"
-    }
+    val supporting = if (isBill) "Monthly bill · ${entry.category}" else entry.category
     val note = entry.note.takeIf { entry.kind == ExpenseEntryKind.Daily && it.isNotBlank() }
 
     AppCard(
-        modifier = Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress),
-        contentPadding = PaddingValues(Spacing.md),
+        onClick = onEdit,
+        contentPadding = PaddingValues(start = Spacing.md, top = Spacing.md, bottom = Spacing.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AccentIconTile(icon = displayIcon, accent = if (isBill) MaterialTheme.extendedColors.accents.indigo else accent)
@@ -701,49 +671,7 @@ private fun ExpenseEntryRow(
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun MonthlyBillRow(
-    bill: MonthlyBill,
-    onLongPress: () -> Unit,
-) {
-    AppCard(
-        modifier = Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress),
-        contentPadding = PaddingValues(Spacing.md),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AccentIconTile(
-                icon = Icons.Rounded.Subscriptions,
-                accent = MaterialTheme.extendedColors.accents.indigo,
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    bill.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${bill.category} · due ${bill.dueDay} · ${billRangeLabel(bill)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.extendedColors.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.width(Spacing.md))
-            Text(
-                Money.format(bill.amountMinor),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-            )
+            EntryOverflowMenu(onEdit = onEdit, onDelete = onDelete)
         }
     }
 }
@@ -864,48 +792,45 @@ private fun SpendChartCard(
 private fun ManageBillsContent(
     bills: List<MonthlyBill>,
     listState: androidx.compose.foundation.lazy.LazyListState,
-    addBillOpen: Boolean,
-    onToggleAddBill: () -> Unit,
+    onAddBill: () -> Unit,
     onEditBill: (MonthlyBill) -> Unit,
-    onUpdateAmount: (MonthlyBill) -> Unit,
-    onStopBill: (MonthlyBill) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg,
-                top = Spacing.sm, bottom = Spacing.xxl,
-            ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
+    val (active, stopped) = bills.partition { it.active }
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = Spacing.lg, end = Spacing.lg,
+            top = Spacing.sm, bottom = Spacing.xxl + 72.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        if (bills.isEmpty()) {
             item {
-                PrimaryButton(
-                    text = if (addBillOpen) "Close" else "New bill",
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = {
-                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
-                    onClick = onToggleAddBill,
+                EmptyState(
+                    icon = Icons.Rounded.Subscriptions,
+                    title = "No bills yet",
+                    description = "Rent, subscriptions, internet: add them once and they show up every month.",
+                    actionText = "Add bill",
+                    onAction = onAddBill,
                 )
             }
-            if (bills.isEmpty()) {
-                item {
-                    EmptyState(
-                        icon = Icons.Rounded.Subscriptions,
-                        title = "No bills yet",
-                        description = "Add a recurring bill to track it every month.",
-                    )
-                }
-            } else {
-                items(bills, key = { it.billId }) { bill ->
-                    ManageBillCard(
-                        bill = bill,
-                        onEditBill = { onEditBill(bill) },
-                        onUpdateAmount = { onUpdateAmount(bill) },
-                        onStopBill = { onStopBill(bill) },
-                    )
+        } else {
+            item {
+                Text(
+                    "${Money.format(active.sumOf { it.amountMinor })} a month",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            items(active, key = { it.billId }) { bill ->
+                ManageBillCard(bill = bill, onClick = { onEditBill(bill) })
+            }
+            if (stopped.isNotEmpty()) {
+                item { SectionHeader("Stopped") }
+                items(stopped, key = { it.billId }) { bill ->
+                    ManageBillCard(bill = bill, onClick = { onEditBill(bill) })
                 }
             }
         }
@@ -915,29 +840,28 @@ private fun ManageBillsContent(
 @Composable
 private fun ManageBillCard(
     bill: MonthlyBill,
-    onEditBill: () -> Unit,
-    onUpdateAmount: () -> Unit,
-    onStopBill: () -> Unit,
+    onClick: () -> Unit,
 ) {
-    AppCard {
+    val muted = MaterialTheme.extendedColors.textMuted
+    AppCard(onClick = onClick, contentPadding = PaddingValues(Spacing.md)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AccentIconTile(
                 icon = Icons.Rounded.Subscriptions,
-                accent = if (bill.active) MaterialTheme.extendedColors.accents.indigo else MaterialTheme.extendedColors.textMuted,
+                accent = if (bill.active) MaterialTheme.extendedColors.accents.indigo else muted,
             )
             Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     bill.title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (bill.active) MaterialTheme.colorScheme.onSurface else muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${bill.category} · due ${bill.dueDay} · ${billRangeLabel(bill)}",
+                    "Due on the ${ordinal(bill.dueDay)} · ${billRangeLabel(bill)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.extendedColors.textMuted,
+                    color = muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -946,124 +870,215 @@ private fun ManageBillCard(
             Text(
                 Money.format(bill.amountMinor),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (bill.active) MaterialTheme.colorScheme.onSurface else muted,
                 fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Spacer(Modifier.height(Spacing.md))
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-            SecondaryButton(text = "Edit", modifier = Modifier.weight(1f), onClick = onEditBill)
-            SecondaryButton(text = "Price", modifier = Modifier.weight(1f), onClick = onUpdateAmount)
-            SecondaryButton(
-                text = if (bill.active) "Stop" else "Stopped",
-                enabled = bill.active,
-                modifier = Modifier.weight(1f),
-                onClick = onStopBill,
             )
         }
     }
 }
 
 @Composable
-private fun EntryActionSheet(
-    entry: ExpenseEntry,
-    onDismiss: () -> Unit,
-    onUpdate: () -> Unit,
-    onDelete: () -> Unit,
+private fun EntryOverflowMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, modifier = Modifier.size(MinTouchTarget)) {
+            Icon(
+                Icons.Rounded.MoreVert,
+                contentDescription = "More options",
+                tint = MaterialTheme.extendedColors.textMuted,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.extendedColors.card,
+        ) {
+            DropdownMenuItem(
+                text = { Text("Edit") },
+                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                onClick = {
+                    expanded = false
+                    onEdit()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Delete", color = MaterialTheme.extendedColors.danger) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Rounded.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.extendedColors.danger,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+            )
+        }
+    }
+}
+
+/** Large amount entry with the currency symbol in front; no label, the size says what it is. */
+@Composable
+private fun AmountInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    autoFocus: Boolean,
+    modifier: Modifier = Modifier,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(autoFocus) {
+        if (autoFocus) runCatching { focusRequester.requestFocus() }
+    }
+    val textStyle = MaterialTheme.typography.headlineLarge.copy(
+        color = MaterialTheme.colorScheme.onSurface,
+        fontWeight = FontWeight.Bold,
+    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.extendedColors.inputField)
+            .clickable { runCatching { focusRequester.requestFocus() } }
+            .padding(horizontal = Spacing.md, vertical = Spacing.md),
+    ) {
+        Text(
+            Money.symbol(),
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.extendedColors.textMuted,
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        BasicTextField(
+            value = value,
+            onValueChange = { onValueChange(it.cleanAmountInput()) },
+            textStyle = textStyle,
+            singleLine = true,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
+            decorationBox = { inner ->
+                Box {
+                    if (value.isEmpty()) {
+                        Text("0", style = textStyle.copy(color = MaterialTheme.extendedColors.textMuted))
+                    }
+                    inner()
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SheetTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+@Composable
+private fun ExpenseFormSheet(
+    entry: ExpenseEntry?,
+    onDismiss: () -> Unit,
+    onSave: (String, String, Long, String, String) -> Unit,
+    onDelete: (() -> Unit)? = null,
+) {
+    val today = LocalDate.now()
+    var amount by remember { mutableStateOf(entry?.let { minorToInput(it.amountMinor) } ?: "") }
+    var category by remember { mutableStateOf(entry?.category ?: DEFAULT_CATEGORY) }
+    var name by remember { mutableStateOf(entry?.title ?: "") }
+    var note by remember { mutableStateOf(entry?.note ?: "") }
+    var noteOpen by remember { mutableStateOf(note.isNotBlank()) }
+    var date by remember { mutableStateOf(entry?.expenseDate?.toLocalDateOrNull() ?: today) }
+    var datePickerOpen by remember { mutableStateOf(false) }
+    val amountMinor = amount.toMinorOrNull()
+    val canSave = amountMinor != null && amountMinor > 0L
+
     AppBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text(
-                entry.title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        Column(
+            modifier = Modifier
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            SheetTitle(if (entry == null) "Add expense" else "Edit expense")
+            AmountInput(value = amount, onValueChange = { amount = it }, autoFocus = entry == null)
+            CategoryChips(category = category, onCategoryChange = { category = it })
+            AppTextField(
+                value = name,
+                onValueChange = { name = it.take(60) },
+                label = "What for? (optional)",
+                placeholder = category,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
-            Text(
-                Money.format(entry.amountMinor),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            if (entry.note.isNotBlank()) {
-                Text(
-                    entry.note,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                FilterChipButton(text = "Today", selected = date == today, onClick = { date = today })
+                FilterChipButton(
+                    text = "Yesterday",
+                    selected = date == today.minusDays(1),
+                    onClick = { date = today.minusDays(1) },
+                )
+                val otherDate = date != today && date != today.minusDays(1)
+                FilterChipButton(
+                    text = if (otherDate) date.format(DateTimeFormatter.ofPattern("d MMM")) else "Pick date",
+                    selected = otherDate,
+                    onClick = { datePickerOpen = true },
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SecondaryButton(text = "Edit", modifier = Modifier.weight(1f), onClick = onUpdate)
-                com.daykit.core.designsystem.components.DestructiveButton(
-                    text = "Delete",
-                    modifier = Modifier.weight(1f),
+            if (noteOpen) {
+                AppTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = "Note",
+                    singleLine = false,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                )
+            } else {
+                AppTextButton(text = "Add a note", onClick = { noteOpen = true })
+            }
+            PrimaryButton(
+                text = if (entry == null) "Add expense" else "Save",
+                enabled = canSave,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    onSave(name.trim().ifBlank { category }, category, amountMinor ?: 0L, note, date.toString())
+                },
+            )
+            if (onDelete != null) {
+                AppTextButton(
+                    text = "Delete expense",
+                    color = MaterialTheme.extendedColors.danger,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
                     onClick = onDelete,
                 )
             }
         }
     }
-}
 
-@Composable
-private fun ExpenseFormSheet(
-    title: String,
-    initialName: String,
-    initialAmount: String,
-    initialCategory: String,
-    initialNote: String,
-    initialDate: String,
-    onDismiss: () -> Unit,
-    onSave: (String, String, Long, String, String) -> Unit,
-) {
-    var name by remember { mutableStateOf(initialName) }
-    var amount by remember { mutableStateOf(initialAmount) }
-    var category by remember { mutableStateOf(initialCategory) }
-    var note by remember { mutableStateOf(initialNote) }
-    var expenseDate by remember { mutableStateOf(initialDate) }
-    val amountMinor = amount.toMinorOrNull()
-    val dateValid = expenseDate.toLocalDateOrNull() != null
-    val canSave = name.isNotBlank() && amountMinor != null && amountMinor > 0L && dateValid
-
-    AppBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-            AppTextField(
-                value = amount,
-                onValueChange = { amount = it.cleanAmountInput() },
-                label = "Amount",
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            )
-            AppTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = "Name",
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-            )
-            CategoryChips(category = category, onCategoryChange = { category = it })
-            DatePickerField(
-                label = "Date",
-                date = expenseDate.toLocalDateOrNull() ?: LocalDate.now(),
-                onDateChange = { expenseDate = it.toString() },
-            )
-            AppTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = "Note",
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            )
-            if (expenseDate.isNotBlank() && !dateValid) {
-                Text("Use YYYY-MM-DD date", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            }
-            FormActions(canSave = canSave, onCancel = onDismiss, onSave = {
-                onSave(name, category, amountMinor ?: 0L, note, expenseDate)
-            })
-        }
+    if (datePickerOpen) {
+        ExpenseDatePickerDialog(
+            date = date,
+            onDismiss = { datePickerOpen = false },
+            onConfirm = {
+                date = it
+                datePickerOpen = false
+            },
+        )
     }
 }
 
 @Composable
 private fun LimitSheet(
     currentLimit: Long,
+    month: YearMonth,
     onDismiss: () -> Unit,
     onSave: (Long) -> Unit,
 ) {
@@ -1071,119 +1086,205 @@ private fun LimitSheet(
     val amountMinor = amount.toMinorOrNull() ?: 0L
 
     AppBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text("Monthly limit", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-            AppTextField(
-                value = amount,
-                onValueChange = { amount = it.cleanAmountInput() },
-                label = "Limit amount",
-                supportingText = "Use 0 to remove the limit.",
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        Column(
+            modifier = Modifier
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            SheetTitle("Spending limit")
+            Text(
+                "For ${monthLabel(month)}. The bar on top turns red when you go over.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.extendedColors.textMuted,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = onDismiss)
-                PrimaryButton(text = "Save", modifier = Modifier.weight(1f), onClick = { onSave(amountMinor) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun BillScheduleSheet(
-    title: String,
-    initialName: String,
-    initialCategory: String,
-    initialStartMonth: YearMonth,
-    initialEndMonth: YearMonth,
-    initialNoEndMonth: Boolean,
-    initialDueDay: String,
-    showAmount: Boolean,
-    onDismiss: () -> Unit,
-    onSave: (String, String, Long, String, String?, Int) -> Unit,
-) {
-    var name by remember { mutableStateOf(initialName) }
-    var amount by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(initialCategory) }
-    var startMonth by remember { mutableStateOf(initialStartMonth) }
-    var endMonth by remember { mutableStateOf(initialEndMonth) }
-    var noEndMonth by remember { mutableStateOf(initialNoEndMonth) }
-    var dueDay by remember { mutableStateOf(initialDueDay) }
-    val amountMinor = amount.toMinorOrNull()
-    val dueDayInt = dueDay.toIntOrNull()
-    val rangeValid = noEndMonth || !endMonth.isBefore(startMonth)
-    val canSave = name.isNotBlank() &&
-        (!showAmount || (amountMinor != null && amountMinor > 0L)) &&
-        dueDayInt in 1..31 &&
-        rangeValid
-
-    AppBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-            AppTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = "Bill name",
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+            AmountInput(value = amount, onValueChange = { amount = it }, autoFocus = currentLimit <= 0L)
+            PrimaryButton(
+                text = "Save",
+                enabled = amountMinor > 0L,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onSave(amountMinor) },
             )
-            if (showAmount) {
-                AppTextField(
-                    value = amount,
-                    onValueChange = { amount = it.cleanAmountInput() },
-                    label = "Monthly amount",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            if (currentLimit > 0L) {
+                AppTextButton(
+                    text = "Remove limit",
+                    color = MaterialTheme.extendedColors.danger,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    onClick = { onSave(0L) },
                 )
             }
-            CategoryChips(category = category, onCategoryChange = { category = it })
-            AppTextField(
-                value = dueDay,
-                onValueChange = { dueDay = it.filter(Char::isDigit).take(2) },
-                label = "Due day",
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            )
-            MonthPickerField(label = "Start month", month = startMonth, onMonthChange = { startMonth = it })
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AppCheckbox(checked = noEndMonth, onCheckedChange = { noEndMonth = it })
-                Text("No end month", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
-            }
-            if (!noEndMonth) {
-                MonthPickerField(label = "End month", month = endMonth, onMonthChange = { endMonth = it })
-            }
-            if (!rangeValid) {
-                Text("End month must be after start month", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            }
-            FormActions(canSave = canSave, onCancel = onDismiss, onSave = {
-                onSave(name, category, amountMinor ?: 0L, startMonth.toString(), if (noEndMonth) null else endMonth.toString(), dueDayInt ?: 1)
-            })
         }
     }
 }
 
+private data class BillDraft(
+    val title: String,
+    val category: String,
+    val amountMinor: Long,
+    val amountFrom: YearMonth,
+    val startMonth: YearMonth,
+    val endMonth: YearMonth?,
+    val dueDay: Int,
+)
+
 @Composable
-private fun BillAmountSheet(
-    bill: MonthlyBill,
+private fun BillFormSheet(
+    bill: MonthlyBill?,
     defaultMonth: YearMonth,
     onDismiss: () -> Unit,
-    onSave: (String, Long) -> Unit,
+    onSave: (BillDraft) -> Unit,
+    onStop: (() -> Unit)? = null,
 ) {
-    var amount by remember(bill.billId) { mutableStateOf(minorToInput(bill.amountMinor)) }
-    var effectiveMonth by remember(bill.billId) { mutableStateOf(defaultMonth) }
+    var amount by remember { mutableStateOf(bill?.let { minorToInput(it.amountMinor) } ?: "") }
+    var name by remember { mutableStateOf(bill?.title ?: "") }
+    var category by remember { mutableStateOf(bill?.category ?: "Bills") }
+    var dueDay by remember { mutableStateOf(bill?.dueDay ?: LocalDate.now().dayOfMonth) }
+    var startMonth by remember { mutableStateOf(bill?.startMonthKey?.let(YearMonth::parse) ?: defaultMonth) }
+    var endMonth by remember { mutableStateOf(bill?.endMonthKey?.let(YearMonth::parse)) }
+    var amountFrom by remember { mutableStateOf(defaultMonth) }
+    var dueDayOpen by remember { mutableStateOf(false) }
     val amountMinor = amount.toMinorOrNull()
-    val canSave = amountMinor != null && amountMinor > 0L
+    val amountChanged = bill != null && amountMinor != null && amountMinor != bill.amountMinor
+    val rangeValid = endMonth?.let { !it.isBefore(startMonth) } ?: true
+    val canSave = name.isNotBlank() && amountMinor != null && amountMinor > 0L && rangeValid
 
     AppBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text("Update price", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-            Text(bill.title, color = MaterialTheme.extendedColors.textMuted, style = MaterialTheme.typography.bodyMedium)
+        Column(
+            modifier = Modifier
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            SheetTitle(if (bill == null) "New monthly bill" else "Edit bill")
+            AmountInput(value = amount, onValueChange = { amount = it }, autoFocus = bill == null)
+            if (amountChanged) {
+                MonthPickerField(
+                    label = "New amount applies from",
+                    month = amountFrom,
+                    onMonthChange = { it?.let { month -> amountFrom = month } },
+                )
+            }
             AppTextField(
-                value = amount,
-                onValueChange = { amount = it.cleanAmountInput() },
-                label = "New amount",
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                value = name,
+                onValueChange = { name = it.take(60) },
+                label = "Bill name",
+                placeholder = "Rent, Netflix, Internet…",
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             )
-            MonthPickerField(label = "Effective from", month = effectiveMonth, onMonthChange = { effectiveMonth = it })
-            FormActions(canSave = canSave, onCancel = onDismiss, onSave = {
-                onSave(effectiveMonth.toString(), amountMinor ?: 0L)
-            })
+            CategoryChips(category = category, onCategoryChange = { category = it })
+            PickerField(
+                label = "Due on",
+                value = "The ${ordinal(dueDay)} of every month",
+                icon = Icons.Rounded.Event,
+                onClick = { dueDayOpen = true },
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                Box(Modifier.weight(1f)) {
+                    MonthPickerField(
+                        label = "Starts",
+                        month = startMonth,
+                        onMonthChange = { it?.let { month -> startMonth = month } },
+                    )
+                }
+                Box(Modifier.weight(1f)) {
+                    MonthPickerField(
+                        label = "Ends",
+                        month = endMonth,
+                        allowNever = true,
+                        onMonthChange = { endMonth = it },
+                    )
+                }
+            }
+            if (!rangeValid) {
+                Text(
+                    "The end month is before the start month.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            PrimaryButton(
+                text = if (bill == null) "Add bill" else "Save",
+                enabled = canSave,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    onSave(
+                        BillDraft(
+                            title = name.trim(),
+                            category = category,
+                            amountMinor = amountMinor ?: 0L,
+                            amountFrom = amountFrom,
+                            startMonth = startMonth,
+                            endMonth = endMonth,
+                            dueDay = dueDay,
+                        ),
+                    )
+                },
+            )
+            if (onStop != null && bill?.active == true) {
+                AppTextButton(
+                    text = "Stop this bill",
+                    color = MaterialTheme.extendedColors.danger,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    onClick = onStop,
+                )
+            }
+        }
+    }
+
+    if (dueDayOpen) {
+        DueDaySheet(
+            selected = dueDay,
+            onDismiss = { dueDayOpen = false },
+            onSelect = {
+                dueDay = it
+                dueDayOpen = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun DueDaySheet(
+    selected: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit,
+) {
+    AppBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            SheetTitle("Due on")
+            (1..31).chunked(7).forEach { week ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), modifier = Modifier.fillMaxWidth()) {
+                    week.forEach { day ->
+                        val isSelected = day == selected
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(MinTouchTarget)
+                                .clip(CircleShape)
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                .clickable { onSelect(day) },
+                        ) {
+                            Text(
+                                day.toString(),
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            )
+                        }
+                    }
+                    repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+            Text(
+                "In shorter months it falls on the last day.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.extendedColors.textMuted,
+            )
         }
     }
 }
@@ -1193,87 +1294,70 @@ private fun CategoryChips(
     category: String,
     onCategoryChange: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Text("Category", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.extendedColors.textMuted)
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-            EXPENSE_CATEGORIES.take(3).forEach { option ->
-                FilterChipButton(
-                    text = option,
-                    selected = option == category,
-                    onClick = { onCategoryChange(option) },
-                )
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-            EXPENSE_CATEGORIES.drop(3).forEach { option ->
-                FilterChipButton(
-                    text = option,
-                    selected = option == category,
-                    onClick = { onCategoryChange(option) },
-                )
-            }
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        items(EXPENSE_CATEGORIES, key = { it }) { option ->
+            FilterChipButton(
+                text = option,
+                selected = option == category,
+                onClick = { onCategoryChange(option) },
+            )
         }
     }
 }
 
 @Composable
-private fun DatePickerField(
-    label: String,
+private fun ExpenseDatePickerDialog(
     date: LocalDate,
-    onDateChange: (LocalDate) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate) -> Unit,
 ) {
-    var open by remember { mutableStateOf(false) }
     val state = rememberDatePickerState(initialSelectedDateMillis = date.toMillis())
-    PickerField(
-        label = label,
-        value = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
-        icon = Icons.Rounded.Event,
-        onClick = { open = true },
-    )
-    if (open) {
-        DatePickerDialog(
-            onDismissRequest = { open = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    state.selectedDateMillis?.let { onDateChange(it.toLocalDate()) }
-                    open = false
-                }) {
-                    Text("Select", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { open = false }) {
-                    Text("Cancel", color = MaterialTheme.extendedColors.textMuted)
-                }
-            },
-            colors = DatePickerDefaults.colors(containerColor = MaterialTheme.extendedColors.card),
-        ) {
-            DatePicker(state = state)
-        }
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { state.selectedDateMillis?.let { onConfirm(it.toLocalDate()) } ?: onDismiss() }) {
+                Text("Select", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = MaterialTheme.extendedColors.textMuted)
+            }
+        },
+        colors = DatePickerDefaults.colors(containerColor = MaterialTheme.extendedColors.card),
+    ) {
+        DatePicker(state = state)
     }
 }
 
+/** [allowNever] adds a "Never" choice, reported as a null month. */
 @Composable
 private fun MonthPickerField(
     label: String,
-    month: YearMonth,
-    onMonthChange: (YearMonth) -> Unit,
+    month: YearMonth?,
+    onMonthChange: (YearMonth?) -> Unit,
+    allowNever: Boolean = false,
 ) {
     var open by remember { mutableStateOf(false) }
-    var draftMonth by remember(month) { mutableStateOf(month) }
+    var draftMonth by remember(month) { mutableStateOf(month ?: YearMonth.now()) }
     PickerField(
         label = label,
-        value = monthLabel(month),
+        value = month?.let(::monthLabel) ?: "Never",
         icon = Icons.Rounded.CalendarMonth,
         onClick = {
-            draftMonth = month
+            draftMonth = month ?: YearMonth.now()
             open = true
         },
     )
     if (open) {
         AppBottomSheet(onDismissRequest = { open = false }) {
-            Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Text(label, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                SheetTitle(label)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1300,7 +1384,12 @@ private fun MonthPickerField(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                    SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = { open = false })
+                    if (allowNever) {
+                        SecondaryButton(text = "Never", modifier = Modifier.weight(1f), onClick = {
+                            onMonthChange(null)
+                            open = false
+                        })
+                    }
                     PrimaryButton(text = "Select", modifier = Modifier.weight(1f), onClick = {
                         onMonthChange(draftMonth)
                         open = false
@@ -1331,21 +1420,25 @@ private fun PickerField(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(Spacing.sm))
-            Text(value, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+            Text(
+                value,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
-@Composable
-private fun FormActions(
-    canSave: Boolean,
-    onCancel: () -> Unit,
-    onSave: () -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-        SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = onCancel)
-        PrimaryButton(text = "Save", enabled = canSave, modifier = Modifier.weight(1f), onClick = onSave)
+private fun ordinal(day: Int): String {
+    val suffix = if (day in 11..13) "th" else when (day % 10) {
+        1 -> "st"
+        2 -> "nd"
+        3 -> "rd"
+        else -> "th"
     }
+    return "$day$suffix"
 }
 
 private fun monthLabel(month: YearMonth): String {
