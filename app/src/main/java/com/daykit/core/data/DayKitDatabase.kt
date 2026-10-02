@@ -57,7 +57,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         DayflowDayEntity::class,
         PomodoroSessionEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class DayKitDatabase : RoomDatabase() {
@@ -134,6 +134,12 @@ abstract class DayKitDatabase : RoomDatabase() {
                         db.execSQL("ALTER TABLE secure_notes ADD COLUMN deletedAtMillis INTEGER")
                         db.execSQL("ALTER TABLE key_store_entries ADD COLUMN deletedAtMillis INTEGER")
                         db.execSQL("ALTER TABLE vault_files ADD COLUMN deletedAtMillis INTEGER")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(7, 8) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        // Typed Key Store entries: existing rows are single-value (format 1).
+                        db.execSQL("ALTER TABLE key_store_entries ADD COLUMN format INTEGER NOT NULL DEFAULT 1")
                     }
                 })
                 .build()

@@ -42,6 +42,7 @@ import com.daykit.feature.habit.data.HabitBackupContributor
 import com.daykit.feature.habit.data.HabitRepository
 import com.daykit.feature.keystore.data.KeyStoreBackupContributor
 import com.daykit.feature.keystore.data.KeyStoreRepository
+import com.daykit.feature.keystore.notification.KeyExpiryReminders
 import com.daykit.feature.notes.data.SecureNoteBackupContributor
 import com.daykit.feature.notes.data.SecureNoteRepository
 import com.daykit.feature.reminder.data.ReminderRepository
@@ -146,8 +147,15 @@ class AppContainer(context: Context) {
         )
     }
 
+    val keyExpiryReminders = KeyExpiryReminders(appContext)
+
     val keyStoreRepository: KeyStoreRepository by lazy {
-        KeyStoreRepository(database.keyStoreEntryDao(), sessionValueCipher)
+        KeyStoreRepository(
+            dao = database.keyStoreEntryDao(),
+            cipher = sessionValueCipher,
+            onSaved = keyExpiryReminders::onSaved,
+            onRemoved = keyExpiryReminders::onRemoved,
+        )
     }
 
     val expenseRepository: ExpenseRepository by lazy {

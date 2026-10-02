@@ -336,6 +336,17 @@ private fun DayKitApp(
         if (sensitiveUnlocked) container.driveBackupRunner.launchIfDue()
     }
 
+    // Card / ID expiry reminders can only be computed while the MSK exists, so rebuild
+    // them on each unlock. The read can be cancelled by a re-lock, but the scheduling
+    // after it is synchronous, so it never stops half-way through.
+    LaunchedEffect(sensitiveUnlocked) {
+        if (!sensitiveUnlocked) return@LaunchedEffect
+        val entries = withContext(Dispatchers.IO) {
+            runCatching { container.keyStoreRepository.liveEntriesOrNull() }.getOrNull()
+        }
+        if (entries != null) container.keyExpiryReminders.sync(entries)
+    }
+
     fun tryBiometricUnlock() {
         if (biometricEnabled != true || !biometricAuthenticator.canAuthenticate()) return
         val cipher = container.biometricUnlockManager.unlockCipher()

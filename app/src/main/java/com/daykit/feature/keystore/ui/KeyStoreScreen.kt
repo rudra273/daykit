@@ -2,12 +2,13 @@
 
 package com.daykit.feature.keystore.ui
 
-import androidx.compose.material.icons.rounded.Key
-import com.daykit.core.designsystem.components.showUndo
-import com.daykit.core.designsystem.components.TrashItem
-import com.daykit.core.designsystem.components.RecentlyDeletedSheet
-import com.daykit.core.designsystem.components.RecentlyDeletedAction
+import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,8 +29,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material.icons.rounded.Password
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.SearchOff
@@ -44,48 +42,51 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.text.KeyboardOptions
 import com.daykit.AppContainer
-import com.daykit.core.util.SensitiveClipboard
 import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
+import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
-import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.DestructiveButton
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
-import com.daykit.core.designsystem.components.PrimaryButton
+import com.daykit.core.designsystem.components.RecentlyDeletedAction
+import com.daykit.core.designsystem.components.RecentlyDeletedSheet
 import com.daykit.core.designsystem.components.RowDivider
 import com.daykit.core.designsystem.components.SearchAppTopBar
-import com.daykit.core.designsystem.components.rememberErrorReporter
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.SectionHeader
+import com.daykit.core.designsystem.components.TrashItem
+import com.daykit.core.designsystem.components.rememberErrorReporter
+import com.daykit.core.designsystem.components.showUndo
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.util.SensitiveClipboard
+import com.daykit.feature.keystore.data.KeyDraft
+import com.daykit.feature.keystore.data.KeyField
+import com.daykit.feature.keystore.data.KeyFieldFormat
+import com.daykit.feature.keystore.data.KeyFieldKind
 import com.daykit.feature.keystore.data.KeyStoreEntry
-import com.daykit.feature.keystore.data.PasswordGenerator
-import com.daykit.feature.keystore.data.PasswordGeneratorOptions
+import com.daykit.feature.keystore.data.KeyType
 import kotlinx.coroutines.launch
 
 private sealed interface KeyEditorState {
@@ -104,7 +105,9 @@ fun KeyStoreScreen(
         .observeEntries()
         .collectAsStateWithLifecycle(initialValue = null)
     var editorState by remember { mutableStateOf<KeyEditorState?>(null) }
-    var actionEntry by remember { mutableStateOf<KeyStoreEntry?>(null) }
+    // By id, so the open sheet follows edits (e.g. a recovery code ticked off).
+    var actionEntryId by remember { mutableStateOf<String?>(null) }
+    val actionEntry = entries?.firstOrNull { it.entryId == actionEntryId }
     var showTrash by remember { mutableStateOf(false) }
     val trashedEntries by container.keyStoreRepository
         .observeTrash()
@@ -115,6 +118,11 @@ fun KeyStoreScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val errors = rememberErrorReporter(snackbarHostState, scope)
+
+    fun copy(label: String, value: String) {
+        SensitiveClipboard.copy(context, label, value)
+        scope.launch { snackbarHostState.showSnackbar("$label copied") }
+    }
 
     BackHandler {
         if (searchActive) {
@@ -130,9 +138,12 @@ fun KeyStoreScreen(
 
     val filteredEntries = remember(entries, query, selectedLabel) {
         entries.orEmpty().filter { entry ->
+            // Secret fields never match: a search box shouldn't confirm what a PIN starts with.
             val matchesQuery = query.isBlank() ||
                 entry.name.contains(query, ignoreCase = true) ||
-                entry.label.contains(query, ignoreCase = true)
+                entry.label.contains(query, ignoreCase = true) ||
+                entry.type.title.contains(query, ignoreCase = true) ||
+                entry.fields.any { !it.kind.isSecret && it.value.contains(query, ignoreCase = true) }
             val matchesLabel = selectedLabel == null || entry.label == selectedLabel
             matchesQuery && matchesLabel
         }
@@ -159,7 +170,7 @@ fun KeyStoreScreen(
                 searchActive = searchActive,
                 onSearchActiveChange = { searchActive = it; if (!it) query = "" },
                 onBack = onBack,
-                searchPlaceholder = "Search name or label",
+                searchPlaceholder = "Search keys",
                 actions = { RecentlyDeletedAction(onClick = { showTrash = true }) },
             )
         },
@@ -243,12 +254,12 @@ fun KeyStoreScreen(
                             contentPadding = PaddingValues(0.dp),
                         ) {
                             groupEntries.forEachIndexed { index, entry ->
+                                val quickCopy = entry.quickCopyValue
                                 KeyEntryRow(
                                     entry = entry,
-                                    onClick = { actionEntry = entry },
-                                    onCopy = {
-                                        SensitiveClipboard.copy(context, entry.name, entry.value)
-                                        scope.launch { snackbarHostState.showSnackbar("${entry.name} value copied") }
+                                    onClick = { actionEntryId = entry.entryId },
+                                    onCopy = quickCopy?.let { value ->
+                                        { copy(entry.name, value) }
                                     },
                                 )
                                 if (index < groupEntries.lastIndex) {
@@ -265,17 +276,19 @@ fun KeyStoreScreen(
     actionEntry?.let { entry ->
         KeyDetailSheet(
             entry = entry,
-            onDismiss = { actionEntry = null },
-            onCopy = {
-                SensitiveClipboard.copy(context, entry.name, entry.value)
-                scope.launch { snackbarHostState.showSnackbar("Copied") }
+            onDismiss = { actionEntryId = null },
+            onCopy = ::copy,
+            onToggleCode = { code, used ->
+                errors.launchGuarded("Couldn't update that code.") {
+                    container.keyStoreRepository.setRecoveryCodeUsed(entry.entryId, code, used)
+                }
             },
             onEdit = {
-                actionEntry = null
+                actionEntryId = null
                 editorState = KeyEditorState.Edit(entry)
             },
             onDelete = {
-                actionEntry = null
+                actionEntryId = null
                 errors.launchGuarded("Couldn't delete that key.") {
                     container.keyStoreRepository.deleteEntry(entry.entryId)
                     scope.launch {
@@ -295,7 +308,7 @@ fun KeyStoreScreen(
                     id = entry.entryId,
                     title = entry.name,
                     deletedAtMillis = entry.deletedAtMillis ?: 0L,
-                    icon = Icons.Rounded.Key,
+                    icon = entry.type.icon,
                 )
             },
             onDismiss = { showTrash = false },
@@ -321,90 +334,110 @@ fun KeyStoreScreen(
         val editing = state as? KeyEditorState.Edit
         KeyFormSheet(
             entry = editing?.entry,
+            existingLabels = uniqueLabels,
             onDismiss = { editorState = null },
-            onSave = { name, label, value ->
+            onSave = { draft ->
                 errors.launchGuarded(
                     failureMessage = "Couldn't save that key.",
                     onFailure = { editorState = null },
                 ) {
                     if (editing != null) {
-                        container.keyStoreRepository.updateEntry(
-                            entryId = editing.entry.entryId,
-                            name = name,
-                            label = label,
-                            value = value,
-                        )
+                        container.keyStoreRepository.updateEntry(editing.entry.entryId, draft)
                     } else {
-                        container.keyStoreRepository.addEntry(name, label, value)
+                        container.keyStoreRepository.addEntry(draft)
                     }
                     editorState = null
+                    if (draft.hasExpiry()) requestNotificationPermissionIfNeeded(context as? Activity)
                 }
             },
         )
     }
 }
 
-private val MonogramTileSize = 30.dp
+private val LeadingTileSize = 30.dp
 
-/** Indent that lands the divider flush with the row's text column, past the monogram tile. */
-private val RowDividerIndent = Spacing.lg + MonogramTileSize + Spacing.md
+/** Indent that lands the divider flush with the row's text column, past the leading tile. */
+private val RowDividerIndent = Spacing.lg + LeadingTileSize + Spacing.md
 
-private val AccentPalette: @Composable () -> List<Color>
-    get() = {
-        val a = MaterialTheme.extendedColors.accents
-        listOf(a.blue, a.teal, a.green, a.red, a.orange, a.yellow, a.purple, a.pink, a.indigo)
+/** A card or ID with an expiry date set, i.e. something [KeyExpiry] may remind about. */
+private fun KeyDraft.hasExpiry(): Boolean = when (type) {
+    KeyType.Card -> fields.any { it.key == "expiry" && KeyFieldFormat.isValidExpiry(it.value) }
+    KeyType.Identity -> fields.any { it.key == "expires" && it.value.isNotBlank() }
+    else -> false
+}
+
+/** Expiry reminders are notifications; ask once there's actually something to remind about. */
+private fun requestNotificationPermissionIfNeeded(activity: Activity?) {
+    if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) ==
+        PackageManager.PERMISSION_GRANTED
+    ) {
+        return
     }
-
-@Composable
-private fun accentFor(key: String): Color {
-    val palette = AccentPalette()
-    val idx = (kotlin.math.abs(key.hashCode())) % palette.size
-    return palette[idx]
+    ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 52)
 }
 
 /**
- * A single-line key row for the grouped Key Store card. Deliberately local rather than
+ * A key row for the grouped Key Store card. Deliberately local rather than
  * [com.daykit.core.designsystem.components.AppListRow], whose 60dp minHeight floor exists
  * for the settings switch-row rhythm — here the floor is the 48dp copy-button touch target
  * and nothing more. The label isn't repeated in the row: it's already the section header
- * above, and the monogram accent is derived from it.
+ * above. [onCopy] is null when the entry has nothing to quick-copy.
  */
 @Composable
 private fun KeyEntryRow(
     entry: KeyStoreEntry,
     onClick: () -> Unit,
-    onCopy: () -> Unit,
+    onCopy: (() -> Unit)?,
 ) {
-    val accent = accentFor(entry.label.ifBlank { entry.name })
+    val summary = remember(entry) { entry.summary() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = MinTouchTarget)
             .clickable(onClick = onClick)
-            .padding(start = Spacing.lg, end = Spacing.xs),
+            .padding(start = Spacing.lg, end = Spacing.xs, top = Spacing.xs, bottom = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        KeyMonogramTile(
-            letter = entry.name.trim().firstOrNull()?.uppercase() ?: "#",
-            accent = accent,
-        )
-        Spacer(Modifier.width(Spacing.md))
-        Text(
-            text = entry.name,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onCopy, modifier = Modifier.size(MinTouchTarget)) {
-            Icon(
-                Icons.Rounded.ContentCopy,
-                // Named per row so TalkBack doesn't read N identical "Copy value" buttons.
-                contentDescription = "Copy value for ${entry.name}",
-                tint = MaterialTheme.extendedColors.textMuted,
-                modifier = Modifier.size(20.dp),
+        if (entry.type == KeyType.Simple) {
+            KeyMonogramTile(
+                letter = entry.name.trim().firstOrNull()?.uppercase() ?: "#",
+                accent = accentFor(entry.label.ifBlank { entry.name }),
             )
+        } else {
+            AccentIconTile(icon = entry.type.icon, accent = entry.type.accent(), size = LeadingTileSize)
+        }
+        Spacer(Modifier.width(Spacing.md))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (summary != null) {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (onCopy != null) {
+            IconButton(onClick = onCopy, modifier = Modifier.size(MinTouchTarget)) {
+                Icon(
+                    Icons.Rounded.ContentCopy,
+                    // Named per row so TalkBack doesn't read N identical "Copy" buttons.
+                    contentDescription = "Copy ${entry.name}",
+                    tint = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        } else {
+            Spacer(Modifier.size(MinTouchTarget))
         }
     }
 }
@@ -414,7 +447,7 @@ private fun KeyEntryRow(
 private fun KeyMonogramTile(letter: String, accent: Color) {
     Box(
         modifier = Modifier
-            .size(MonogramTileSize)
+            .size(LeadingTileSize)
             .clip(MaterialTheme.shapes.medium)
             .background(accent.asAccentContainer()),
         contentAlignment = Alignment.Center,
@@ -432,15 +465,12 @@ private fun KeyMonogramTile(letter: String, accent: Color) {
 private fun KeyDetailSheet(
     entry: KeyStoreEntry,
     onDismiss: () -> Unit,
-    onCopy: () -> Unit,
+    onCopy: (label: String, value: String) -> Unit,
+    onToggleCode: (code: String, used: Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    var revealed by remember(entry.entryId) { mutableStateOf(false) }
-    AppBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) {
+    AppBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -448,51 +478,46 @@ private fun KeyDetailSheet(
                 .padding(bottom = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text(
-                text = entry.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            if (entry.label.isNotBlank()) {
-                Text(
-                    text = entry.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AccentIconTile(
+                    icon = entry.type.icon,
+                    accent = entry.type.accent(),
+                    size = 40.dp,
+                    iconSize = 22.dp,
                 )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.extendedColors.inputField)
-                    .padding(horizontal = Spacing.md, vertical = Spacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = if (revealed) entry.value else "••••••••••••",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = if (revealed) Int.MAX_VALUE else 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = { revealed = !revealed }) {
-                    Icon(
-                        if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                        contentDescription = if (revealed) "Hide" else "Show",
-                        tint = MaterialTheme.extendedColors.textMuted,
-                        modifier = Modifier.size(20.dp),
+                Spacer(Modifier.width(Spacing.md))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = entry.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = listOf(entry.type.title, entry.label).filter { it.isNotBlank() }.joinToString(" · "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.extendedColors.textMuted,
                     )
                 }
             }
-            PrimaryButton(
-                text = "Copy",
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = {
-                    Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                },
-                onClick = onCopy,
-            )
+            if (entry.hasHero()) {
+                KeyHero(entry = entry, onCopy = onCopy, onToggleCode = onToggleCode)
+            }
+            val rows = entry.fields.filter { it.value.isNotBlank() && it.kind !in HeroOwnedKinds }
+            if (rows.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.large)
+                        .background(MaterialTheme.extendedColors.inputField),
+                ) {
+                    rows.forEachIndexed { index, field ->
+                        KeyFieldRow(field = field, onCopy = onCopy)
+                        if (index < rows.lastIndex) RowDivider()
+                    }
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -515,147 +540,57 @@ private fun KeyDetailSheet(
     }
 }
 
+/** One stored value: its name, the value (masked until the eye is tapped if secret), copy. */
 @Composable
-private fun KeyFormSheet(
-    entry: KeyStoreEntry?,
-    onDismiss: () -> Unit,
-    onSave: (name: String, label: String, value: String) -> Unit,
+private fun KeyFieldRow(
+    field: KeyField,
+    onCopy: (label: String, value: String) -> Unit,
 ) {
-    val editKey = entry?.entryId ?: "new"
-    var name by remember(editKey) { mutableStateOf(entry?.name ?: "") }
-    var value by remember(editKey) { mutableStateOf(entry?.value ?: "") }
-    var label by remember(editKey) { mutableStateOf(entry?.label ?: "") }
-    var valueVisible by remember(editKey) { mutableStateOf(false) }
-    var generatorExpanded by remember(editKey) { mutableStateOf(false) }
-    var generatedLength by remember(editKey) { mutableStateOf(20) }
-    var useUppercase by remember(editKey) { mutableStateOf(true) }
-    var useLowercase by remember(editKey) { mutableStateOf(true) }
-    var useNumbers by remember(editKey) { mutableStateOf(true) }
-    var useSymbols by remember(editKey) { mutableStateOf(true) }
-
-    val canSave = name.isNotBlank() && value.isNotBlank()
-    val noCaps = KeyboardOptions(capitalization = KeyboardCapitalization.None)
-
-    AppBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    val secret = field.kind.isSecret
+    var revealed by rememberSaveable(field.key) { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 56.dp)
+            .padding(start = Spacing.lg, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.lg)
-                .padding(bottom = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (entry != null) "Edit key" else "Add key",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                text = field.label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.extendedColors.textMuted,
             )
-            AppTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = "Key name",
-                keyboardOptions = noCaps,
+            Text(
+                text = KeyFieldFormat.display(field.kind, field.value, revealed),
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = if (secret || field.kind == KeyFieldKind.Expiry) FontFamily.Monospace else null,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = if (revealed || !secret) 6 else 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            AppTextField(
-                value = value,
-                onValueChange = { value = it },
-                label = "Value",
-                keyboardOptions = noCaps,
-                visualTransformation = if (valueVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { valueVisible = !valueVisible }) {
-                        Icon(
-                            if (valueVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            contentDescription = if (valueVisible) "Hide" else "Show",
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                },
-            )
-            SecondaryButton(
-                text = if (generatorExpanded) "Hide generator" else "Generate password",
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Rounded.Password, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                onClick = { generatorExpanded = !generatorExpanded },
-            )
-            if (generatorExpanded) {
-                AppCard(modifier = Modifier.fillMaxWidth()) {
-                    Text("Password generator", style = MaterialTheme.typography.titleSmall)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("Length", style = MaterialTheme.typography.bodyMedium)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { generatedLength = (generatedLength - 1).coerceAtLeast(8) }) {
-                                Icon(Icons.Rounded.Remove, contentDescription = "Shorter")
-                            }
-                            Text("$generatedLength", style = MaterialTheme.typography.titleMedium)
-                            IconButton(onClick = { generatedLength = (generatedLength + 1).coerceAtMost(128) }) {
-                                Icon(Icons.Rounded.Add, contentDescription = "Longer")
-                            }
-                        }
-                    }
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        FilterChipButton("Uppercase", useUppercase) {
-                            if (!useUppercase || useLowercase || useNumbers || useSymbols) useUppercase = !useUppercase
-                        }
-                        FilterChipButton("Lowercase", useLowercase) {
-                            if (!useLowercase || useUppercase || useNumbers || useSymbols) useLowercase = !useLowercase
-                        }
-                        FilterChipButton("Numbers", useNumbers) {
-                            if (!useNumbers || useUppercase || useLowercase || useSymbols) useNumbers = !useNumbers
-                        }
-                        FilterChipButton("Symbols", useSymbols) {
-                            if (!useSymbols || useUppercase || useLowercase || useNumbers) useSymbols = !useSymbols
-                        }
-                    }
-                    Spacer(Modifier.height(Spacing.md))
-                    PrimaryButton(
-                        text = "Use generated password",
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = {
-                            val generated = PasswordGenerator.generate(PasswordGeneratorOptions(
-                                length = generatedLength,
-                                uppercase = useUppercase,
-                                lowercase = useLowercase,
-                                numbers = useNumbers,
-                                symbols = useSymbols,
-                            ))
-                            value = generated
-                            valueVisible = true
-                        },
-                    )
-                }
-            }
-            AppTextField(
-                value = label,
-                onValueChange = { label = it },
-                label = "Label (optional)",
-                keyboardOptions = noCaps,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                SecondaryButton(
-                    text = "Cancel",
-                    modifier = Modifier.weight(1f),
-                    onClick = onDismiss,
-                )
-                PrimaryButton(
-                    text = "Save",
-                    enabled = canSave,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSave(name, label, value) },
+        }
+        if (secret) {
+            IconButton(onClick = { revealed = !revealed }, modifier = Modifier.size(MinTouchTarget)) {
+                Icon(
+                    if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                    contentDescription = if (revealed) "Hide ${field.label}" else "Show ${field.label}",
+                    tint = MaterialTheme.extendedColors.textMuted,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
+        IconButton(
+            onClick = { onCopy(field.label, KeyFieldFormat.copyText(field.kind, field.value)) },
+            modifier = Modifier.size(MinTouchTarget),
+        ) {
+            Icon(
+                Icons.Rounded.ContentCopy,
+                contentDescription = "Copy ${field.label}",
+                tint = MaterialTheme.extendedColors.textMuted,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
+

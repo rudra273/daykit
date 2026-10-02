@@ -18,6 +18,8 @@ data class KeyStoreEntryEntity(
     val labelIv: ByteArray,
     val valueCiphertext: ByteArray,
     val valueIv: ByteArray,
+    /** How the decrypted value is laid out: see [KeyEntryDocument.FORMAT_SINGLE] / [KeyEntryDocument.FORMAT_DOCUMENT]. */
+    val format: Int = KeyEntryDocument.FORMAT_SINGLE,
     val version: Int,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
