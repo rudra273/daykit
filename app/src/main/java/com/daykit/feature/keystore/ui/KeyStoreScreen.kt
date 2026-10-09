@@ -24,9 +24,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -42,6 +42,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,7 +71,7 @@ import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppFab
 import com.daykit.core.designsystem.components.DestructiveButton
 import com.daykit.core.designsystem.components.EmptyState
-import com.daykit.core.designsystem.components.FilterChipButton
+import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.RecentlyDeletedAction
 import com.daykit.core.designsystem.components.RecentlyDeletedSheet
 import com.daykit.core.designsystem.components.RowDivider
@@ -90,7 +92,7 @@ import com.daykit.feature.keystore.data.KeyType
 import kotlinx.coroutines.launch
 
 private sealed interface KeyEditorState {
-    data object Add : KeyEditorState
+    data class Add(val type: KeyType) : KeyEditorState
     data class Edit(val entry: KeyStoreEntry) : KeyEditorState
 }
 
@@ -112,9 +114,10 @@ fun KeyStoreScreen(
     val trashedEntries by container.keyStoreRepository
         .observeTrash()
         .collectAsStateWithLifecycle(initialValue = emptyList())
-    var query by remember { mutableStateOf("") }
-    var searchActive by remember { mutableStateOf(false) }
-    var selectedLabel by remember { mutableStateOf<String?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    val types = remember { listOf<KeyType?>(null) + KeyType.entries }
+    val pagerState = rememberPagerState(pageCount = { types.size })
 
     val snackbarHostState = remember { SnackbarHostState() }
     val errors = rememberErrorReporter(snackbarHostState, scope)
@@ -128,142 +131,124 @@ fun KeyStoreScreen(
         if (searchActive) {
             searchActive = false
             query = ""
-        } else if (query.isNotEmpty() || selectedLabel != null) {
+        } else if (query.isNotEmpty() || pagerState.currentPage != 0) {
             query = ""
-            selectedLabel = null
+            scope.launch { pagerState.animateScrollToPage(0) }
         } else {
             onBack()
         }
     }
 
-    val filteredEntries = remember(entries, query, selectedLabel) {
+    val matchingEntries = remember(entries, query) {
         entries.orEmpty().filter { entry ->
-            // Secret fields never match: a search box shouldn't confirm what a PIN starts with.
-            val matchesQuery = query.isBlank() ||
+            // Secret fields never match search.
+            query.isBlank() ||
                 entry.name.contains(query, ignoreCase = true) ||
                 entry.label.contains(query, ignoreCase = true) ||
                 entry.type.title.contains(query, ignoreCase = true) ||
                 entry.fields.any { !it.kind.isSecret && it.value.contains(query, ignoreCase = true) }
-            val matchesLabel = selectedLabel == null || entry.label == selectedLabel
-            matchesQuery && matchesLabel
         }
     }
-
-    val listState = rememberLazyListState()
 
     val uniqueLabels = remember(entries) {
         entries.orEmpty().map { it.label }.filter { it.isNotBlank() }.toSet().toList().sorted()
     }
 
-    val grouped = remember(filteredEntries) {
-        filteredEntries.groupBy { it.label.ifBlank { "Unlabeled" } }
-            .toSortedMap()
-    }
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            SearchAppTopBar(
-                title = "Key Store",
-                query = query,
-                onQueryChange = { query = it },
-                searchActive = searchActive,
-                onSearchActiveChange = { searchActive = it; if (!it) query = "" },
-                onBack = onBack,
-                searchPlaceholder = "Search keys",
-                actions = { RecentlyDeletedAction(onClick = { showTrash = true }) },
-            )
+            Column {
+                SearchAppTopBar(
+                    title = "Key Store",
+                    query = query,
+                    onQueryChange = { query = it },
+                    searchActive = searchActive,
+                    onSearchActiveChange = { searchActive = it; if (!it) query = "" },
+                    onBack = onBack,
+                    searchPlaceholder = "Search keys",
+                    actions = { RecentlyDeletedAction(onClick = { showTrash = true }) },
+                )
+                ScrollableTabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    edgePadding = Spacing.md,
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.extendedColors.accents.blue,
+                ) {
+                    types.forEachIndexed { index, type ->
+                        Tab(
+                            selected = pagerState.currentPage == index,
+                            onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                            text = { Text(type.tabTitle(), maxLines = 1) },
+                            unselectedContentColor = MaterialTheme.extendedColors.textMuted,
+                        )
+                    }
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             AppFab(
                 icon = Icons.Rounded.Add,
                 contentDescription = "Add key",
-                onClick = { editorState = KeyEditorState.Add },
+                onClick = { editorState = KeyEditorState.Add(types[pagerState.currentPage] ?: KeyType.Simple) },
             )
         },
     ) { innerPadding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = Spacing.lg,
-                end = Spacing.lg,
-                top = innerPadding.calculateTopPadding() +
-                    if (uniqueLabels.isEmpty() && entries?.isNotEmpty() == true) 10.dp else Spacing.md,
-                bottom = Spacing.xxl + 72.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            if (uniqueLabels.isNotEmpty()) {
-                item(key = "filters") {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        item(key = "all-labels") {
-                            FilterChipButton(
-                                text = "All",
-                                selected = selectedLabel == null,
-                                onClick = { selectedLabel = null },
-                            )
-                        }
-                        items(uniqueLabels) { lbl ->
-                            val isSelected = selectedLabel == lbl
-                            FilterChipButton(
-                                text = lbl,
-                                selected = isSelected,
-                                onClick = { selectedLabel = if (isSelected) null else lbl },
-                            )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            key = { types[it]?.storageKey ?: "all" },
+        ) { page ->
+            val type = types[page]
+            val filteredEntries = remember(matchingEntries, type) {
+                matchingEntries.filter { type == null || it.type == type }
+            }
+            val grouped = remember(filteredEntries) {
+                filteredEntries.groupBy { it.label.ifBlank { "Unlabeled" } }.toSortedMap()
+            }
+            val listState = rememberLazyListState()
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = Spacing.lg,
+                    end = Spacing.lg,
+                    top = Spacing.md,
+                    bottom = Spacing.xxl + 72.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                if (entries == null) {
+                    item(key = "loading") {
+                        Box(Modifier.fillMaxWidth().padding(Spacing.xxl), contentAlignment = Alignment.Center) {
+                            LoadingIndicator()
                         }
                     }
-                }
-            }
-
-            val currentEntries = entries
-            if (currentEntries != null && currentEntries.isEmpty()) {
-                item(key = "empty-all") {
-                    EmptyState(
-                        icon = Icons.Rounded.VpnKey,
-                        title = "No keys saved",
-                        description = "Tap + to add your first key.",
-                    )
-                }
-            } else if (currentEntries != null && filteredEntries.isEmpty()) {
-                item(key = "empty-filter") {
-                    EmptyState(
-                        icon = Icons.Rounded.SearchOff,
-                        title = "No matching keys",
-                    )
-                }
-            } else {
-                grouped.forEach { (group, groupEntries) ->
-                    item(key = "section-$group") {
-                        SectionHeader(
-                            text = group,
-                            topPadding = if (
-                                uniqueLabels.isEmpty() && group == grouped.keys.firstOrNull()
-                            ) 0.dp else Spacing.sm,
+                } else if (filteredEntries.isEmpty()) {
+                    item(key = "empty") {
+                        EmptyState(
+                            icon = if (query.isNotBlank()) Icons.Rounded.SearchOff else type?.icon ?: Icons.Rounded.VpnKey,
+                            title = if (query.isNotBlank()) "No matching keys" else "No ${type.emptyTitle()} saved",
+                            description = if (query.isBlank()) "Tap + to add your first entry." else null,
                         )
                     }
-                    // One card per label group rather than per entry: the per-row card
-                    // border + 8dp gap was most of each row's height.
-                    item(key = "group-$group") {
-                        AppCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(0.dp),
-                        ) {
-                            groupEntries.forEachIndexed { index, entry ->
-                                val quickCopy = entry.quickCopyValue
-                                KeyEntryRow(
-                                    entry = entry,
-                                    onClick = { actionEntryId = entry.entryId },
-                                    onCopy = quickCopy?.let { value ->
-                                        { copy(entry.name, value) }
-                                    },
-                                )
-                                if (index < groupEntries.lastIndex) {
-                                    RowDivider(startIndent = RowDividerIndent)
+                } else {
+                    grouped.forEach { (group, groupEntries) ->
+                        item(key = "section-$group") {
+                            SectionHeader(text = group, topPadding = if (group == grouped.keys.firstOrNull()) 0.dp else Spacing.sm)
+                        }
+                        item(key = "group-$group") {
+                            AppCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(0.dp),
+                            ) {
+                                groupEntries.forEachIndexed { index, entry ->
+                                    KeyEntryRow(
+                                        entry = entry,
+                                        onClick = { actionEntryId = entry.entryId },
+                                        onCopy = entry.quickCopyValue?.let { value -> { copy(entry.name, value) } },
+                                    )
+                                    if (index < groupEntries.lastIndex) RowDivider(startIndent = RowDividerIndent)
                                 }
                             }
                         }
@@ -335,6 +320,7 @@ fun KeyStoreScreen(
         KeyFormSheet(
             entry = editing?.entry,
             existingLabels = uniqueLabels,
+            initialType = (state as? KeyEditorState.Add)?.type ?: KeyType.Simple,
             onDismiss = { editorState = null },
             onSave = { draft ->
                 errors.launchGuarded(
@@ -594,3 +580,21 @@ private fun KeyFieldRow(
     }
 }
 
+
+private fun KeyType?.tabTitle(): String = when (this) {
+    null -> "All"
+    KeyType.Simple -> "Keys"
+    KeyType.Login -> "Logins"
+    KeyType.Card -> "Cards"
+    KeyType.Bank -> "Banks"
+    KeyType.Identity -> "IDs"
+    KeyType.Recovery -> "Recovery"
+    KeyType.Crypto -> "Wallets"
+}
+
+private fun KeyType?.emptyTitle(): String = when (this) {
+    null -> "keys"
+    KeyType.Identity -> "IDs"
+    KeyType.Recovery -> "recovery codes"
+    else -> tabTitle().lowercase()
+}

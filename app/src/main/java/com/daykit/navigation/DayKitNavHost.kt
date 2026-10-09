@@ -2,6 +2,11 @@ package com.daykit.navigation
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -57,13 +62,25 @@ fun DayKitNavHost(
     bottomBarPadding: PaddingValues,
 ) {
     val back: () -> Unit = { navController.popBackStack() }
+    val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
 
     NavHost(
         navController = navController,
         startDestination = Routes.HOME,
-        // Instant screen switches — no fade/scale animation.
-        enterTransition = { EnterTransition.None },
-        exitTransition = { ExitTransition.None },
+        enterTransition = {
+            val from = TopLevelDestination.entries.indexOfFirst { it.route == initialState.destination.route }
+            val to = TopLevelDestination.entries.indexOfFirst { it.route == targetState.destination.route }
+            if (from >= 0 && to >= 0 && from != to) {
+                slideInHorizontally(tween(220)) { width -> (if (to > from) width else -width) * direction }
+            } else EnterTransition.None
+        },
+        exitTransition = {
+            val from = TopLevelDestination.entries.indexOfFirst { it.route == initialState.destination.route }
+            val to = TopLevelDestination.entries.indexOfFirst { it.route == targetState.destination.route }
+            if (from >= 0 && to >= 0 && from != to) {
+                slideOutHorizontally(tween(220)) { width -> (if (to > from) -width else width) * direction }
+            } else ExitTransition.None
+        },
         popEnterTransition = { EnterTransition.None },
         popExitTransition = { ExitTransition.None },
     ) {

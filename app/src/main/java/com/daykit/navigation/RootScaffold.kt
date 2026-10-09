@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -89,19 +91,47 @@ fun RootScaffold(
         }
     }
 
+    val quickAction by container.pendingQuickAction.collectAsStateWithLifecycle()
+    LaunchedEffect(quickAction) {
+        val request = quickAction ?: return@LaunchedEffect
+        navController.navigate(request.action.route) { launchSingleTop = true }
+        if (request.action == QuickAction.Reminders) {
+            container.pendingQuickAction.compareAndSet(request, null)
+        }
+    }
+
+    fun navigateTab(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     val density = LocalDensity.current
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val navigationInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var bottomBarHeight by remember { mutableStateOf(52.dp + navigationInset) }
 
     Box(Modifier.fillMaxSize()) {
-        DayKitNavHost(
-            navController = navController,
-            activity = activity,
-            container = container,
-            lockedCount = lockedCount,
-            onAppLockSelectionChanged = onAppLockSelectionChanged,
-            bottomBarPadding = PaddingValues(bottom = bottomBarHeight),
-        )
+        Box(
+            Modifier.fillMaxSize().tabSwipeNavigation(
+                route = currentDestination?.route,
+                thresholdPx = with(density) { 64.dp.toPx() },
+                edgePx = with(density) { 24.dp.toPx() },
+                isRtl = isRtl,
+                onNavigate = ::navigateTab,
+            ),
+        ) {
+            DayKitNavHost(
+                navController = navController,
+                activity = activity,
+                container = container,
+                lockedCount = lockedCount,
+                onAppLockSelectionChanged = onAppLockSelectionChanged,
+                bottomBarPadding = PaddingValues(bottom = bottomBarHeight),
+            )
+        }
         if (onTopLevel) {
                 Row(
                     modifier = Modifier
@@ -128,13 +158,7 @@ fun RootScaffold(
                                 .weight(1f)
                                 .heightIn(min = 52.dp)
                                 .clickable(role = Role.Tab, onClickLabel = dest.label) {
-                                    navController.navigate(dest.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
+                                    navigateTab(dest.route)
                                 }
                                 .semantics { this.selected = selected },
                             horizontalAlignment = Alignment.CenterHorizontally,

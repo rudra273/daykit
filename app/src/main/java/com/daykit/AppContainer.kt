@@ -2,6 +2,7 @@ package com.daykit
 
 import android.content.Context
 import android.net.Uri
+import com.daykit.navigation.QuickActionRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.daykit.core.backup.BackupCrypto
 import com.daykit.core.backup.BackupPasswordStore
@@ -56,6 +57,7 @@ class AppContainer(context: Context) {
     // Media URIs shared into the app ("share to DayKit" from Gallery), waiting
     // to be imported into the file vault once the user has unlocked.
     val pendingVaultShares = MutableStateFlow<List<Uri>>(emptyList())
+    val pendingQuickAction = MutableStateFlow<QuickActionRequest?>(null)
     val keyStoreCrypto = AndroidKeyStoreCrypto()
     val sensitiveValueCipher = SensitiveValueCipher(keyStoreCrypto)
     // Ties PIN derivations to this device so they can't be brute-forced elsewhere.

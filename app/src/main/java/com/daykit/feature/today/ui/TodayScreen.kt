@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,6 +94,7 @@ import com.daykit.feature.habit.data.Habit
 import com.daykit.feature.habit.data.HabitDashboard
 import com.daykit.feature.habit.data.HabitGoalType
 import com.daykit.feature.habit.ui.habitColor
+import com.daykit.feature.habit.ui.HabitReminderTime
 import com.daykit.feature.reminder.data.Reminder
 import com.daykit.navigation.Routes
 import kotlinx.coroutines.Dispatchers
@@ -521,12 +523,14 @@ private fun HabitRow(habit: Habit, completed: Boolean, streak: Int, weekDone: Li
         Spacer(Modifier.width(Spacing.xs))
         Column(Modifier.weight(1f)) {
             Text(habit.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(goalText(habit), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.extendedColors.textMuted)
+                HabitReminderTime(habit)
                 if (streak > 1) {
-                    Spacer(Modifier.width(Spacing.sm))
-                    Icon(Icons.Rounded.LocalFireDepartment, contentDescription = null, tint = MaterialTheme.extendedColors.accents.orange, modifier = Modifier.size(14.dp))
-                    Text("$streak days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.extendedColors.accents.orange)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Rounded.LocalFireDepartment, contentDescription = null, tint = MaterialTheme.extendedColors.accents.orange, modifier = Modifier.size(14.dp))
+                        Text("$streak days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.extendedColors.accents.orange)
+                    }
                 }
             }
         }

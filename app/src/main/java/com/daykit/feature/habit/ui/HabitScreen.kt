@@ -16,6 +16,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -683,6 +684,7 @@ private fun PausedHabitRow(habit: Habit, onEdit: () -> Unit, onDelete: () -> Uni
                     color = MaterialTheme.extendedColors.textMuted,
                     style = MaterialTheme.typography.bodySmall,
                 )
+                HabitReminderTime(habit)
             }
             HabitOverflowMenu(onEdit = onEdit, onDelete = onDelete)
         }
@@ -840,24 +842,27 @@ private fun DailyHabitRow(
                     color = color,
                     trackColor = MaterialTheme.extendedColors.inputField,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                FlowRow(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         progressText(habit, log),
                         color = MaterialTheme.extendedColors.textMuted,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    HabitReminderTime(habit)
                     if (streak > 0) {
-                        Icon(
-                            Icons.Rounded.LocalFireDepartment,
-                            contentDescription = null,
-                            tint = MaterialTheme.extendedColors.accents.orange,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Text(
-                            "$streak",
-                            color = MaterialTheme.extendedColors.textMuted,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(
+                                Icons.Rounded.LocalFireDepartment,
+                                contentDescription = null,
+                                tint = MaterialTheme.extendedColors.accents.orange,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                "$streak",
+                                color = MaterialTheme.extendedColors.textMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 }
             }
@@ -1641,6 +1646,7 @@ private fun QuitHabitTile(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        HabitReminderTime(habit)
         Spacer(Modifier.height(Spacing.xs))
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(

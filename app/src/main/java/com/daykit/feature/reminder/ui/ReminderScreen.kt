@@ -48,6 +48,8 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +75,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.daykit.AppContainer
+import com.daykit.navigation.QuickAction
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppAlertDialog
@@ -116,7 +119,15 @@ fun ReminderScreen(
     val reminders by container.reminderRepository
         .observeReminders()
         .collectAsStateWithLifecycle(initialValue = null)
-    var addOpen by remember { mutableStateOf(false) }
+    var addOpen by rememberSaveable { mutableStateOf(false) }
+    val quickAction by container.pendingQuickAction.collectAsStateWithLifecycle()
+    LaunchedEffect(quickAction) {
+        val request = quickAction
+        if (request?.action == QuickAction.AddReminder) {
+            addOpen = true
+            container.pendingQuickAction.compareAndSet(request, null)
+        }
+    }
     var editReminder by remember { mutableStateOf<Reminder?>(null) }
     var actionReminder by remember { mutableStateOf<Reminder?>(null) }
     var deleteReminder by remember { mutableStateOf<Reminder?>(null) }

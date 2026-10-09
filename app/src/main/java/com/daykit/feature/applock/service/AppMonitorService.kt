@@ -14,10 +14,17 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.daykit.DayKitApplication
 import com.daykit.MainActivity
 import com.daykit.R
+import com.daykit.navigation.QuickAction
+import com.daykit.core.util.TimeFormat
+import com.daykit.feature.reminder.notification.TodayReminderPreview
+import com.daykit.feature.reminder.notification.nextReminderToday
+import java.time.Instant
+import java.time.ZoneId
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.permissions.AppLockPermissionChecker
 import com.daykit.core.security.CredentialKind
@@ -34,6 +41,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 
 class AppMonitorService : Service() {
@@ -135,6 +146,7 @@ class AppMonitorService : Service() {
         observeAppLimits()
         observeBiometricSetting()
         monitorForegroundApps()
+        observeTodayReminder()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -443,7 +455,33 @@ class AppMonitorService : Service() {
         }.getOrDefault(packageName)
     }
 
-    private fun buildNotification(): Notification {
+    private fun observeTodayReminder() {
+        val container = (application as DayKitApplication).container
+        scope.launch {
+            val reminders = flow {
+                emitAll(container.reminderRepository.observeReminders())
+            }.catch { error ->
+                Log.w("AppMonitorService", "Could not read upcoming reminders", error)
+                emit(emptyList())
+            }
+            val clock = flow {
+                while (true) {
+                    val now = System.currentTimeMillis()
+                    emit(now)
+                    // Refresh at minute boundaries, including the start of a new day.
+                    delay(60_000L - now % 60_000L)
+                }
+            }
+            combine(reminders, clock) { items, now -> nextReminderToday(items, now) }
+                .distinctUntilChanged()
+                .collect { next ->
+                    getSystemService(NotificationManager::class.java)
+                        .notify(NOTIFICATION_ID, buildNotification(next))
+                }
+        }
+    }
+
+    private fun buildNotification(nextReminder: TodayReminderPreview? = null): Notification {
         val channel = NotificationChannel(
             NOTIFICATION_CHANNEL_ID,
             "App Lock protection",
@@ -454,18 +492,34 @@ class AppMonitorService : Service() {
         }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
 
-        val contentIntent = PendingIntent.getActivity(
+        fun actionIntent(action: QuickAction): PendingIntent = PendingIntent.getActivity(
             this,
-            0,
-            Intent(this, MainActivity::class.java),
+            action.ordinal + 1,
+            Intent(this, MainActivity::class.java).apply {
+                this.action = action.intentAction
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        return Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_app_lock)
-            .setContentTitle("App Lock is protecting your apps")
-            .setContentIntent(contentIntent)
+        val builder = Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_reminder)
+            .setContentIntent(actionIntent(if (nextReminder == null) QuickAction.AddReminder else QuickAction.Reminders))
+            .addAction(
+                Notification.Action.Builder(
+                    android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_reminder),
+                    "Add reminder",
+                    actionIntent(QuickAction.AddReminder),
+                ).build(),
+            )
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
-            .build()
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
+        nextReminder?.let {
+            val due = Instant.ofEpochMilli(it.dueAtMillis).atZone(ZoneId.systemDefault())
+            builder.setContentTitle(it.title)
+                .setContentText(TimeFormat.format(due.hour, due.minute))
+        }
+        return builder.build()
     }
 
     companion object {

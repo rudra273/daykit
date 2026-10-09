@@ -57,6 +57,8 @@ import com.daykit.feature.onboarding.ui.BiometricSetupScreen
 import com.daykit.feature.onboarding.ui.PermissionGrantScreen
 import com.daykit.feature.onboarding.ui.SetupCredentialScreen
 import com.daykit.navigation.RootScaffold
+import com.daykit.navigation.QuickAction
+import com.daykit.navigation.QuickActionRequest
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import kotlinx.coroutines.Dispatchers
@@ -73,12 +75,28 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         handleShareIntent(intent)
+        val pendingAction = if (savedInstanceState == null) intent?.action
+            else savedInstanceState.getString("pending_quick_action")
+        handleQuickAction(pendingAction)
         setContentView()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleShareIntent(intent)
+        handleQuickAction(intent.action)
+    }
+
+    private fun handleQuickAction(action: String?) {
+        QuickAction.fromIntentAction(action)?.let {
+            container.pendingQuickAction.value = QuickActionRequest(it)
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("pending_quick_action", container.pendingQuickAction.value?.action?.intentAction)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {

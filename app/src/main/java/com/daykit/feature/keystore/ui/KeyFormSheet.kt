@@ -91,13 +91,14 @@ internal fun KeyFormSheet(
     existingLabels: List<String>,
     onDismiss: () -> Unit,
     onSave: (KeyDraft) -> Unit,
+    initialType: KeyType = KeyType.Simple,
 ) {
     val editKey = entry?.entryId ?: "new"
-    var type by remember(editKey) { mutableStateOf(entry?.type ?: KeyType.Simple) }
+    var type by remember(editKey) { mutableStateOf(entry?.type ?: initialType) }
     var name by remember(editKey) { mutableStateOf(entry?.name ?: "") }
     var label by remember(editKey) { mutableStateOf(entry?.label ?: "") }
     var fields by remember(editKey) {
-        mutableStateOf(entry?.fields ?: KeyEntryDocument.normalize(KeyType.Simple, emptyList()))
+        mutableStateOf(entry?.fields ?: KeyEntryDocument.normalize(initialType, emptyList()))
     }
 
     fun updateField(key: String, transform: (KeyField) -> KeyField) {
