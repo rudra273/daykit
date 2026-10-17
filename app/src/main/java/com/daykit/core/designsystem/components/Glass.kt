@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.ExtendedColors
@@ -81,6 +82,14 @@ fun Modifier.glassControl(shape: Shape): Modifier {
     return this
         .innerBevel(shape, tokens.rim(strength = 0.8f))
         .frostedBackdrop(shape, Color.Transparent)
+        .layout { measurable, constraints ->
+            // Material buttons add a 48dp touch target after this modifier and
+            // centre the (shorter) visible button in it. Draw modifiers take the
+            // size of the next layout node, so report the size clamped to our
+            // constraints; otherwise the glass spills 6dp above and below.
+            val placeable = measurable.measure(constraints)
+            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+        }
 }
 
 /** Where a row sits in a run of rows that share one glass panel. */
