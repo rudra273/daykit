@@ -11,14 +11,23 @@ network use is user-initiated Google Drive backup of already-encrypted files.
 These require a written justification in the Play Console (some trigger manual
 review). Paste the "Justification" text into the corresponding declaration.
 
-### `PACKAGE_USAGE_STATS` (Usage Access) — restricted, manual review likely
-**Feature:** App Lock.
-**Justification:** DayKit's App Lock lets the user require a PIN/biometric before
-opening apps they select. Usage Access is the only supported API to detect which
-app is in the foreground so the lock challenge can be shown for the correct app.
-The permission is requested only after the user enables App Lock and picks apps
-to lock. DayKit does not log, transmit, or sell usage data — it is read in-memory
-solely to compare the current foreground package against the user's locked list.
+### `PACKAGE_USAGE_STATS` (Usage Access) — sensitive, expect manual review
+**Features:** App Lock, Focus (daily limits), Device Manager.
+**Justification:** DayKit uses Usage Access for three user-facing features, all
+processed only on the device:
+1. **App Lock** — detects which app is in the foreground so the PIN/password
+   challenge appears for the apps the user chose to lock. Android offers no other
+   supported way to do this.
+2. **Focus daily limits** — measures today's time in the apps the user put under a
+   daily limit, so the app can be blocked once the limit is reached, and suggests
+   limits from the past week's usage.
+3. **Device Manager** — shows the user their own most-used and least recently used
+   apps (from the usage history Android keeps, up to ~90 days) to help them clean
+   up unused apps.
+Usage Access is requested from onboarding and from these screens, with an
+explanation of why it is needed. Usage data is never uploaded, shared, sold, or
+included in backups; DayKit stores only the lock list, limits and schedules the
+user sets.
 
 ### `SYSTEM_ALERT_WINDOW` (Display over other apps / Overlay)
 **Feature:** App Lock + Event Light.
@@ -28,13 +37,14 @@ Light") to illuminate the user's face during video calls. Requested only when th
 user enables one of these features. No overlay is shown at any other time and no
 content from other apps is read.
 
-### `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` — manual review
-**Feature:** Reminders.
+### `SCHEDULE_EXACT_ALARM` (user-granted; `USE_EXACT_ALARM` is not requested)
+**Features:** Reminders and Focus routines.
 **Justification:** DayKit fires user-set reminders and alarm-style notifications
 at an exact time chosen by the user. Inexact alarms would cause reminders to fire
-late, which defeats the feature (e.g. a bill-due or medication reminder). Alarms
-are scheduled only for reminders the user explicitly creates and are cancelled
-when the user deletes them.
+late, which defeats the feature (e.g. a bill-due or medication reminder). Focus routines use exact
+alarms to start and end a scheduled block on time. Alarms are scheduled only for
+reminders and routines the user creates, and are cancelled when they are deleted.
+The app keeps working without this permission and warns the user instead.
 
 ### `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_SPECIAL_USE` — manual review
 **Feature:** App Lock monitor service and Event Light service.
@@ -49,7 +59,14 @@ Both services run only while their feature is enabled and show an ongoing
 notification. No standard foreground-service type fits these uses, hence
 `specialUse`.
 
-### Device Admin (`BIND_DEVICE_ADMIN`)
+### Device Admin (`BIND_DEVICE_ADMIN`) — NOT in the first production release
+Anti-theft protection (device admin + Settings locked behind the PIN) is switched
+off for v1 (`AntiTheftProtection.AVAILABLE = false`, receiver removed from the
+manifest) to avoid the likeliest Play rejection. Nothing to declare for v1. The
+text below is kept for when it returns in a later update.
+
+<details><summary>Saved justification for the later release</summary>
+
 **Feature:** Anti-theft protection (optional, off by default).
 **Justification:** DayKit's App Lock protects the user's apps from someone else
 using their phone. Without anti-theft protection, that person could simply
@@ -76,6 +93,8 @@ after enabling: open DayKit > Settings > Security & Privacy > turn off
 Anti-theft Protection > enter the PIN. Or open the phone's Settings, tap
 "Forgot PIN?" and confirm the device screen lock.
 
+</details>
+
 ### `RECEIVE_BOOT_COMPLETED`
 **Feature:** App Lock persistence.
 **Justification:** Restarts the App Lock monitor service after a reboot or app
@@ -84,8 +103,12 @@ sensitive work on a spoofed intent.
 
 ### `USE_FULL_SCREEN_INTENT`
 **Feature:** Reminder alarms.
-**Justification:** Shows a full-screen reminder/alarm UI (with screen-on) for
-time-critical reminders the user created, matching alarm-clock behavior.
+**Declaration:** choose the alarm use case.
+**Justification:** Shows a full-screen alarm UI (with screen-on) when a reminder
+the user set as an alarm goes off, matching alarm-clock behavior. Users can turn
+full-screen alerts off in Settings > Notifications. If Play does not approve
+default access, Android 14+ users grant it themselves from that same screen and
+reminders still arrive as normal high-priority notifications.
 
 ### `USE_BIOMETRIC`, `POST_NOTIFICATIONS`, `INTERNET`, `HIDE_OVERLAY_WINDOWS`
 Standard permissions. Biometric = optional unlock for locked tools.
@@ -104,7 +127,8 @@ analytics. No advertising ID. No data sold.
 **Data handling:**
 - All user content (Key Store, Secure Notes, Expenses, Habits, App Lock list,
   File Vault media) is stored locally, encrypted (SQLCipher DB; File Vault files
-  AES-256-GCM with per-file keys wrapped by a key derived from the user's PIN).
+  AES-256-GCM with per-file keys; Key Store, Notes and vault keys additionally
+  under a key derived from the user's PIN/password).
 - The only data that leaves the device is an **encrypted backup file** the user
   chooses to upload to **their own Google Drive**. It is encrypted on-device with
   a user-chosen password before upload; DayKit uploads no plaintext content.
@@ -127,8 +151,11 @@ app-created backup files) for the optional backup feature.
 ## 3. Pre-upload checklist
 - [ ] Release keystore created and `local.properties` signing vars filled in.
 - [ ] `./gradlew :app:bundleRelease` (AAB) or `assembleRelease` produces a signed artifact.
-- [ ] Privacy policy URL live: https://www.rosmox.com/projects/daykit/privacy-policy
+- [ ] Privacy policy URL live: https://rosmox.com/products/daykit/privacy-policy
+      (website copy must match the in-app `PrivacyPolicyScreen` text)
 - [ ] Data safety form completed per section 2.
 - [ ] Permission declarations submitted per section 1 (expect manual review for
-      exact alarms + special-use FGS + usage access).
-- [ ] `versionCode` / `versionName` bumped as intended (currently 9 / "1.0.8").
+      special-use FGS + full-screen intent + usage access).
+- [ ] Android OAuth client for the **Play app signing** SHA-1 added in Google Cloud,
+      and the OAuth consent screen published to "In production".
+- [ ] `versionCode` / `versionName` bumped as intended (currently 10 / "1.1.0").

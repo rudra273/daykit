@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 DayKit (`com.daykit`) — a single-module Android app: a local-first "kit" of privacy tools (App Lock, Key Store, Secure Notes, File Vault, Focus, Habits, Reminders, Expenses, Editor, DNS, Event Light). 100% Kotlin + Jetpack Compose, minSdk 31 / targetSdk 36. The only network use is user-initiated Google Drive backup of already-encrypted blobs.
 
+## Release status (first Play Store production release)
+
+- **Anti-theft protection is disabled for v1** (decided 2026-10-20): device admin + the Settings app locked behind the PIN is the likeliest Play rejection. `AntiTheftProtection.AVAILABLE = false` hides the toggle, and the `DayKitDeviceAdmin` receiver is removed from the manifest (the class and `@xml/device_admin` stay). Don't re-enable it until v1 is approved; to bring it back, flip the flag, restore the receiver, and re-add the Device Admin sections to the privacy policy and `PLAY_CONSOLE_PERMISSIONS.md` (the old justification is kept there).
+- The privacy policy lives at `https://rosmox.com/products/daykit/privacy-policy`. `PrivacyPolicyScreen` is the source text; the website copy must be updated by hand whenever it changes.
+- Any change to what a permission is used for (Usage Access especially: App Lock, Focus limits, Device Manager) must be reflected in both the in-app policy and `PLAY_CONSOLE_PERMISSIONS.md`.
+
 ## Build & test
 
 There is no system JVM on this machine. **Every Gradle invocation must set JAVA_HOME first:**

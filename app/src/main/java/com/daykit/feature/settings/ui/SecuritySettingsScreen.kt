@@ -372,8 +372,8 @@ fun SecuritySettingsScreen(
                 }
             }
             item { SettingsFootnote("Turning the screen off always re-locks every app.") }
-            item { SectionHeader("Protection") }
-            item {
+            if (AntiTheftProtection.AVAILABLE || isAdminActive) item { SectionHeader("Protection") }
+            if (AntiTheftProtection.AVAILABLE || isAdminActive) item {
                 AppCard(contentPadding = PaddingValues(0.dp)) {
                     // Anti-theft: device admin + Settings locked behind the PIN.
                     AppListRow(

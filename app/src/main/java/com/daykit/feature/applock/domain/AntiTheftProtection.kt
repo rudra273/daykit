@@ -21,6 +21,13 @@ import com.daykit.feature.applock.data.AppLockRepository
 object AntiTheftProtection {
     const val SETTINGS_LABEL = "Settings"
 
+    /**
+     * Off for the first production release: device admin + a locked Settings app is the
+     * likeliest Play rejection, so v1 ships without it and it returns in a later update.
+     * Re-enabling also needs the DayKitDeviceAdmin receiver restored in the manifest.
+     */
+    const val AVAILABLE = false
+
     private fun component(context: Context) = ComponentName(context, DayKitDeviceAdmin::class.java)
 
     private fun devicePolicyManager(context: Context) =
