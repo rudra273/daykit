@@ -184,7 +184,6 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.daykit.widget.TOGGLE_HABIT" />
                 <action android:name="android.intent.action.DATE_CHANGED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
@@ -193,6 +192,10 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_habit_checkin_info" />
         </receiver>
+        <!-- Habit widget check-ins arrive here via the widget's own PendingIntent only. -->
+        <receiver
+            android:name=".feature.widget.HabitToggleReceiver"
+            android:exported="false" />
         <service
             android:name=".feature.widget.ReminderWidgetRemoteViewsService"
             android:exported="true"

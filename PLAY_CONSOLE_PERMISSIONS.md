@@ -158,4 +158,4 @@ app-created backup files) for the optional backup feature.
       special-use FGS + full-screen intent + usage access).
 - [ ] Android OAuth client for the **Play app signing** SHA-1 added in Google Cloud,
       and the OAuth consent screen published to "In production".
-- [ ] `versionCode` / `versionName` bumped as intended (currently 10 / "1.1.0").
+- [ ] `versionCode` / `versionName` bumped as intended (currently 11 / "1.1.1").
