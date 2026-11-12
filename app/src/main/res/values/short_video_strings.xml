@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="short_video_blocker_title">Short video blocker</string>
+    <string name="short_video_entry_description">Manage Shorts and Reels</string>
+    <string name="short_video_intro_title">Keep the apps. Skip the short videos.</string>
+    <string name="short_video_setup_title">Optional setup</string>
+    <string name="short_video_setup_steps">If you want to use this blocker, open Android Accessibility settings, enable Short video blocker, then come back and choose your apps. Other Focus tools work without this setup.</string>
+    <string name="short_video_supported_apps">Supported apps</string>
+    <string name="short_video_choose_apps">Choose what to block</string>
+    <plurals name="short_video_active_apps">
+        <item quantity="one">Blocking in %d app</item>
+        <item quantity="other">Blocking in %d apps</item>
+    </plurals>
     <string name="short_video_blocker_summary">Leave supported Shorts and Reels viewers automatically while keeping the rest of each app available.</string>
     <string name="short_video_service_description">DayKit uses Accessibility to recognize Shorts and Reels in the apps you select and automatically return you to Home or the previous screen. Screen content is processed on your device and is never saved or shared by this feature.</string>
     <string name="short_video_youtube">YouTube Shorts</string>

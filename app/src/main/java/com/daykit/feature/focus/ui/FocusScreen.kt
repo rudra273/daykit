@@ -92,6 +92,7 @@ import java.time.ZoneId
 
 /** Which nested editor, if any, has replaced the list. */
 private sealed interface FocusEditor {
+    data object ShortVideos : FocusEditor
     data class Group(val existing: FocusGroup?) : FocusEditor
     data class Schedule(val existing: FocusSchedule?) : FocusEditor
 }
@@ -158,6 +159,12 @@ fun FocusScreen(
     }
 
     when (val current = editor) {
+        FocusEditor.ShortVideos -> ShortVideoBlockerScreen(
+            onBack = { editor = null },
+            onOpeningSettings = { container.sensitiveKeyManager.expectingActivityResult = it },
+        )
+
+
         is FocusEditor.Group -> FocusGroupEditorHost(
             container = container,
             existing = current.existing,
@@ -382,10 +389,6 @@ private fun FocusHome(
                 )
             }
 
-            item(key = "short-video-blocker") {
-                ShortVideoBlockerCard()
-            }
-
             item(key = "modes") {
                 val onMode: (FocusMode) -> Unit = { mode ->
                     when (mode) {
@@ -412,6 +415,10 @@ private fun FocusHome(
                         }
                     }
                 }
+            }
+
+            item(key = "short-video-blocker") {
+                ShortVideoBlockerEntry(onClick = { onEdit(FocusEditor.ShortVideos) })
             }
 
             if (hasUsageAccess) {

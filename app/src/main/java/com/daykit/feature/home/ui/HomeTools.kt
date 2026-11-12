@@ -51,12 +51,12 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
     ToolSection(
         "Productivity",
         listOf(
-            ToolTile(Routes.TOOL_DAYFLOW, "Dayflow", "Pomodoro, journal & mood", Icons.Rounded.AutoAwesome, { accents.indigo },
-                listOf("dayflow", "pomodoro", "journal", "mood", "timer")),
-            ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TrackChanges, { accents.green },
-                listOf("habit", "habits")),
             ToolTile(Routes.TOOL_FOCUS, "Focus", "Block distractions", Icons.Rounded.Timer, { accents.red },
                 listOf("focus", "focus block", "block app", "distraction", "screen time")),
+            ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TrackChanges, { accents.green },
+                listOf("habit", "habits")),
+            ToolTile(Routes.TOOL_DAYFLOW, "Dayflow", "Pomodoro, journal & mood", Icons.Rounded.AutoAwesome, { accents.indigo },
+                listOf("dayflow", "pomodoro", "journal", "mood", "timer")),
             ToolTile(Routes.TOOL_EXPENSES, "Expenses", "Track monthly spending", Icons.Rounded.Payments, { accents.pink },
                 listOf("expenses", "budget", "money")),
         ),
