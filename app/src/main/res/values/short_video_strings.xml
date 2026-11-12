@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="short_video_blocker_title">Short video blocker</string>
+    <string name="short_video_blocker_summary">Leave supported Shorts and Reels viewers automatically while keeping the rest of each app available.</string>
+    <string name="short_video_service_description">DayKit uses Accessibility to recognize Shorts and Reels in the apps you select and automatically return you to Home or the previous screen. Screen content is processed on your device and is never saved or shared by this feature.</string>
+    <string name="short_video_youtube">YouTube Shorts</string>
+    <string name="short_video_instagram">Instagram Reels</string>
+    <string name="short_video_facebook">Facebook Reels</string>
+    <string name="short_video_review_access">Review automatic redirect</string>
+    <string name="short_video_agree">Agree</string>
+    <string name="short_video_enable_access">Enable Accessibility</string>
+    <string name="short_video_disclosure_title">Allow DayKit to detect short videos?</string>
+    <string name="short_video_disclosure_accept">Agree and open settings</string>
+    <string name="short_video_disclosure_cancel">Cancel</string>
+    <string name="short_video_settings_error">Couldn’t open Android Accessibility settings.</string>
+</resources>

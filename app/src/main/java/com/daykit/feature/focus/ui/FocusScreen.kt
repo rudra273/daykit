@@ -382,6 +382,10 @@ private fun FocusHome(
                 )
             }
 
+            item(key = "short-video-blocker") {
+                ShortVideoBlockerCard()
+            }
+
             item(key = "modes") {
                 val onMode: (FocusMode) -> Unit = { mode ->
                     when (mode) {
