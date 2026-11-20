@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
@@ -225,6 +226,29 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_reminders_info" />
         </receiver>
+        <receiver
+            android:name=".feature.widget.WeatherGlassWidgetProvider"
+            android:label="@string/widget_weather_glass_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_weather_glass_info" />
+        </receiver>
+        <service
+            android:name=".feature.wallpaper.WeatherGlassWallpaperService"
+            android:label="@string/wallpaper_weather_glass_title"
+            android:exported="true"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/weather_glass_wallpaper" />
+        </service>
     </application>
 
 </manifest>

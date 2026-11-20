@@ -69,6 +69,7 @@ import com.daykit.feature.widget.DayflowWidgetProvider
 import com.daykit.feature.widget.ExpenseQuickAddWidgetProvider
 import com.daykit.feature.widget.HabitCheckInWidgetProvider
 import com.daykit.feature.widget.ReminderWidgetProvider
+import com.daykit.feature.widget.WeatherGlassWidgetProvider
 import kotlinx.coroutines.launch
 
 private enum class CanvasSection(val label: String) {
@@ -166,17 +167,24 @@ fun CanvasScreen(
         }
     }
 
+    val weatherWidgetCount = remember(refreshTrigger) {
+        val manager = AppWidgetManager.getInstance(context)
+        runCatching {
+            manager.getAppWidgetIds(ComponentName(context, WeatherGlassWidgetProvider::class.java)).size
+        }.getOrDefault(0)
+    }
+
     fun showSnack(message: String) {
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
-    fun requestPinWidget(item: CanvasWidgetItem) {
+    fun requestPinProvider(providerClass: Class<*>) {
         val manager = AppWidgetManager.getInstance(context)
         if (!manager.isRequestPinAppWidgetSupported) {
             showSnack("Your launcher doesn't support pinning from apps. Long-press your home screen and choose Widgets.")
             return
         }
-        val provider = ComponentName(context, item.providerClass)
+        val provider = ComponentName(context, providerClass)
         val requested = runCatching {
             manager.requestPinAppWidget(provider, null, null)
         }.getOrDefault(false)
@@ -184,6 +192,8 @@ fun CanvasScreen(
             showSnack("Could not open widget pin prompt. Long-press your home screen and choose Widgets.")
         }
     }
+
+    fun requestPinWidget(item: CanvasWidgetItem) = requestPinProvider(item.providerClass)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -251,16 +261,12 @@ fun CanvasScreen(
                 }
 
                 CanvasSection.DailyWidgets -> {
-                    Box(
+                    DailyWeatherWidgetShowcase(
+                        pinnedCount = weatherWidgetCount,
+                        onPin = { requestPinProvider(WeatherGlassWidgetProvider::class.java) },
+                        onShowMessage = ::showSnack,
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        EmptyState(
-                            icon = Icons.Rounded.Widgets,
-                            title = "Everyday widgets coming soon",
-                            description = "Minimal clocks, progress trackers, quotes, and quick-glance daily widgets will appear here.",
-                        )
-                    }
+                    )
                 }
 
                 CanvasSection.Wallpapers -> {

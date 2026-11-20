@@ -2,6 +2,7 @@ package com.daykit.core.backup
 
 import android.content.Context
 import com.daykit.core.data.AppPreferences
+import com.daykit.core.data.HomeCardSize
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.data.StartTab
 import com.daykit.core.data.TimeFormatPreference
@@ -42,6 +43,8 @@ class AppPreferencesBackupContributor(
         .put("reminderFullScreen", AppPreferences.reminderFullScreen)
         .put("homeHiddenTools", JSONArray(AppPreferences.homeHiddenTools.toList()))
         .put("homeToolOrder", JSONArray(AppPreferences.homeToolOrder))
+        .put("homeCardSize", AppPreferences.homeCardSize.name)
+        .put("homeColumns", AppPreferences.homeColumns)
         .put("cardStyle", CardStyleStore.get(context).name)
         // The photo itself is not backed up, so a custom background restores as plain.
         .put("pageBackground", PageBackgroundStore.get(context).takeUnless { it == PageBackgroundKind.Custom }?.name ?: PageBackgroundKind.Plain.name)
@@ -70,6 +73,8 @@ class AppPreferencesBackupContributor(
             ?.let { PageBackgroundStore.set(context, it) }
         payload.optJSONArray("homeHiddenTools")?.let { AppPreferences.homeHiddenTools = it.strings().toSet() }
         payload.optJSONArray("homeToolOrder")?.let { AppPreferences.homeToolOrder = it.strings() }
+        enumOrNull<HomeCardSize>(payload.optString("homeCardSize"))?.let { AppPreferences.homeCardSize = it }
+        if (payload.has("homeColumns")) AppPreferences.homeColumns = payload.getInt("homeColumns")
     }
 
     private inline fun <reified E : Enum<E>> enumOrNull(name: String): E? =

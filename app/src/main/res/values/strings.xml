@@ -24,4 +24,8 @@ Open DayKit to add a reminder.</string>
     <string name="widget_reminder_snoozed">Snoozed · %1$s</string>
     <string name="widget_reminder_overdue">Overdue · %1$s</string>
     <string name="widget_reminder_upcoming">Upcoming · %1$s</string>
+    <string name="widget_weather_glass_title">Glass Weather</string>
+    <string name="widget_weather_glass_description">Transparent frosted-glass weather cube that blends with your home screen wallpaper.</string>
+    <string name="wallpaper_weather_glass_title">DayKit Glass Weather</string>
+    <string name="wallpaper_weather_glass_description">60fps animated frosted-glass weather cube over your chosen wallpaper photo.</string>
 </resources>

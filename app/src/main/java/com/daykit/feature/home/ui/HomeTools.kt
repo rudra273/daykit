@@ -65,6 +65,8 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
     ToolSection(
         "Utilities",
         listOf(
+            ToolTile(Routes.TOOL_CANVAS, "Canvas", "Home widgets & wallpapers", Icons.Rounded.Widgets, { accents.purple },
+                listOf("canvas", "widget", "widgets", "wallpaper", "wallpapers", "home screen")),
             ToolTile(Routes.TOOL_DEVICE_MANAGER, "Device Manager", "Usage, storage & battery", Icons.Rounded.PhoneAndroid, { accents.teal },
                 listOf("device manager", "usage", "storage", "battery", "largest files", "apps")),
             ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
@@ -79,8 +81,6 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
                 listOf("dns", "ad block", "private dns")),
             ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", "Light for video calls", Icons.Rounded.FlashOn, { accents.yellow },
                 listOf("event light", "ring light", "video call light", "night light", "border light")),
-            ToolTile(Routes.TOOL_CANVAS, "Canvas", "Home widgets & wallpapers", Icons.Rounded.Widgets, { accents.purple },
-                listOf("canvas", "widget", "widgets", "wallpaper", "wallpapers", "home screen")),
         ),
     ),
 )

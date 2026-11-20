@@ -59,6 +59,14 @@ Both services run only while their feature is enabled and show an ongoing
 notification. No standard foreground-service type fits these uses, hence
 `specialUse`.
 
+### `ACCESS_COARSE_LOCATION` (optional, foreground-only)
+**Feature:** Canvas — Glass Weather widget & live wallpaper.
+**Justification:** Requested only when the user taps "Use current location" in
+Canvas -> Daily Widgets to detect their city and fetch live local weather from
+Open-Meteo. City-level coarse location only; never collected in the background,
+never shared for ads, and users can search and pick a city manually without
+granting this permission.
+
 ### Device Admin (`BIND_DEVICE_ADMIN`) — NOT in the first production release
 Anti-theft protection (device admin + Settings locked behind the PIN) is switched
 off for v1 (`AntiTheftProtection.AVAILABLE = false`, receiver removed from the

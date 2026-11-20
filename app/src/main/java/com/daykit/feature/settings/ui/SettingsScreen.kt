@@ -88,7 +88,7 @@ fun SettingsScreen(
                 Icons.Rounded.Tune, accents.blue, onOpenGeneral,
             ),
             SettingsLink("Appearance", listOf("Theme", "Dark mode", "Haptic feedback"), Icons.Rounded.Palette, accents.orange, onOpenAppearance),
-            SettingsLink("Home Screen", listOf("Show tools", "Hide tools", "Reorder tools"), Icons.Rounded.GridView, accents.green, onOpenHomeLayout),
+            SettingsLink("Home Screen", listOf("Show tools", "Hide tools", "Reorder tools", "Card size", "Columns"), Icons.Rounded.GridView, accents.green, onOpenHomeLayout),
             SettingsLink(
                 "Notifications & Permissions",
                 listOf("Full-Screen Alarm", "Snooze Length", "Sound & Vibration", "Permissions", "Usage Access", "Overlay", "Exact alarms"),

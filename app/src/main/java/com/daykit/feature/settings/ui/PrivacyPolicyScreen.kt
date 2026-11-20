@@ -101,7 +101,8 @@ fun PrivacyPolicyScreen(
             PolicySection(
                 title = "Network And Third Parties",
                 body = listOf(
-                    "DayKit uses internet access for Google Drive backup and restore when the user connects a Google account.",
+                    "DayKit uses internet access for Google Drive backup and restore when the user connects a Google account, and for fetching live weather forecasts from Open-Meteo when the user uses the Glass Weather widget or live wallpaper.",
+                    "Approximate location (ACCESS_COARSE_LOCATION) is optional and only requested if the user taps auto-detect in the weather widget. Coordinates are used solely to fetch local weather for that city from Open-Meteo and are never stored on a DayKit server or shared for advertising; users can also pick a city manually without granting location access.",
                     "The app uses Google sign-in/authorization components and Google Drive APIs for Drive backup operations.",
                     "The Document Scanner uses Google Play services' ML Kit document scanner. Pages are captured and processed on the device, and DayKit does not upload scanned documents.",
                     "The app does not sell user data. The app does not use advertising identifiers for ad targeting. The app does not intentionally share user-created vault data with third parties except when the user stores an encrypted backup in Google Drive.",

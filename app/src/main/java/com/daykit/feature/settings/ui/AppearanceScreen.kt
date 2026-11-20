@@ -134,9 +134,9 @@ fun AppearanceScreen(
         Triple(ThemeMode.DARK, "Dark", Icons.Rounded.DarkMode to accents.indigo),
     )
     val styleOptions = listOf(
-        Triple(CardStyle.Flat, "Clean cards that sit on the page by color alone.", Icons.Rounded.CropSquare to accents.blue),
-        Triple(CardStyle.Clay, "A soft lift and edge, like pressed clay.", Icons.Rounded.Layers to accents.orange),
-        Triple(CardStyle.Glass, "See-through frosted cards. Best on a colorful background.", Icons.Rounded.AutoAwesome to accents.indigo),
+        CardStyle.Flat to (Icons.Rounded.CropSquare to accents.blue),
+        CardStyle.Clay to (Icons.Rounded.Layers to accents.orange),
+        CardStyle.Glass to (Icons.Rounded.AutoAwesome to accents.indigo),
     )
 
     Box(Modifier.fillMaxSize()) {
@@ -219,10 +219,9 @@ fun AppearanceScreen(
                     Spacer(Modifier.height(Spacing.sm))
                 }
                 AppCard(contentPadding = PaddingValues(0.dp)) {
-                    styleOptions.forEachIndexed { index, (style, description, iconAccent) ->
+                    styleOptions.forEachIndexed { index, (style, iconAccent) ->
                         AppListRow(
                             headline = style.label,
-                            supporting = description,
                             leadingIcon = iconAccent.first,
                             leadingAccent = iconAccent.second,
                             modifier = Modifier.selectable(
