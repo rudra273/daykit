@@ -30,6 +30,7 @@ object Routes {
     const val TOOL_DNS = "tool/dns"
     const val TOOL_EVENTLIGHT = "tool/eventlight"
     const val TOOL_DEVICE_MANAGER = "tool/device_manager"
+    const val TOOL_CANVAS = "tool/canvas"
 
     const val SETTINGS_SECURITY = "settings/security"
     const val SETTINGS_GENERAL = "settings/general"

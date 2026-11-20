@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.PhotoSizeSelectLarge
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -78,6 +79,8 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
                 listOf("dns", "ad block", "private dns")),
             ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", "Light for video calls", Icons.Rounded.FlashOn, { accents.yellow },
                 listOf("event light", "ring light", "video call light", "night light", "border light")),
+            ToolTile(Routes.TOOL_CANVAS, "Canvas", "Home widgets & wallpapers", Icons.Rounded.Widgets, { accents.purple },
+                listOf("canvas", "widget", "widgets", "wallpaper", "wallpapers", "home screen")),
         ),
     ),
 )

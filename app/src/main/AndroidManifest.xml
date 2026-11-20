@@ -216,7 +216,7 @@
         <receiver
             android:name=".feature.widget.ReminderWidgetProvider"
             android:label="@string/widget_reminders_title"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.DATE_CHANGED" />

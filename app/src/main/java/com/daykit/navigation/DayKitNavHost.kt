@@ -25,6 +25,7 @@ import com.daykit.core.designsystem.SolidPage
 import com.daykit.core.designsystem.background.LocalPageBackground
 import com.daykit.core.designsystem.background.pageBackground
 import com.daykit.feature.applock.ui.AppLockScreen
+import com.daykit.feature.canvas.ui.CanvasScreen
 import com.daykit.feature.dayflow.ui.DayflowScreen
 import com.daykit.feature.devicemanager.ui.DeviceManagerScreen
 import com.daykit.feature.dns.ui.DnsManagerScreen
@@ -156,6 +157,7 @@ fun DayKitNavHost(
                 onExpectActivityResult = { container.sensitiveKeyManager.expectingActivityResult = true },
             )
         }
+        opaqueComposable(Routes.TOOL_CANVAS) { CanvasScreen(onBack = back) }
 
         // ── Settings sub-screens ──
         opaqueComposable(Routes.SETTINGS_SECURITY) { SecuritySettingsScreen(container = container, onBack = back) }
