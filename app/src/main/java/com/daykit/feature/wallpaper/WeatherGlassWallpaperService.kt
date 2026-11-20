@@ -142,7 +142,7 @@ class WeatherGlassWallpaperService : WallpaperService() {
             xPixelOffset: Int,
             yPixelOffset: Int,
         ) {
-            val clamped = xOffset.coerceIn(0f, 1f)
+            val clamped = if (xOffset.isFinite()) xOffset.coerceIn(0f, 1f) else return
             if (firstObservedOffset.isNaN()) {
                 firstObservedOffset = clamped
                 minObservedOffset = clamped
@@ -154,8 +154,15 @@ class WeatherGlassWallpaperService : WallpaperService() {
                     minObservedOffset = clamped
                 }
             }
+            // An offset pinned to an edge (0 or 1) proves the launcher really scrolls
+            // the wallpaper (non-scrolling launchers report a constant 0.5).
+            if (clamped <= 0.001f || clamped >= 0.999f) {
+                seenOffsetChange = true
+            }
             pageXOffset = clamped
-            pageXStep = if (xOffsetStep.isFinite() && xOffsetStep > 0.005f && xOffsetStep < 0.995f) {
+            // xOffsetStep = 1 / (pages - 1). With exactly 2 pages the step is 1.0,
+            // so accept the full (0, 1] range instead of rejecting it.
+            pageXStep = if (xOffsetStep.isFinite() && xOffsetStep > 0.005f && xOffsetStep <= 1.0f) {
                 xOffsetStep
             } else {
                 0f
@@ -260,10 +267,15 @@ class WeatherGlassWallpaperService : WallpaperService() {
             if (!weatherEnabled) return
 
             // 3. Compute "Page 1 only" slide/fade factor (never hide in preview; works even on launchers that omit xOffsetStep)
-            val hasMultiPageScroll = (pageXStep in 0.005f..0.995f) || seenOffsetChange
-            val pageProgress = if (onlyOnFirstPage && !isPreview && hasMultiPageScroll) {
-                val step = if (pageXStep in 0.005f..0.995f) pageXStep else 0.35f
-                val distFromPage1 = (pageXOffset - minObservedOffset).coerceAtLeast(0f)
+            //    Page 1 is always xOffset == 0 (xOffset == 1 for RTL launchers), so measure the
+            //    distance from that absolute edge instead of the smallest offset seen so far
+            //    (which broke when the wallpaper was applied from any page other than page 1).
+            //    Only hide once we know the launcher actually scrolls the wallpaper, otherwise
+            //    launchers that report a constant 0.5 would hide the cube everywhere.
+            val pageProgress = if (onlyOnFirstPage && !isPreview && seenOffsetChange) {
+                val isRtl = resources.configuration.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL
+                val distFromPage1 = if (isRtl) 1f - pageXOffset else pageXOffset
+                val step = if (pageXStep > 0f) pageXStep else 0.25f
                 (distFromPage1 / step).coerceIn(0f, 1.4f)
             } else {
                 0f
