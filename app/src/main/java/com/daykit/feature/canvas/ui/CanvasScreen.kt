@@ -270,16 +270,11 @@ fun CanvasScreen(
                 }
 
                 CanvasSection.Wallpapers -> {
-                    Box(
+                    WallpaperStudioSection(
+                        refreshTrigger = refreshTrigger,
+                        onShowMessage = ::showSnack,
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        EmptyState(
-                            icon = Icons.Rounded.Wallpaper,
-                            title = "Wallpapers coming soon",
-                            description = "Clean, local-first procedural and mesh wallpapers for your home and lock screen will appear here.",
-                        )
-                    }
+                    )
                 }
             }
         }

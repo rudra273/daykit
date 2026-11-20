@@ -101,6 +101,7 @@ object WeatherPrefs {
     private const val KEY_WALLPAPER_CUBE_X = "wallpaper_cube_x"
     private const val KEY_WALLPAPER_CUBE_Y = "wallpaper_cube_y"
     private const val KEY_WALLPAPER_CUBE_SCALE = "wallpaper_cube_scale"
+    private const val KEY_WALLPAPER_WEATHER_ENABLED = "wallpaper_weather_enabled"
 
     private const val WALLPAPER_BG_FILENAME = "weather_live_wallpaper_bg.jpg"
 
@@ -193,6 +194,13 @@ object WeatherPrefs {
             .putFloat(KEY_WALLPAPER_CUBE_Y, centerY.coerceIn(0.12f, 0.88f))
             .putFloat(KEY_WALLPAPER_CUBE_SCALE, scale.coerceIn(0.35f, 0.92f))
             .apply()
+    }
+
+    fun wallpaperWeatherEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_WALLPAPER_WEATHER_ENABLED, true)
+
+    fun setWallpaperWeatherEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_WALLPAPER_WEATHER_ENABLED, enabled).apply()
     }
 
     fun wallpaperPhotoFile(context: Context): File =

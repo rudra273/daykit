@@ -1,19 +1,14 @@
 package com.daykit.feature.canvas.ui
 
 import android.Manifest
-import android.app.WallpaperManager
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.BlurMaskFilter
 import android.graphics.Paint as AndroidPaint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.RectF
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -23,21 +18,17 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,23 +39,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,12 +64,10 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -91,7 +77,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -99,25 +84,19 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.daykit.DayKitApplication
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.background.frostedBackdrop
-import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.extendedColors
-import com.daykit.feature.wallpaper.WeatherGlassWallpaperService
 import com.daykit.feature.weather.CitySearchResult
 import com.daykit.feature.weather.WeatherApiClient
 import com.daykit.feature.weather.WeatherLocationHelper
@@ -125,10 +104,8 @@ import com.daykit.feature.weather.WeatherPrefs
 import com.daykit.feature.weather.WeatherSnapshot
 import com.daykit.feature.weather.WeatherSyncWorker
 import com.daykit.feature.widget.WeatherGlassWidgetProvider
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
@@ -185,9 +162,6 @@ fun DailyWeatherWidgetShowcase(
 
     var snapshot by remember { mutableStateOf(WeatherPrefs.loadSnapshot(context)) }
     var useFahrenheit by remember { mutableStateOf(WeatherPrefs.useFahrenheit(context)) }
-    var onlyOnFirstPage by remember { mutableStateOf(WeatherPrefs.onlyOnFirstPage(context)) }
-    var photoVersion by remember { mutableLongStateOf(WeatherPrefs.wallpaperPhotoVersion(context)) }
-    var hasWallpaperPhoto by remember { mutableStateOf(WeatherPrefs.hasWallpaperPhoto(context)) }
 
     var windStrength by remember { mutableFloatStateOf(snapshot.windStrength) }
     var intensity by remember { mutableFloatStateOf(snapshot.intensity) }
@@ -195,30 +169,10 @@ fun DailyWeatherWidgetShowcase(
 
     var isSyncing by remember { mutableStateOf(false) }
     var showCitySearch by remember { mutableStateOf(false) }
-    var showLayoutEditor by remember { mutableStateOf(false) }
-    var cubeCenterX by remember { mutableFloatStateOf(WeatherPrefs.wallpaperCubeX(context)) }
-    var cubeCenterY by remember { mutableFloatStateOf(WeatherPrefs.wallpaperCubeY(context)) }
-    var cubeScale by remember { mutableFloatStateOf(WeatherPrefs.wallpaperCubeScale(context)) }
 
     val cloudPuffs = remember { generateCloudPuffBitmaps() }
     val physics = remember { WeatherPhysicsEngine() }
     var frameTick by remember { mutableLongStateOf(0L) }
-
-    // Load user's chosen wallpaper background photo (if any) for live frosted preview
-    var previewBgBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(photoVersion, hasWallpaperPhoto) {
-        previewBgBitmap = if (hasWallpaperPhoto) {
-            withContext(Dispatchers.IO) {
-                val file = WeatherPrefs.wallpaperPhotoFile(context)
-                if (file.exists()) {
-                    val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                    runCatching { BitmapFactory.decodeFile(file.absolutePath, opts) }.getOrNull()
-                } else null
-            }
-        } else {
-            null
-        }
-    }
 
     fun applyLiveSnapshot(live: WeatherSnapshot) {
         snapshot = live
@@ -278,23 +232,6 @@ fun DailyWeatherWidgetShowcase(
             detectLocationAndSync()
         } else {
             onShowMessage("Location permission denied. You can still search your city manually.")
-        }
-    }
-
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val ok = WeatherPrefs.importWallpaperPhoto(context, uri)
-                if (ok) {
-                    hasWallpaperPhoto = true
-                    photoVersion = WeatherPrefs.wallpaperPhotoVersion(context)
-                    onShowMessage("Wallpaper background updated")
-                } else {
-                    onShowMessage("Could not load selected photo")
-                }
-            }
         }
     }
 
@@ -471,30 +408,18 @@ fun DailyWeatherWidgetShowcase(
             }
         }
 
-        // 2. Centered Transparent Frosted-Glass Weather Cube (with optional user wallpaper photo preview behind it)
+        // 2. Centered Transparent Frosted-Glass Weather Cube
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp)),
+                .fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
             val density = LocalDensity.current
-            val cardSize = min(maxWidth * 0.80f, min(maxHeight * 0.86f, 272.dp)).coerceAtLeast(196.dp)
+            val cardSize = min(maxWidth * 0.84f, min(maxHeight * 0.88f, 286.dp)).coerceAtLeast(204.dp)
             val cornerRadius = cardSize * 0.22f
             val cornerRadiusPx = with(density) { cornerRadius.toPx() }
             val cardShape = RoundedCornerShape(cornerRadius)
-
-            // If user selected a wallpaper photo for the Live Wallpaper, preview it behind the cube
-            val bg = previewBgBitmap
-            if (bg != null && !bg.isRecycled) {
-                Image(
-                    bitmap = bg.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
 
             Box(
                 modifier = Modifier
@@ -506,26 +431,9 @@ fun DailyWeatherWidgetShowcase(
                         ambientColor = Color.Black.copy(alpha = 0.35f),
                         spotColor = Color.Black.copy(alpha = 0.45f),
                     )
-                    .then(
-                        if (bg == null) {
-                            Modifier.frostedBackdrop(cardShape, Color(0xFF141B24).copy(alpha = 0.22f))
-                        } else {
-                            Modifier
-                        },
-                    )
+                    .frostedBackdrop(cardShape, Color(0xFF141B24).copy(alpha = 0.22f))
                     .clip(cardShape),
             ) {
-                if (bg != null && !bg.isRecycled) {
-                    Image(
-                        bitmap = bg.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(10.dp),
-                    )
-                }
-
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     @Suppress("UNUSED_VARIABLE")
                     val tick = frameTick
@@ -591,107 +499,51 @@ fun DailyWeatherWidgetShowcase(
             )
         }
 
-        Spacer(Modifier.height(Spacing.sm))
+        Spacer(Modifier.height(Spacing.md))
 
-        // 4. Live Wallpaper options (Background Photo + Position & Size + Page mode)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FilterChipButton(
-                text = if (hasWallpaperPhoto) "Change Photo" else "Pick Photo",
-                selected = hasWallpaperPhoto,
-                onClick = {
-                    markExpectingExternalActivity(context)
-                    photoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
-            )
-            FilterChipButton(
-                text = "Position & Size",
-                selected = false,
-                onClick = { showLayoutEditor = true },
-            )
-            FilterChipButton(
-                text = if (onlyOnFirstPage) "Page 1 only" else "All pages",
-                selected = onlyOnFirstPage,
-                onClick = {
-                    val next = !onlyOnFirstPage
-                    onlyOnFirstPage = next
-                    WeatherPrefs.setOnlyOnFirstPage(context, next)
-                },
-            )
-            if (hasWallpaperPhoto) {
-                Text(
-                    text = "Clear",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.extendedColors.textMuted,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .clickable {
-                            WeatherPrefs.clearWallpaperPhoto(context)
-                            hasWallpaperPhoto = false
-                            photoVersion = WeatherPrefs.wallpaperPhotoVersion(context)
-                        }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                )
-            }
-        }
-
-        Spacer(Modifier.height(Spacing.sm))
-
-        // 5. Pin Home Screen Widget & Apply 60fps Live Wallpaper buttons
+        // 4. Add to Home Screen bar (Live Wallpaper studio lives in the Wallpapers tab)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = Spacing.xs),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            OutlinedButton(
-                onClick = onPin,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(6.dp))
+            if (pinnedCount > 0) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.extendedColors.accents.green,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = if (pinnedCount == 1) "Added to Home" else "$pinnedCount on Home",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.extendedColors.accents.green,
+                    )
+                }
+            } else {
                 Text(
-                    text = if (pinnedCount > 0) "Widget ($pinnedCount)" else "Add Widget",
-                    maxLines = 1,
+                    text = "Transparent 2 × 2 widget",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.textMuted,
                 )
             }
 
             PrimaryButton(
-                text = "Live Wallpaper",
+                text = if (pinnedCount > 0) "Add another" else "Add to Home",
                 leadingIcon = {
                     Icon(
-                        Icons.Rounded.Wallpaper,
+                        Icons.Rounded.Add,
                         contentDescription = null,
-                        modifier = Modifier.size(17.dp),
+                        modifier = Modifier.size(18.dp),
                     )
                 },
-                onClick = {
-                    markExpectingExternalActivity(context)
-                    val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-                        putExtra(
-                            WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                            ComponentName(context, WeatherGlassWallpaperService::class.java),
-                        )
-                    }
-                    val started = runCatching { context.startActivity(intent) }.isSuccess
-                    if (!started) {
-                        runCatching {
-                            context.startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER))
-                        }.onFailure {
-                            onShowMessage("Live wallpaper picker is not available on this device.")
-                        }
-                    }
-                },
-                modifier = Modifier.weight(1f),
+                onClick = onPin,
             )
         }
     }
@@ -719,199 +571,6 @@ fun DailyWeatherWidgetShowcase(
                 }
             },
         )
-    }
-
-    if (showLayoutEditor) {
-        WallpaperLayoutEditorDialog(
-            city = snapshot.city,
-            tempText = "$displayTemp$unitSymbol",
-            conditionLabel = displayCondition,
-            highLowText = "H:${displayHigh}°  L:${displayLow}°",
-            bgBitmap = previewBgBitmap,
-            centerX = cubeCenterX,
-            centerY = cubeCenterY,
-            scale = cubeScale,
-            onLayoutChange = { x, y, s ->
-                cubeCenterX = x
-                cubeCenterY = y
-                cubeScale = s
-                WeatherPrefs.saveWallpaperCubeLayout(context, x, y, s)
-            },
-            onDismiss = { showLayoutEditor = false },
-        )
-    }
-}
-
-@Composable
-private fun WallpaperLayoutEditorDialog(
-    city: String,
-    tempText: String,
-    conditionLabel: String,
-    highLowText: String,
-    bgBitmap: Bitmap?,
-    centerX: Float,
-    centerY: Float,
-    scale: Float,
-    onLayoutChange: (Float, Float, Float) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF0A0D12))
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column {
-                    Text(
-                        text = "Wallpaper Position & Size",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                    )
-                    Text(
-                        text = "Drag the weather cube anywhere on your screen",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.65f),
-                    )
-                }
-                TextButton(
-                    onClick = { onLayoutChange(0.50f, 0.28f, 0.68f) },
-                ) {
-                    Text("Reset", color = Color.White.copy(alpha = 0.85f))
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            // Interactive phone-ratio wallpaper preview frame
-            BoxWithConstraints(
-                modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(9f / 19.5f)
-                    .clip(RoundedCornerShape(30.dp))
-                    .border(1.5.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(30.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            0.0f to Color(0xFF102238),
-                            0.55f to Color(0xFF182C44),
-                            1.0f to Color(0xFF0C141E),
-                        ),
-                    ),
-            ) {
-                val density = LocalDensity.current
-                val frameW = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
-                val frameH = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
-
-                if (bgBitmap != null && !bgBitmap.isRecycled) {
-                    Image(
-                        bitmap = bgBitmap.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-
-                val cardSizePx = (frameW * scale).coerceIn(frameW * 0.35f, frameW * 0.92f)
-                val cardSizeDp = with(density) { cardSizePx.toDp() }
-                val cardCorner = cardSizeDp * 0.22f
-                val cardShape = RoundedCornerShape(cardCorner)
-
-                val marginX = frameW * 0.03f
-                val marginY = frameH * 0.04f
-                val leftPx = (frameW * centerX - cardSizePx * 0.5f)
-                    .coerceIn(marginX, (frameW - cardSizePx - marginX).coerceAtLeast(marginX))
-                val topPx = (frameH * centerY - cardSizePx * 0.5f)
-                    .coerceIn(marginY, (frameH - cardSizePx - marginY).coerceAtLeast(marginY))
-
-                val latestX by rememberUpdatedState(centerX)
-                val latestY by rememberUpdatedState(centerY)
-                val latestScale by rememberUpdatedState(scale)
-                val latestOnLayoutChange by rememberUpdatedState(onLayoutChange)
-
-                Box(
-                    modifier = Modifier
-                        .offset { IntOffset(leftPx.roundToInt(), topPx.roundToInt()) }
-                        .size(cardSizeDp)
-                        .clip(cardShape)
-                        .background(Color(0xFF182433).copy(alpha = 0.58f))
-                        .border(1.5.dp, Color.White.copy(alpha = 0.72f), cardShape)
-                        .pointerInput(frameW, frameH) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                val nextX = (latestX + dragAmount.x / frameW).coerceIn(0.15f, 0.85f)
-                                val nextY = (latestY + dragAmount.y / frameH).coerceIn(0.12f, 0.88f)
-                                latestOnLayoutChange(nextX, nextY, latestScale)
-                            }
-                        }
-                        .padding(cardSizeDp * 0.105f),
-                ) {
-                    val textScale = (scale / 0.68f).coerceIn(0.55f, 1.25f)
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        Text(
-                            text = city,
-                            color = Color.White.copy(alpha = 0.92f),
-                            fontSize = (11f * textScale).sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = tempText,
-                            color = Color.White,
-                            fontSize = (28f * textScale).sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                        )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            text = conditionLabel,
-                            color = Color.White,
-                            fontSize = (11f * textScale).sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                        )
-                        Text(
-                            text = highLowText,
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = (9.5f * textScale).sp,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Size slider (35% .. 92% of screen width)
-            val normalizedSize = ((scale - 0.35f) / (0.92f - 0.35f)).coerceIn(0f, 1f)
-            TranslucentControlSlider(
-                label = "Widget Size",
-                value = normalizedSize,
-                onValueChange = { frac ->
-                    val nextScale = lerpFloat(0.35f, 0.92f, frac)
-                    onLayoutChange(centerX, centerY, nextScale)
-                },
-                valueLabel = "${(scale * 100).roundToInt()}%",
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(Modifier.height(14.dp))
-
-            PrimaryButton(
-                text = "Done",
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
     }
 }
 

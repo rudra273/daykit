@@ -52,10 +52,14 @@ class WeatherGlassWallpaperService : WallpaperService() {
 
         private var pageXOffset = 0f
         private var pageXStep = 0f
+        private var firstObservedOffset = Float.NaN
+        private var minObservedOffset = 0f
+        private var seenOffsetChange = false
 
         private var snapshot: WeatherSnapshot = WeatherPrefs.loadSnapshot(applicationContext)
         private var useFahrenheit: Boolean = WeatherPrefs.useFahrenheit(applicationContext)
         private var onlyOnFirstPage: Boolean = WeatherPrefs.onlyOnFirstPage(applicationContext)
+        private var weatherEnabled: Boolean = WeatherPrefs.wallpaperWeatherEnabled(applicationContext)
         private var cubeCenterX: Float = WeatherPrefs.wallpaperCubeX(applicationContext)
         private var cubeCenterY: Float = WeatherPrefs.wallpaperCubeY(applicationContext)
         private var cubeScale: Float = WeatherPrefs.wallpaperCubeScale(applicationContext)
@@ -138,8 +142,20 @@ class WeatherGlassWallpaperService : WallpaperService() {
             xPixelOffset: Int,
             yPixelOffset: Int,
         ) {
-            pageXOffset = xOffset.coerceIn(0f, 1f)
-            pageXStep = if (xOffsetStep.isFinite() && xOffsetStep > 0f && xOffsetStep < 1f) {
+            val clamped = xOffset.coerceIn(0f, 1f)
+            if (firstObservedOffset.isNaN()) {
+                firstObservedOffset = clamped
+                minObservedOffset = clamped
+            } else {
+                if (kotlin.math.abs(clamped - firstObservedOffset) > 0.01f) {
+                    seenOffsetChange = true
+                }
+                if (clamped < minObservedOffset) {
+                    minObservedOffset = clamped
+                }
+            }
+            pageXOffset = clamped
+            pageXStep = if (xOffsetStep.isFinite() && xOffsetStep > 0.005f && xOffsetStep < 0.995f) {
                 xOffsetStep
             } else {
                 0f
@@ -162,6 +178,7 @@ class WeatherGlassWallpaperService : WallpaperService() {
             snapshot = WeatherPrefs.loadSnapshot(applicationContext)
             useFahrenheit = WeatherPrefs.useFahrenheit(applicationContext)
             onlyOnFirstPage = WeatherPrefs.onlyOnFirstPage(applicationContext)
+            weatherEnabled = WeatherPrefs.wallpaperWeatherEnabled(applicationContext)
             cubeCenterX = WeatherPrefs.wallpaperCubeX(applicationContext)
             cubeCenterY = WeatherPrefs.wallpaperCubeY(applicationContext)
             cubeScale = WeatherPrefs.wallpaperCubeScale(applicationContext)
@@ -239,10 +256,15 @@ class WeatherGlassWallpaperService : WallpaperService() {
                 drawDefaultBackdrop(canvas, w, h, t)
             }
 
-            // 2. Compute "Page 1 only" slide/fade factor (never hide in preview or single-page launchers)
-            val hasMultiPageScroll = pageXStep in 0.01f..0.99f
+            // 2. If weather widget is toggled off for the wallpaper, show just the clean backdrop
+            if (!weatherEnabled) return
+
+            // 3. Compute "Page 1 only" slide/fade factor (never hide in preview; works even on launchers that omit xOffsetStep)
+            val hasMultiPageScroll = (pageXStep in 0.005f..0.995f) || seenOffsetChange
             val pageProgress = if (onlyOnFirstPage && !isPreview && hasMultiPageScroll) {
-                (pageXOffset / pageXStep).coerceIn(0f, 1.4f)
+                val step = if (pageXStep in 0.005f..0.995f) pageXStep else 0.35f
+                val distFromPage1 = (pageXOffset - minObservedOffset).coerceAtLeast(0f)
+                (distFromPage1 / step).coerceIn(0f, 1.4f)
             } else {
                 0f
             }
