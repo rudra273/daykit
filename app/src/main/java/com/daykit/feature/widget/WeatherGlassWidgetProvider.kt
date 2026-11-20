@@ -331,31 +331,11 @@ class WeatherGlassWidgetProvider : AppWidgetProvider() {
             if (t < 0.22f) {
                 val cx = padX + iconSize * 0.45f
                 val cy = iconTop + iconSize * 0.48f
-                val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFFFB81C.toInt()
-                    strokeCap = Paint.Cap.ROUND
-                    strokeWidth = iconSize * 0.09f
+                if (snapshot.isNight()) {
+                    com.daykit.feature.weather.WeatherIcons.drawMoon(canvas, cx, cy, iconSize)
+                } else {
+                    com.daykit.feature.weather.WeatherIcons.drawSun(canvas, cx, cy, iconSize)
                 }
-                val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(
-                        cx, cy, iconSize * 0.6f,
-                        Color.argb(115, 255, 202, 40),
-                        Color.TRANSPARENT,
-                        Shader.TileMode.CLAMP,
-                    )
-                }
-                canvas.drawCircle(cx, cy, iconSize * 0.6f, glowPaint)
-                for (i in 0 until 8) {
-                    val a = i * (PI.toFloat() / 4f)
-                    canvas.drawLine(
-                        cx + cos(a) * iconSize * 0.34f,
-                        cy + sin(a) * iconSize * 0.34f,
-                        cx + cos(a) * iconSize * 0.47f,
-                        cy + sin(a) * iconSize * 0.47f,
-                        sunPaint,
-                    )
-                }
-                canvas.drawCircle(cx, cy, iconSize * 0.24f, sunPaint)
             } else {
                 val cloudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = Color.WHITE

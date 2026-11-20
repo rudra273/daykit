@@ -183,6 +183,7 @@ class WeatherGlassWallpaperService : WallpaperService() {
 
         private fun reloadPrefs() {
             snapshot = WeatherPrefs.loadSnapshot(applicationContext)
+            nightCheckedAt = 0L
             useFahrenheit = WeatherPrefs.useFahrenheit(applicationContext)
             onlyOnFirstPage = WeatherPrefs.onlyOnFirstPage(applicationContext)
             weatherEnabled = WeatherPrefs.wallpaperWeatherEnabled(applicationContext)
@@ -516,6 +517,19 @@ class WeatherGlassWallpaperService : WallpaperService() {
             canvas.drawRoundRect(0f, 0f, s, s, cr, cr, rimPaint)
         }
 
+        private var nightCache = false
+        private var nightCheckedAt = 0L
+
+        /** Day/night re-evaluated at most once a minute (not every frame). */
+        private fun isNightCached(): Boolean {
+            val now = System.currentTimeMillis()
+            if (now - nightCheckedAt > 60_000L || now < nightCheckedAt) {
+                nightCache = snapshot.isNight(now)
+                nightCheckedAt = now
+            }
+            return nightCache
+        }
+
         private fun drawCubeTextAndIcon(canvas: Canvas, s: Float, t: Float, wind: Float) {
             val padX = s * 0.11f
             fun tp(sizeRatio: Float, bold: Boolean, alpha: Int = 255) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -538,32 +552,11 @@ class WeatherGlassWallpaperService : WallpaperService() {
             if (t < 0.22f) {
                 val cx = padX + iconSize * 0.45f
                 val cy = iconTop + iconSize * 0.48f
-                val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFFFB81C.toInt()
-                    strokeCap = Paint.Cap.ROUND
-                    strokeWidth = iconSize * 0.09f
+                if (isNightCached()) {
+                    com.daykit.feature.weather.WeatherIcons.drawMoon(canvas, cx, cy, iconSize)
+                } else {
+                    com.daykit.feature.weather.WeatherIcons.drawSun(canvas, cx, cy, iconSize)
                 }
-                val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(
-                        cx, cy, iconSize * 0.6f,
-                        Color.argb(115, 255, 202, 40),
-                        Color.TRANSPARENT,
-                        Shader.TileMode.CLAMP,
-                    )
-                }
-                canvas.drawCircle(cx, cy, iconSize * 0.6f, glow)
-                val rot = sim.elapsed * 0.24f
-                for (i in 0 until 8) {
-                    val a = rot + i * (PI.toFloat() / 4f)
-                    canvas.drawLine(
-                        cx + cos(a) * iconSize * 0.34f,
-                        cy + sin(a) * iconSize * 0.34f,
-                        cx + cos(a) * iconSize * 0.47f,
-                        cy + sin(a) * iconSize * 0.47f,
-                        sunPaint,
-                    )
-                }
-                canvas.drawCircle(cx, cy, iconSize * 0.24f, sunPaint)
             } else {
                 val cp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = Color.WHITE

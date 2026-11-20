@@ -99,6 +99,7 @@ import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.weather.CitySearchResult
 import com.daykit.feature.weather.WeatherApiClient
+import com.daykit.feature.weather.WeatherIcons
 import com.daykit.feature.weather.WeatherLocationHelper
 import com.daykit.feature.weather.WeatherPrefs
 import com.daykit.feature.weather.WeatherSnapshot
@@ -459,6 +460,7 @@ fun DailyWeatherWidgetShowcase(
                     highLowText = "H:${displayHigh}°  L:${displayLow}°",
                     intensity = intensity,
                     windStrength = windStrength,
+                    isNight = snapshot.isNight(),
                     frameTickProvider = { frameTick },
                     modifier = Modifier
                         .fillMaxSize()
@@ -663,6 +665,7 @@ private fun WeatherCubeContent(
     highLowText: String,
     intensity: Float,
     windStrength: Float,
+    isNight: Boolean,
     frameTickProvider: () -> Long,
     modifier: Modifier = Modifier,
 ) {
@@ -712,6 +715,7 @@ private fun WeatherCubeContent(
         AnimatedWeatherIcon(
             intensity = intensity,
             windStrength = windStrength,
+            isNight = isNight,
             frameTickProvider = frameTickProvider,
             modifier = Modifier.size(34.dp),
         )
@@ -759,6 +763,7 @@ private fun WeatherCubeContent(
 private fun AnimatedWeatherIcon(
     intensity: Float,
     windStrength: Float,
+    isNight: Boolean,
     frameTickProvider: () -> Long,
     modifier: Modifier = Modifier,
 ) {
@@ -771,42 +776,14 @@ private fun AnimatedWeatherIcon(
         val cy = size.height * 0.50f
 
         if (sunAlpha > 0.01f) {
-            val sunColor = Color(0xFFFFB81C).copy(alpha = sunAlpha)
-            val coreRadius = size.minDimension * 0.23f
-            val innerRay = size.minDimension * 0.33f
-            val outerRay = size.minDimension * 0.45f
-            val rotation = timeSec * 0.24f
-
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0.0f to Color(0xFFFFCA28).copy(alpha = 0.42f * sunAlpha),
-                    1.0f to Color.Transparent,
-                    center = Offset(cx, cy),
-                    radius = size.minDimension * 0.58f,
-                ),
-                radius = size.minDimension * 0.58f,
-                center = Offset(cx, cy),
-            )
-
-            val rayWidth = size.minDimension * 0.085f
-            for (i in 0 until 8) {
-                val angle = rotation + i * (PI.toFloat() / 4f)
-                val cosA = cos(angle)
-                val sinA = sin(angle)
-                drawLine(
-                    color = sunColor,
-                    start = Offset(cx + cosA * innerRay, cy + sinA * innerRay),
-                    end = Offset(cx + cosA * outerRay, cy + sinA * outerRay),
-                    strokeWidth = rayWidth,
-                    cap = StrokeCap.Round,
-                )
+            val iconBox = size.minDimension
+            drawIntoCanvas { c ->
+                if (isNight) {
+                    WeatherIcons.drawMoon(c.nativeCanvas, cx, cy, iconBox, sunAlpha)
+                } else {
+                    WeatherIcons.drawSun(c.nativeCanvas, cx, cy, iconBox, sunAlpha)
+                }
             }
-
-            drawCircle(
-                color = sunColor,
-                radius = coreRadius,
-                center = Offset(cx, cy),
-            )
         }
 
         if (cloudMix > 0.01f) {

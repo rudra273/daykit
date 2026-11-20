@@ -51,7 +51,27 @@ data class WeatherSnapshot(
     val conditionLabel: String = "Clear",
     val updatedAtMillis: Long = 0L,
     val isLiveSynced: Boolean = false,
+    /** Today's sunrise/sunset for the selected city (epoch millis, 0 = unknown). */
+    val sunriseMillis: Long = 0L,
+    val sunsetMillis: Long = 0L,
 ) {
+    /**
+     * True when it's currently night at the selected city. Uses the synced sunrise/sunset
+     * time-of-day (valid for following days too since it shifts only minutes per day);
+     * falls back to the device clock (before 6 AM / after 6 PM) when not yet synced.
+     */
+    fun isNight(nowMillis: Long = System.currentTimeMillis()): Boolean {
+        if (sunriseMillis > 0L && sunsetMillis > 0L) {
+            val day = 86_400_000L
+            val now = Math.floorMod(nowMillis, day)
+            val rise = Math.floorMod(sunriseMillis, day)
+            val set = Math.floorMod(sunsetMillis, day)
+            val isDay = if (rise < set) now in rise until set else now >= rise || now < set
+            return !isDay
+        }
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        return hour < 6 || hour >= 18
+    }
     fun displayTemp(useFahrenheit: Boolean): Int =
         if (useFahrenheit) (tempC * 9f / 5f + 32f).roundToInt() else tempC.roundToInt()
 
@@ -95,6 +115,8 @@ object WeatherPrefs {
     private const val KEY_CONDITION_LABEL = "condition_label"
     private const val KEY_UPDATED_AT = "updated_at"
     private const val KEY_IS_LIVE = "is_live"
+    private const val KEY_SUNRISE = "sunrise_millis"
+    private const val KEY_SUNSET = "sunset_millis"
     private const val KEY_USE_FAHRENHEIT = "use_fahrenheit"
     private const val KEY_ONLY_FIRST_PAGE = "wallpaper_only_first_page"
     private const val KEY_WALLPAPER_PHOTO_VERSION = "wallpaper_photo_version"
@@ -128,6 +150,8 @@ object WeatherPrefs {
             conditionLabel = p.getString(KEY_CONDITION_LABEL, "Clear") ?: "Clear",
             updatedAtMillis = p.getLong(KEY_UPDATED_AT, 0L),
             isLiveSynced = p.getBoolean(KEY_IS_LIVE, false),
+            sunriseMillis = p.getLong(KEY_SUNRISE, 0L),
+            sunsetMillis = p.getLong(KEY_SUNSET, 0L),
         )
     }
 
@@ -146,6 +170,8 @@ object WeatherPrefs {
             .putString(KEY_CONDITION_LABEL, snapshot.conditionLabel)
             .putLong(KEY_UPDATED_AT, snapshot.updatedAtMillis)
             .putBoolean(KEY_IS_LIVE, snapshot.isLiveSynced)
+            .putLong(KEY_SUNRISE, snapshot.sunriseMillis)
+            .putLong(KEY_SUNSET, snapshot.sunsetMillis)
             .apply()
     }
 
@@ -282,8 +308,8 @@ object WeatherApiClient {
                 "https://api.open-meteo.com/v1/forecast" +
                     "?latitude=$latitude&longitude=$longitude" +
                     "&current=temperature_2m,weather_code,wind_speed_10m,precipitation" +
-                    "&daily=temperature_2m_max,temperature_2m_min" +
-                    "&timezone=auto&forecast_days=1",
+                    "&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset" +
+                    "&timezone=auto&timeformat=unixtime&forecast_days=1",
             )
             val body = httpGet(url) ?: return@withContext null
             val root = JSONObject(body)
@@ -297,6 +323,8 @@ object WeatherApiClient {
 
             val highC = daily?.optJSONArray("temperature_2m_max")?.optDouble(0, tempC.toDouble())?.toFloat() ?: tempC
             val lowC = daily?.optJSONArray("temperature_2m_min")?.optDouble(0, tempC.toDouble())?.toFloat() ?: tempC
+            val sunriseMillis = (daily?.optJSONArray("sunrise")?.optLong(0, 0L) ?: 0L) * 1000L
+            val sunsetMillis = (daily?.optJSONArray("sunset")?.optLong(0, 0L) ?: 0L) * 1000L
 
             val (conditionLabel, intensity) = mapWmoToVisuals(wmoCode, precipMm)
             val windStrength = (windKmh / 48f).coerceIn(0.08f, 1.0f)
@@ -315,6 +343,8 @@ object WeatherApiClient {
                 conditionLabel = conditionLabel,
                 updatedAtMillis = System.currentTimeMillis(),
                 isLiveSynced = true,
+                sunriseMillis = sunriseMillis,
+                sunsetMillis = sunsetMillis,
             )
         }.onFailure { Log.w(TAG, "Live weather fetch failed", it) }.getOrNull()
     }
