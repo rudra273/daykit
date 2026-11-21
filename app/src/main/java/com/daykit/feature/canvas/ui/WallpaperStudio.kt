@@ -311,10 +311,14 @@ fun WallpaperStudioSection(
             slots.forEach { slot ->
                 val isSelected = slot.uid == selectedUid
                 val cardWPx = (frameW * slot.widthFraction).coerceIn(frameW * 0.30f, frameW * 0.94f)
-                val cardHPx = (cardWPx / slot.type.aspectRatio).coerceIn(frameH * 0.10f, frameH * 0.62f)
+                val cardHPx = (cardWPx / slot.effectiveAspectRatio).coerceIn(frameH * 0.10f, frameH * 0.62f)
                 val cardWDp = with(density) { cardWPx.toDp() }
                 val cardHDp = with(density) { cardHPx.toDp() }
-                val cornerDp = if (slot.type == DailyWidgetType.GLASS_WEATHER) cardWDp * 0.22f else cardHDp * 0.18f
+                val cornerDp = when (slot.type) {
+                    DailyWidgetType.GLASS_WEATHER -> cardWDp * 0.22f
+                    DailyWidgetType.SOLAR_ARC -> minOf(cardWDp, cardHDp) * 0.22f
+                    else -> cardHDp * 0.18f
+                }
                 val cardShape = RoundedCornerShape(cornerDp)
 
                 val marginX = frameW * 0.03f
@@ -510,6 +514,34 @@ fun WallpaperStudioSection(
 
         if (selectedSlot != null) {
             Spacer(Modifier.height(Spacing.xs))
+            if (selectedSlot.type == DailyWidgetType.SOLAR_ARC) {
+                val isWide = selectedSlot.effectiveAspectRatio >= 1.38f
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilterChipButton(
+                        text = "Square (2×2)",
+                        selected = !isWide,
+                        onClick = {
+                            updateSlot(selectedSlot.uid) {
+                                it.copy(aspectRatioOverride = 1.0f, widthFraction = it.widthFraction.coerceAtMost(0.72f))
+                            }
+                        },
+                    )
+                    FilterChipButton(
+                        text = "Wide (4×2)",
+                        selected = isWide,
+                        onClick = {
+                            updateSlot(selectedSlot.uid) {
+                                it.copy(aspectRatioOverride = 2.0f, widthFraction = it.widthFraction.coerceAtLeast(0.78f))
+                            }
+                        },
+                    )
+                }
+                Spacer(Modifier.height(Spacing.xs))
+            }
             val normalizedSize = ((selectedSlot.widthFraction - 0.34f) / (0.94f - 0.34f)).coerceIn(0f, 1f)
             WallpaperSizeSlider(
                 label = "${selectedSlot.type.title} Size",

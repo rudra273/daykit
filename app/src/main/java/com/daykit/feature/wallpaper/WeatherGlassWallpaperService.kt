@@ -316,7 +316,7 @@ class WeatherGlassWallpaperService : WallpaperService() {
             var steppedWeather = false
             for (slot in slots) {
                 val cardW = (w * slot.widthFraction).coerceIn(w * 0.30f, w * 0.94f)
-                val cardH = (cardW / slot.type.aspectRatio).coerceIn(120f, h * 0.65f)
+                val cardH = (cardW / slot.effectiveAspectRatio).coerceIn(120f, h * 0.65f)
                 val baseLeft = (w * slot.centerX - cardW * 0.5f)
                     .coerceIn(marginX, (w - cardW - marginX).coerceAtLeast(marginX))
                 val cardLeft = baseLeft + slideOffsetX
@@ -367,7 +367,7 @@ class WeatherGlassWallpaperService : WallpaperService() {
                     if (hasBlurBackdrop) {
                         val cr = when (slot.type) {
                             DailyWidgetType.LIQUID_GLASS_CLOCK -> cardH * 0.24f
-                            DailyWidgetType.SOLAR_ARC -> cardH * 0.20f
+                            DailyWidgetType.SOLAR_ARC -> min(cardW, cardH) * 0.22f
                             else -> cardH * 0.18f
                         }
                         canvas.save()

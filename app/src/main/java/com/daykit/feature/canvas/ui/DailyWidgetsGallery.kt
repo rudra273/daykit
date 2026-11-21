@@ -87,6 +87,7 @@ fun DailyWidgetsGallery(
     val isDark = isSystemInDarkTheme()
     var filter by rememberSaveable { mutableStateOf(DailyFilter.ALL) }
     var expandWeatherStudio by rememberSaveable { mutableStateOf(false) }
+    var solarWidePreview by rememberSaveable { mutableStateOf(false) }
 
     // Live 1-second ticker for clock & solar previews
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -236,14 +237,67 @@ fun DailyWidgetsGallery(
                     }
                 } else {
                     AppCard {
-                        DailyWidgetHeader(type = type)
+                        DailyWidgetHeader(
+                            type = type,
+                            trailingAction = if (type == DailyWidgetType.SOLAR_ARC) {
+                                {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.extendedColors.inputField)
+                                            .padding(3.dp),
+                                    ) {
+                                        listOf("2×2" to false, "4×2" to true).forEach { (label, isWide) ->
+                                            val active = solarWidePreview == isWide
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (active) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                    )
+                                                    .clickable { solarWidePreview = isWide }
+                                                    .padding(horizontal = 9.dp, vertical = 4.dp),
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (active) {
+                                                        MaterialTheme.colorScheme.onPrimary
+                                                    } else {
+                                                        MaterialTheme.extendedColors.textMuted
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                        )
                         Spacer(Modifier.height(Spacing.sm))
 
                         // Showcase stage backdrop tailored to Liquid Glass vs Solid widgets
                         val stageBrush = when (type) {
-                            DailyWidgetType.SOLAR_ARC -> Brush.linearGradient(
-                                listOf(Color(0xFF0C1018), Color(0xFF1D283A), Color(0xFF0E131D)),
-                            )
+                            DailyWidgetType.SOLAR_ARC -> if (solarState.isDaytime) {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFF8EA7C2),
+                                        Color(0xFF4F88C6),
+                                        Color(0xFF286BB5),
+                                    ),
+                                )
+                            } else {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFF1A2438),
+                                        Color(0xFF10192A),
+                                        Color(0xFF0A101C),
+                                    ),
+                                )
+                            }
                             DailyWidgetType.RADIAL_DIAL_CLOCK -> Brush.linearGradient(
                                 listOf(Color(0xFF152414), Color(0xFF284222), Color(0xFF0F1A10)),
                             )
@@ -261,15 +315,21 @@ fun DailyWidgetsGallery(
                             )
                         }
 
+                        val previewAspect = if (type == DailyWidgetType.SOLAR_ARC) {
+                            if (solarWidePreview) 2.0f else 1.0f
+                        } else {
+                            type.aspectRatio
+                        }
+
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(22.dp))
                                 .background(stageBrush)
-                                .padding(horizontal = 14.dp, vertical = 16.dp),
+                                .padding(horizontal = 14.dp, vertical = 18.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            val widthFraction = if (type.aspectRatio <= 1.1f) 0.64f else 1.0f
+                            val widthFraction = if (previewAspect <= 1.1f) 0.62f else 1.0f
                             DailyWidgetLivePreview(
                                 type = type,
                                 nowMillis = nowMillis,
@@ -280,7 +340,7 @@ fun DailyWidgetsGallery(
                                 darkSurface = isDark,
                                 modifier = Modifier
                                     .fillMaxWidth(widthFraction)
-                                    .aspectRatio(type.aspectRatio),
+                                    .aspectRatio(previewAspect),
                             )
                         }
 

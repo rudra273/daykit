@@ -43,9 +43,9 @@ enum class DailyWidgetType(
         title = "Solar Arc",
         subtitle = "Sunrise & sunset horizon curve",
         style = DailyWidgetStyle.LIQUID_GLASS,
-        sizeLabel = "4 × 2",
-        aspectRatio = 2.02f,
-        defaultWidthFraction = 0.88f,
+        sizeLabel = "2 × 2 · 4 × 2",
+        aspectRatio = 1.0f,
+        defaultWidthFraction = 0.62f,
     ),
     RADIAL_DIAL_CLOCK(
         id = "radial_clock",
@@ -104,7 +104,11 @@ data class WallpaperWidgetSlot(
     val centerX: Float = 0.50f,
     val centerY: Float = 0.28f,
     val widthFraction: Float = type.defaultWidthFraction,
-)
+    val aspectRatioOverride: Float? = null,
+) {
+    val effectiveAspectRatio: Float
+        get() = aspectRatioOverride ?: type.aspectRatio
+}
 
 /**
  * Persists multi-widget wallpaper placements inside [WeatherPrefs.prefs] so
@@ -138,6 +142,11 @@ object WallpaperLayoutPrefs {
                 for (i in 0 until arr.length()) {
                     val obj = arr.optJSONObject(i) ?: continue
                     val type = DailyWidgetType.fromId(obj.optString("type")) ?: continue
+                    val arOverride = if (obj.has("ar")) {
+                        obj.optDouble("ar", Double.NaN).takeIf { !it.isNaN() }?.toFloat()?.coerceIn(0.75f, 2.4f)
+                    } else {
+                        null
+                    }
                     add(
                         WallpaperWidgetSlot(
                             uid = obj.optString("uid", "w_$i"),
@@ -147,6 +156,7 @@ object WallpaperLayoutPrefs {
                             widthFraction = obj.optDouble("wf", type.defaultWidthFraction.toDouble())
                                 .toFloat()
                                 .coerceIn(0.32f, 0.94f),
+                            aspectRatioOverride = arOverride,
                         ),
                     )
                 }
@@ -157,14 +167,16 @@ object WallpaperLayoutPrefs {
     fun saveSlots(context: Context, slots: List<WallpaperWidgetSlot>) {
         val arr = JSONArray()
         for (slot in slots) {
-            arr.put(
-                JSONObject()
-                    .put("uid", slot.uid)
-                    .put("type", slot.type.id)
-                    .put("cx", slot.centerX.coerceIn(0.10f, 0.90f))
-                    .put("cy", slot.centerY.coerceIn(0.08f, 0.92f))
-                    .put("wf", slot.widthFraction.coerceIn(0.32f, 0.94f)),
-            )
+            val obj = JSONObject()
+                .put("uid", slot.uid)
+                .put("type", slot.type.id)
+                .put("cx", slot.centerX.coerceIn(0.10f, 0.90f))
+                .put("cy", slot.centerY.coerceIn(0.08f, 0.92f))
+                .put("wf", slot.widthFraction.coerceIn(0.32f, 0.94f))
+            if (slot.aspectRatioOverride != null) {
+                obj.put("ar", slot.aspectRatioOverride.coerceIn(0.75f, 2.4f))
+            }
+            arr.put(obj)
         }
         WeatherPrefs.prefs(context).edit()
             .putString(KEY_SLOTS_JSON, arr.toString())
@@ -237,10 +249,10 @@ object DailyWidgetDataProvider {
         }
 
         val isDay = nowMinutes in riseMinutes until setMinutes
-        // Map sunrise -> 0.22, solar noon -> 0.50, sunset -> 0.78 on the horizontal curve
+        // Map sunrise -> 0.25, solar noon -> 0.50, sunset -> 0.75 on the single cosine arch
         val curveProgress = if (isDay) {
             val daySpan = (setMinutes - riseMinutes).coerceAtLeast(60).toFloat()
-            0.22f + ((nowMinutes - riseMinutes) / daySpan).coerceIn(0f, 1f) * 0.56f
+            0.25f + ((nowMinutes - riseMinutes) / daySpan).coerceIn(0f, 1f) * 0.50f
         } else {
             val nightSpan = (1440 - (setMinutes - riseMinutes)).coerceAtLeast(60).toFloat()
             val nightElapsed = if (nowMinutes >= setMinutes) {
@@ -250,11 +262,11 @@ object DailyWidgetDataProvider {
             }
             val frac = (nightElapsed / nightSpan).coerceIn(0f, 1f)
             if (frac < 0.5f) {
-                0.78f + frac * 0.44f
+                0.75f + frac * 0.50f
             } else {
-                (frac - 0.5f) * 0.44f
+                (frac - 0.5f) * 0.50f
             }
-        }.coerceIn(0.05f, 0.95f)
+        }.coerceIn(0.04f, 0.96f)
 
         return SolarArcState(
             sunriseText = riseLabel,

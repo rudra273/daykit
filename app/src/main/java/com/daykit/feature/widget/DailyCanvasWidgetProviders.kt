@@ -10,12 +10,14 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
+import android.os.Bundle
 import android.widget.RemoteViews
 import com.daykit.MainActivity
 import com.daykit.R
 import com.daykit.feature.dailywidgets.DailyWidgetDataProvider
 import com.daykit.feature.dailywidgets.DailyWidgetRenderer
 import com.daykit.feature.dailywidgets.DailyWidgetType
+import kotlin.math.roundToInt
 
 /**
  * Shared base [AppWidgetProvider] that renders any [DailyWidgetType] via [DailyWidgetRenderer]
@@ -26,6 +28,7 @@ abstract class BaseDailyCanvasWidgetProvider(
     private val widgetType: DailyWidgetType,
     private val bitmapWidth: Int,
     private val bitmapHeight: Int,
+    private val supportsDynamicAspect: Boolean = false,
 ) : AppWidgetProvider() {
 
     override fun onUpdate(
@@ -35,6 +38,18 @@ abstract class BaseDailyCanvasWidgetProvider(
     ) {
         for (id in appWidgetIds) {
             renderAndPush(context, appWidgetManager, id)
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle,
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        if (supportsDynamicAspect) {
+            renderAndPush(context, appWidgetManager, appWidgetId)
         }
     }
 
@@ -60,10 +75,11 @@ abstract class BaseDailyCanvasWidgetProvider(
         manager: AppWidgetManager,
         appWidgetId: Int,
     ) {
-        val bmp = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+        val (renderW, renderH) = resolveBitmapSize(manager, appWidgetId)
+        val bmp = Bitmap.createBitmap(renderW, renderH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         val pad = 8f
-        val rect = RectF(pad, pad, bitmapWidth - pad, bitmapHeight - pad)
+        val rect = RectF(pad, pad, renderW - pad, renderH - pad)
         val isDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
 
@@ -110,6 +126,22 @@ abstract class BaseDailyCanvasWidgetProvider(
         manager.updateAppWidget(appWidgetId, views)
     }
 
+    private fun resolveBitmapSize(manager: AppWidgetManager, appWidgetId: Int): Pair<Int, Int> {
+        if (!supportsDynamicAspect) return bitmapWidth to bitmapHeight
+        val opts = runCatching { manager.getAppWidgetOptions(appWidgetId) }.getOrNull()
+            ?: return bitmapWidth to bitmapHeight
+        val minW = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
+        val minH = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+        if (minW <= 0 || minH <= 0) return bitmapWidth to bitmapHeight
+        val aspect = (minW.toFloat() / minH.toFloat()).coerceIn(0.80f, 2.50f)
+        val basePx = 560
+        return if (aspect >= 1f) {
+            (basePx * aspect).roundToInt().coerceIn(520, 1080) to basePx
+        } else {
+            basePx to (basePx / aspect).roundToInt().coerceIn(520, 820)
+        }
+    }
+
     companion object {
         const val ACTION_REFRESH = "com.daykit.feature.widget.ACTION_REFRESH_DAILY_WIDGET"
 
@@ -127,8 +159,9 @@ abstract class BaseDailyCanvasWidgetProvider(
 
 class SolarArcWidgetProvider : BaseDailyCanvasWidgetProvider(
     widgetType = DailyWidgetType.SOLAR_ARC,
-    bitmapWidth = 860,
-    bitmapHeight = 426,
+    bitmapWidth = 560,
+    bitmapHeight = 560,
+    supportsDynamicAspect = true,
 )
 
 class RadialClockWidgetProvider : BaseDailyCanvasWidgetProvider(

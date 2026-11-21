@@ -73,7 +73,7 @@ object DailyWidgetRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // 1. SOLAR ARC (Reference Image 1 — Liquid Glass)
+    // 1. SOLAR ARC (Full Unified Liquid Glass — Square 2×2 & Wide 4×2)
     // -------------------------------------------------------------------------
     fun drawSolarArc(
         canvas: Canvas,
@@ -83,66 +83,100 @@ object DailyWidgetRenderer {
     ) {
         val w = rect.width()
         val h = rect.height()
-        val cr = h * 0.20f
+        val minDim = min(w, h)
+        val cr = minDim * 0.22f
+        val isWide = (w / h.coerceAtLeast(1f)) >= 1.38f
 
         canvas.save()
         val clip = Path().apply { addRoundRect(rect, cr, cr, Path.Direction.CW) }
         canvas.clipPath(clip)
 
-        val alphaMult = if (overWallpaperBlur) 0.72f else 0.94f
-        val horizonY = rect.top + h * 0.54f
+        // 1. Unified full-surface Liquid Glass body (no two-tone split at horizon)
+        val glassColors = when {
+            overWallpaperBlur && state.isDaytime -> intArrayOf(
+                Color.argb(68, 224, 236, 250),
+                Color.argb(48, 148, 180, 218),
+                Color.argb(66, 36, 72, 124),
+            )
+            overWallpaperBlur && !state.isDaytime -> intArrayOf(
+                Color.argb(86, 44, 58, 88),
+                Color.argb(68, 22, 32, 54),
+                Color.argb(84, 14, 22, 40),
+            )
+            state.isDaytime -> intArrayOf(
+                Color.argb(122, 152, 178, 208),
+                Color.argb(106, 92, 138, 192),
+                Color.argb(132, 38, 92, 162),
+            )
+            else -> intArrayOf(
+                Color.argb(148, 44, 56, 86),
+                Color.argb(134, 24, 34, 58),
+                Color.argb(156, 14, 22, 42),
+            )
+        }
+        val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+            shader = LinearGradient(
+                rect.left, rect.top,
+                rect.left + w * 0.32f, rect.bottom,
+                glassColors,
+                floatArrayOf(0f, 0.52f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(rect, bodyPaint)
 
-        // Upper sky gradient
-        val topColors = if (state.isDaytime) {
-            intArrayOf(
-                withAlpha(0xFF4BA6C7.toInt(), alphaMult),
-                withAlpha(0xFF2D7A9C.toInt(), alphaMult),
-            )
-        } else {
-            intArrayOf(
-                withAlpha(0xFF2C2D42.toInt(), alphaMult),
-                withAlpha(0xFF1F2233.toInt(), alphaMult),
-            )
+        // Uniform frosted glass milkiness veil
+        val veilPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(if (overWallpaperBlur) 22 else 28, 255, 255, 255)
         }
-        val upperPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(rect.left, rect.top, rect.right, horizonY, topColors, null, Shader.TileMode.CLAMP)
-        }
-        canvas.drawRect(rect.left, rect.top, rect.right, horizonY, upperPaint)
+        canvas.drawRect(rect, veilPaint)
 
-        // Lower below-horizon gradient
-        val botColors = if (state.isDaytime) {
-            intArrayOf(
-                withAlpha(0xFF226F8D.toInt(), alphaMult),
-                withAlpha(0xFF1A5770.toInt(), alphaMult),
-            )
-        } else {
-            intArrayOf(
-                withAlpha(0xFF11121B.toInt(), alphaMult),
-                withAlpha(0xFF0C0D14.toInt(), alphaMult),
+        // Top-left liquid glass specular caustic sheen
+        val causticPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                rect.left, rect.top,
+                rect.left + w * 0.65f, rect.top + h * 0.55f,
+                intArrayOf(
+                    Color.argb(58, 255, 255, 255),
+                    Color.argb(16, 255, 255, 255),
+                    Color.TRANSPARENT,
+                ),
+                floatArrayOf(0f, 0.45f, 1f),
+                Shader.TileMode.CLAMP,
             )
         }
-        val lowerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(rect.left, horizonY, rect.right, rect.bottom, botColors, null, Shader.TileMode.CLAMP)
-        }
-        canvas.drawRect(rect.left, horizonY, rect.right, rect.bottom, lowerPaint)
+        canvas.drawRect(rect, causticPaint)
 
-        // Crisp horizon line
+        // Subtle bottom-edge internal glass refraction lift
+        val bottomRefractionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                rect.left, rect.bottom,
+                rect.left, rect.bottom - h * 0.24f,
+                Color.argb(38, 218, 236, 255),
+                Color.TRANSPARENT,
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(rect, bottomRefractionPaint)
+
+        // 2. Crisp middle horizon line
+        val horizonY = rect.top + h * 0.61f
         val horizonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(if (state.isDaytime) 105 else 95, 255, 255, 255)
-            strokeWidth = (h * 0.008f).coerceAtLeast(1.2f)
+            color = Color.argb(145, 255, 255, 255)
+            strokeWidth = (minDim * 0.0055f).coerceIn(1.2f, 2.4f)
         }
         canvas.drawLine(rect.left, horizonY, rect.right, horizonY, horizonPaint)
 
-        // Smooth solar cosine curve: crosses horizonY at x = 0.22 and x = 0.78, peaks at x = 0.50
-        val amp = h * 0.26f
+        // 3. Single smooth cosine arch:
+        //    trough at x = 0.0 & 1.0, crosses horizon at x = 0.25 & 0.75, single peak at x = 0.50
+        val amp = h * 0.135f
         fun curveY(normX: Float): Float {
-            // cos((normX - 0.5) * 2*PI / 1.12) = 0 at 0.22 and 0.78
-            val phase = (normX - 0.50f) * (PI.toFloat() / 0.28f)
+            val phase = (normX - 0.50f) * (2f * PI.toFloat())
             return horizonY - cos(phase) * amp
         }
 
         val fullPath = Path()
-        val steps = 80
+        val steps = 96
         for (i in 0..steps) {
             val nx = i.toFloat() / steps
             val x = rect.left + nx * w
@@ -150,69 +184,229 @@ object DailyWidgetRenderer {
             if (i == 0) fullPath.moveTo(x, y) else fullPath.lineTo(x, y)
         }
 
-        // Dim full path below horizon
-        val dimCurvePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = (h * 0.017f).coerceAtLeast(2.2f)
-            color = Color.argb(95, 255, 255, 255)
-            strokeCap = Paint.Cap.ROUND
-        }
-        canvas.drawPath(fullPath, dimCurvePaint)
+        val strokeW = (minDim * 0.023f).coerceIn(3.0f, 9.0f)
 
-        // Bright upper daylight arc
+        // Below-horizon segment: translucent dark glass-etched curve
+        canvas.save()
+        canvas.clipRect(rect.left, horizonY, rect.right, rect.bottom)
+        val belowCurvePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = strokeW
+            color = Color.argb(if (state.isDaytime) 92 else 112, 14, 24, 42)
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        canvas.drawPath(fullPath, belowCurvePaint)
+        canvas.restore()
+
+        // Above-horizon segment: luminous frosted-white single arch with soft bloom
         canvas.save()
         canvas.clipRect(rect.left, rect.top, rect.right, horizonY)
-        val brightCurvePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val aboveBloomPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = (h * 0.020f).coerceAtLeast(2.6f)
-            color = Color.argb(220, 255, 255, 255)
+            strokeWidth = strokeW * 1.9f
+            color = Color.argb(52, 255, 255, 255)
             strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
         }
-        canvas.drawPath(fullPath, brightCurvePaint)
+        canvas.drawPath(fullPath, aboveBloomPaint)
+
+        val aboveCurvePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = strokeW
+            color = Color.argb(218, 255, 255, 255)
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        canvas.drawPath(fullPath, aboveCurvePaint)
         canvas.restore()
 
-        // Glowing sun / moon orb along curve
+        // 4. Radiant Sun / Moon orb positioned along the single arch
         val orbX = rect.left + state.curveProgress * w
         val orbY = curveY(state.curveProgress)
-        val orbR = h * 0.068f
-        val orbGlowR = orbR * 2.5f
-        val glowColor = if (state.isDaytime) Color.argb(175, 255, 196, 48) else Color.argb(155, 232, 238, 255)
-        val coreColor = if (state.isDaytime) 0xFFFFB72B.toInt() else 0xFFF2F4FA.toInt()
+        val orbR = (minDim * 0.036f).coerceIn(5.0f, 16.0f)
+        val isAboveHorizon = orbY <= horizonY + orbR * 0.45f
 
-        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(orbX, orbY, orbGlowR, glowColor, Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        val outerGlowR = orbR * 2.95f
+        val outerGlowColor = if (isAboveHorizon) {
+            Color.argb(155, 255, 255, 255)
+        } else {
+            Color.argb(95, 195, 218, 255)
         }
-        canvas.drawCircle(orbX, orbY, orbGlowR, glowPaint)
-
-        val corePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = coreColor }
-        canvas.drawCircle(orbX, orbY, orbR, corePaint)
-
-        // Labels: Sunrise (left) & Sunset (right)
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(185, 235, 240, 250)
-            textSize = h * 0.095f
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        val outerGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(orbX, orbY, outerGlowR, outerGlowColor, Color.TRANSPARENT, Shader.TileMode.CLAMP)
         }
+        canvas.drawCircle(orbX, orbY, outerGlowR, outerGlowPaint)
+
+        val innerHaloR = orbR * 1.5f
+        val innerHaloColor = if (isAboveHorizon) {
+            Color.argb(235, 255, 255, 255)
+        } else {
+            Color.argb(155, 224, 236, 255)
+        }
+        val innerHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(orbX, orbY, innerHaloR, innerHaloColor, Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        }
+        canvas.drawCircle(orbX, orbY, innerHaloR, innerHaloPaint)
+
+        val orbCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isAboveHorizon) Color.WHITE else Color.argb(205, 225, 236, 255)
+        }
+        canvas.drawCircle(orbX, orbY, orbR, orbCorePaint)
+
+        // 5. Typography & Sunrise/Sunset Horizon Icon (matches reference layout)
+        val padX = if (isWide) h * 0.115f else w * 0.095f
+        val primaryLabel = if (state.isDaytime) "SUNSET" else "SUNRISE"
+        val primaryTime = if (state.isDaytime) state.sunsetText else state.sunriseText
+        val secondaryText = if (state.isDaytime) {
+            "Sunrise: ${state.sunriseText}"
+        } else {
+            "Sunset: ${state.sunsetText}"
+        }
+
+        val headerSize = if (isWide) h * 0.078f else h * 0.068f
+        val headerBaselineY = rect.top + h * (if (isWide) 0.185f else 0.168f)
+        val iconSize = headerSize * 1.32f
+        val iconCx = padX + iconSize * 0.52f
+        val iconCy = headerBaselineY - headerSize * 0.34f
+        drawSolarHorizonIcon(
+            canvas = canvas,
+            cx = iconCx,
+            cy = iconCy,
+            size = iconSize,
+            isSunset = state.isDaytime,
+            color = Color.argb(212, 255, 255, 255),
+        )
+
+        val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(212, 255, 255, 255)
+            textSize = headerSize
+            letterSpacing = 0.08f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setShadowLayer(minDim * 0.014f, 0f, minDim * 0.004f, Color.argb(55, 0, 0, 0))
+        }
+        canvas.drawText(primaryLabel, padX + iconSize * 1.28f, headerBaselineY, headerPaint)
+
         val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = h * 0.145f
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            textSize = if (isWide) h * 0.228f else h * 0.205f
+            letterSpacing = -0.02f
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            setShadowLayer(minDim * 0.022f, 0f, minDim * 0.008f, Color.argb(65, 0, 0, 0))
         }
-        val leftX = rect.left + w * 0.22f
-        val rightX = rect.left + w * 0.78f
-        val labelY = rect.top + h * 0.75f
-        val timeY = rect.top + h * 0.90f
+        canvas.drawText(primaryTime, padX - minDim * 0.008f, rect.top + h * (if (isWide) 0.405f else 0.368f), timePaint)
 
-        canvas.drawText("Sunrise", leftX, labelY, labelPaint)
-        canvas.drawText(state.sunriseText, leftX, timeY, timePaint)
-        canvas.drawText("Sunset", rightX, labelY, labelPaint)
-        canvas.drawText(state.sunsetText, rightX, timeY, timePaint)
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(238, 255, 255, 255)
+            textSize = if (isWide) h * 0.084f else h * 0.076f
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            setShadowLayer(minDim * 0.016f, 0f, minDim * 0.005f, Color.argb(60, 0, 0, 0))
+        }
+        canvas.drawText(secondaryText, padX, rect.top + h * 0.895f, footerPaint)
 
-        // Frosted rim
-        drawLiquidGlassRim(canvas, rect, cr, rimAlpha = 140, tintColor = Color.TRANSPARENT)
+        // 6. High-craft Liquid Glass perimeter optics (frosted inner glow + beveled specular rim)
+        val innerGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = minDim * 0.052f
+            color = Color.argb(if (overWallpaperBlur) 60 else 68, 255, 255, 255)
+            maskFilter = BlurMaskFilter(minDim * 0.042f, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.drawRoundRect(rect, cr, cr, innerGlowPaint)
+
+        val rimStroke = (minDim * 0.0088f).coerceIn(1.6f, 3.8f)
+        val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = rimStroke
+            shader = LinearGradient(
+                rect.left, rect.top, rect.right, rect.bottom,
+                intArrayOf(
+                    Color.argb(215, 255, 255, 255),
+                    Color.argb(65, 255, 255, 255),
+                    Color.argb(48, 255, 255, 255),
+                    Color.argb(165, 255, 255, 255),
+                ),
+                floatArrayOf(0f, 0.36f, 0.68f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRoundRect(rect, cr, cr, rimPaint)
+
+        val innerDepthRect = RectF(
+            rect.left + rimStroke,
+            rect.top + rimStroke,
+            rect.right - rimStroke,
+            rect.bottom - rimStroke,
+        )
+        val innerDepthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = (rimStroke * 0.55f).coerceAtLeast(1f)
+            color = Color.argb(24, 0, 0, 0)
+        }
+        canvas.drawRoundRect(innerDepthRect, (cr - rimStroke).coerceAtLeast(0f), (cr - rimStroke).coerceAtLeast(0f), innerDepthPaint)
+
         canvas.restore()
+    }
+
+    /**
+     * Minimal iOS-style sunrise / sunset horizon glyph (half-sun, rays, horizon line, directional arrow).
+     */
+    private fun drawSolarHorizonIcon(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        size: Float,
+        isSunset: Boolean,
+        color: Int,
+    ) {
+        val stroke = (size * 0.095f).coerceIn(1.2f, 3.2f)
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.STROKE
+            strokeWidth = stroke
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.FILL
+        }
+
+        val horizonY = cy + size * 0.30f
+        // Horizon baseline
+        canvas.drawLine(cx - size * 0.46f, horizonY, cx + size * 0.46f, horizonY, linePaint)
+
+        // Half-sun dome resting on the horizon
+        val sunR = size * 0.21f
+        val sunOval = RectF(cx - sunR, horizonY - sunR, cx + sunR, horizonY + sunR)
+        canvas.drawArc(sunOval, 180f, 180f, true, fillPaint)
+
+        // Left & right angled rays
+        val rayInner = sunR * 1.38f
+        val rayOuter = sunR * 1.82f
+        val anglesDeg = floatArrayOf(-150f, -30f)
+        for (deg in anglesDeg) {
+            val rad = Math.toRadians(deg.toDouble()).toFloat()
+            canvas.drawLine(
+                cx + cos(rad) * rayInner,
+                horizonY + sin(rad) * rayInner,
+                cx + cos(rad) * rayOuter,
+                horizonY + sin(rad) * rayOuter,
+                linePaint,
+            )
+        }
+
+        // Tiny vertical arrow above sun (down for sunset, up for sunrise)
+        val arrowTop = cy - size * 0.44f
+        val arrowBot = cy - size * 0.14f
+        canvas.drawLine(cx, arrowTop, cx, arrowBot, linePaint)
+        val head = size * 0.12f
+        if (isSunset) {
+            canvas.drawLine(cx - head, arrowBot - head * 0.85f, cx, arrowBot, linePaint)
+            canvas.drawLine(cx + head, arrowBot - head * 0.85f, cx, arrowBot, linePaint)
+        } else {
+            canvas.drawLine(cx - head, arrowTop + head * 0.85f, cx, arrowTop, linePaint)
+            canvas.drawLine(cx + head, arrowTop + head * 0.85f, cx, arrowTop, linePaint)
+        }
     }
 
     // -------------------------------------------------------------------------
