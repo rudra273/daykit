@@ -320,17 +320,9 @@ object DailyWidgetDataProvider {
             val key = "steps_${dayKeyFmt.format(c.time)}"
             val stored = prefs.getInt(key, -1)
             val steps = when {
-                stored >= 0 -> stored
                 offset > 0 -> 0
-                offset == 0 -> {
-                    // Progressive intraday estimate until real step sensor syncs
-                    val hr = cal.get(Calendar.HOUR_OF_DAY)
-                    (1850 + hr * 210).coerceIn(1200, 7400)
-                }
-                else -> {
-                    val seed = (c.get(Calendar.DAY_OF_YEAR) * 137 + offset * 43) and 0x7FFFFFFF
-                    2400 + (seed % 3400)
-                }
+                stored >= 0 -> stored
+                else -> 0
             }
             if (offset == 0) todaySteps = steps
             days.add(

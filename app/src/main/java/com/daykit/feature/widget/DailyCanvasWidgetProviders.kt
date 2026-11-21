@@ -1,5 +1,6 @@
 package com.daykit.feature.widget
 
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -10,6 +11,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
+import android.os.Build
 import android.os.Bundle
 import android.widget.RemoteViews
 import com.daykit.MainActivity
@@ -17,6 +19,7 @@ import com.daykit.R
 import com.daykit.feature.dailywidgets.DailyWidgetDataProvider
 import com.daykit.feature.dailywidgets.DailyWidgetRenderer
 import com.daykit.feature.dailywidgets.DailyWidgetType
+import com.daykit.feature.dailywidgets.DeviceStepCounter
 import kotlin.math.roundToInt
 
 /**
@@ -29,7 +32,22 @@ abstract class BaseDailyCanvasWidgetProvider(
     private val bitmapWidth: Int,
     private val bitmapHeight: Int,
     private val supportsDynamicAspect: Boolean = false,
+    private val ticksEveryMinute: Boolean = false,
 ) : AppWidgetProvider() {
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        if (ticksEveryMinute) {
+            scheduleNextMinuteTick(context)
+        }
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        if (ticksEveryMinute) {
+            cancelMinuteTick(context)
+        }
+    }
 
     override fun onUpdate(
         context: Context,
@@ -38,6 +56,9 @@ abstract class BaseDailyCanvasWidgetProvider(
     ) {
         for (id in appWidgetIds) {
             renderAndPush(context, appWidgetManager, id)
+        }
+        if (ticksEveryMinute && appWidgetIds.isNotEmpty()) {
+            scheduleNextMinuteTick(context)
         }
     }
 
@@ -56,9 +77,12 @@ abstract class BaseDailyCanvasWidgetProvider(
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         val action = intent.action ?: return
-        if (action == Intent.ACTION_TIME_CHANGED ||
+        if (action == ACTION_CLOCK_MINUTE_TICK ||
+            action == Intent.ACTION_TIME_CHANGED ||
             action == Intent.ACTION_TIMEZONE_CHANGED ||
             action == Intent.ACTION_DATE_CHANGED ||
+            action == Intent.ACTION_BOOT_COMPLETED ||
+            action == Intent.ACTION_MY_PACKAGE_REPLACED ||
             action == Intent.ACTION_BATTERY_CHANGED ||
             action == ACTION_REFRESH
         ) {
@@ -66,11 +90,46 @@ abstract class BaseDailyCanvasWidgetProvider(
             val ids = mgr.getAppWidgetIds(ComponentName(context, this::class.java))
             if (ids.isNotEmpty()) {
                 onUpdate(context, mgr, ids)
+            } else if (ticksEveryMinute) {
+                cancelMinuteTick(context)
             }
         }
     }
 
-    private fun renderAndPush(
+    protected fun minuteTickPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context.applicationContext, this::class.java).apply {
+            action = ACTION_CLOCK_MINUTE_TICK
+        }
+        return PendingIntent.getBroadcast(
+            context.applicationContext,
+            widgetType.ordinal + 900,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    protected fun scheduleNextMinuteTick(context: Context) {
+        val alarm = context.applicationContext.getSystemService(AlarmManager::class.java) ?: return
+        val now = System.currentTimeMillis()
+        // Fire 150ms past the next exact minute boundary so Calendar reflects the new minute
+        val nextMinuteMillis = ((now / 60_000L) + 1L) * 60_000L + 150L
+        val pi = minuteTickPendingIntent(context)
+        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
+        runCatching {
+            if (canExact) {
+                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC, nextMinuteMillis, pi)
+            } else {
+                alarm.setAndAllowWhileIdle(AlarmManager.RTC, nextMinuteMillis, pi)
+            }
+        }
+    }
+
+    protected fun cancelMinuteTick(context: Context) {
+        val alarm = context.applicationContext.getSystemService(AlarmManager::class.java) ?: return
+        runCatching { alarm.cancel(minuteTickPendingIntent(context)) }
+    }
+
+    protected fun renderAndPush(
         context: Context,
         manager: AppWidgetManager,
         appWidgetId: Int,
@@ -144,6 +203,7 @@ abstract class BaseDailyCanvasWidgetProvider(
 
     companion object {
         const val ACTION_REFRESH = "com.daykit.feature.widget.ACTION_REFRESH_DAILY_WIDGET"
+        const val ACTION_CLOCK_MINUTE_TICK = "com.daykit.feature.widget.ACTION_CLOCK_MINUTE_TICK"
 
         fun providerClassFor(type: DailyWidgetType): Class<*> = when (type) {
             DailyWidgetType.GLASS_WEATHER -> WeatherGlassWidgetProvider::class.java
@@ -168,19 +228,67 @@ class RadialClockWidgetProvider : BaseDailyCanvasWidgetProvider(
     widgetType = DailyWidgetType.RADIAL_DIAL_CLOCK,
     bitmapWidth = 840,
     bitmapHeight = 438,
+    ticksEveryMinute = true,
 )
 
 class GlassClockWidgetProvider : BaseDailyCanvasWidgetProvider(
     widgetType = DailyWidgetType.LIQUID_GLASS_CLOCK,
     bitmapWidth = 880,
     bitmapHeight = 410,
+    ticksEveryMinute = true,
 )
 
 class StepsChartWidgetProvider : BaseDailyCanvasWidgetProvider(
     widgetType = DailyWidgetType.STEPS_BAR_CHART,
     bitmapWidth = 840,
     bitmapHeight = 488,
-)
+) {
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        DeviceStepCounter.schedulePeriodicSync(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        DeviceStepCounter.cancelPeriodicSync(context)
+    }
+
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray,
+    ) {
+        DeviceStepCounter.schedulePeriodicSync(context)
+        if (!DeviceStepCounter.hasPermission(context) || !DeviceStepCounter.isSensorAvailable(context)) {
+            super.onUpdate(context, appWidgetManager, appWidgetIds)
+            return
+        }
+        val pending = goAsync()
+        DeviceStepCounter.syncOneShot(context, timeoutMs = 1800L) {
+            try {
+                for (id in appWidgetIds) {
+                    renderAndPush(context, appWidgetManager, id)
+                }
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    companion object {
+        fun refreshAll(context: Context) {
+            val appCtx = context.applicationContext
+            val mgr = AppWidgetManager.getInstance(appCtx)
+            val ids = mgr.getAppWidgetIds(ComponentName(appCtx, StepsChartWidgetProvider::class.java))
+            if (ids.isEmpty()) return
+            appCtx.sendBroadcast(
+                Intent(appCtx, StepsChartWidgetProvider::class.java).apply {
+                    action = ACTION_REFRESH
+                },
+            )
+        }
+    }
+}
 
 class BatteryBentoWidgetProvider : BaseDailyCanvasWidgetProvider(
     widgetType = DailyWidgetType.BENTO_BATTERY,

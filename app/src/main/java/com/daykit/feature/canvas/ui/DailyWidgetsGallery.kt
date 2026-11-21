@@ -1,8 +1,12 @@
 package com.daykit.feature.canvas.ui
 
+import android.Manifest
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.graphics.RectF
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -36,8 +40,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,9 +67,11 @@ import com.daykit.feature.dailywidgets.DailyWidgetDataProvider
 import com.daykit.feature.dailywidgets.DailyWidgetRenderer
 import com.daykit.feature.dailywidgets.DailyWidgetStyle
 import com.daykit.feature.dailywidgets.DailyWidgetType
+import com.daykit.feature.dailywidgets.DeviceStepCounter
 import com.daykit.feature.weather.WeatherIcons
 import com.daykit.feature.weather.WeatherPrefs
 import com.daykit.feature.widget.BaseDailyCanvasWidgetProvider
+import com.daykit.feature.widget.StepsChartWidgetProvider
 import kotlinx.coroutines.delay
 
 private enum class DailyFilter(val label: String) {
@@ -88,6 +96,36 @@ fun DailyWidgetsGallery(
     var filter by rememberSaveable { mutableStateOf(DailyFilter.ALL) }
     var expandWeatherStudio by rememberSaveable { mutableStateOf(false) }
     var solarWidePreview by rememberSaveable { mutableStateOf(false) }
+    var hasStepPermission by remember { mutableStateOf(DeviceStepCounter.hasPermission(context)) }
+    val hasStepSensor = remember { DeviceStepCounter.isSensorAvailable(context) }
+    var stepTick by remember { mutableIntStateOf(0) }
+
+    val stepPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        hasStepPermission = granted || DeviceStepCounter.hasPermission(context)
+        if (hasStepPermission) {
+            DeviceStepCounter.syncOneShot(context) {
+                stepTick++
+                StepsChartWidgetProvider.refreshAll(context)
+            }
+            onShowMessage("Step sensor enabled — counting live steps")
+        } else {
+            onShowMessage("Physical activity permission is needed for real step counts")
+        }
+    }
+
+    DisposableEffect(hasStepPermission, hasStepSensor) {
+        if (hasStepPermission && hasStepSensor) {
+            val unregister = DeviceStepCounter.registerLiveListener(context) {
+                stepTick++
+                StepsChartWidgetProvider.refreshAll(context)
+            }
+            onDispose { unregister() }
+        } else {
+            onDispose {}
+        }
+    }
 
     // Live 1-second ticker for clock & solar previews
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -118,7 +156,7 @@ fun DailyWidgetsGallery(
     val solarState = remember(refreshTrigger, nowMillis / 60_000L) {
         DailyWidgetDataProvider.loadSolarArcState(context, nowMillis)
     }
-    val stepsState = remember(refreshTrigger, nowMillis / 60_000L) {
+    val stepsState = remember(refreshTrigger, stepTick, nowMillis / 60_000L) {
         DailyWidgetDataProvider.loadStepsState(context, nowMillis)
     }
     val batteryState = remember(refreshTrigger, nowMillis / 30_000L) {
@@ -268,6 +306,60 @@ fun DailyWidgetsGallery(
                                                     } else {
                                                         MaterialTheme.extendedColors.textMuted
                                                     },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (type == DailyWidgetType.STEPS_BAR_CHART) {
+                                {
+                                    when {
+                                        !hasStepSensor -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.extendedColors.inputField)
+                                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                                            ) {
+                                                Text(
+                                                    text = "No sensor",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.extendedColors.textMuted,
+                                                )
+                                            }
+                                        }
+                                        !hasStepPermission -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.primary)
+                                                    .clickable {
+                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                            stepPermissionLauncher.launch(
+                                                                Manifest.permission.ACTIVITY_RECOGNITION,
+                                                            )
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                                            ) {
+                                                Text(
+                                                    text = "Enable Steps",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onPrimary,
+                                                )
+                                            }
+                                        }
+                                        else -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.extendedColors.accents.green.copy(alpha = 0.16f))
+                                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                                            ) {
+                                                Text(
+                                                    text = "Live Sensor",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.extendedColors.accents.green,
                                                 )
                                             }
                                         }
