@@ -17,6 +17,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,21 +33,26 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Wallpaper
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,9 +81,15 @@ import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.feature.dailywidgets.DailyWidgetDataProvider
+import com.daykit.feature.dailywidgets.DailyWidgetStyle
+import com.daykit.feature.dailywidgets.DailyWidgetType
+import com.daykit.feature.dailywidgets.WallpaperLayoutPrefs
+import com.daykit.feature.dailywidgets.WallpaperWidgetSlot
 import com.daykit.feature.wallpaper.WeatherGlassWallpaperService
 import com.daykit.feature.weather.WeatherPrefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -98,9 +110,9 @@ private fun markExpectingActivityResult(context: Context) {
 }
 
 /**
- * Interactive Live Wallpaper Studio under Canvas -> Wallpapers.
- * Lets the user pick a background photo, toggle live widgets (starting with Glass Weather),
- * drag-and-drop to position & resize widgets directly on a phone preview, apply the 60fps
+ * Interactive Multi-Widget Live Wallpaper Studio under Canvas -> Wallpapers.
+ * Lets the user pick a background photo, add multiple Liquid Glass & Solid widgets via "+ Widget",
+ * drag-and-drop to position & resize each widget directly on a phone preview, apply the 60fps
  * Live Wallpaper, or remove it cleanly.
  */
 @Composable
@@ -111,20 +123,41 @@ fun WallpaperStudioSection(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val isDark = isSystemInDarkTheme()
 
-    var snapshot by remember(refreshTrigger) { mutableStateOf(WeatherPrefs.loadSnapshot(context)) }
+    val snapshot = remember(refreshTrigger) { WeatherPrefs.loadSnapshot(context) }
     val useFahrenheit = remember(refreshTrigger) { WeatherPrefs.useFahrenheit(context) }
 
     var hasWallpaperPhoto by remember { mutableStateOf(WeatherPrefs.hasWallpaperPhoto(context)) }
     var photoVersion by remember { mutableLongStateOf(WeatherPrefs.wallpaperPhotoVersion(context)) }
-    var weatherEnabled by remember { mutableStateOf(WeatherPrefs.wallpaperWeatherEnabled(context)) }
     var onlyOnFirstPage by remember { mutableStateOf(WeatherPrefs.onlyOnFirstPage(context)) }
-    var cubeCenterX by remember { mutableFloatStateOf(WeatherPrefs.wallpaperCubeX(context)) }
-    var cubeCenterY by remember { mutableFloatStateOf(WeatherPrefs.wallpaperCubeY(context)) }
-    var cubeScale by remember { mutableFloatStateOf(WeatherPrefs.wallpaperCubeScale(context)) }
+    var slots by remember { mutableStateOf(WallpaperLayoutPrefs.loadSlots(context)) }
+    var selectedUid by remember { mutableStateOf(slots.firstOrNull()?.uid) }
+    var showAddWidgetDialog by remember { mutableStateOf(false) }
 
     var isLiveActive by remember(refreshTrigger) { mutableStateOf(isDayKitLiveWallpaperActive(context)) }
     var isRemoving by remember { mutableStateOf(false) }
+
+    var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            delay(1000L)
+        }
+    }
+
+    val solarState = remember(refreshTrigger, nowMillis / 60_000L) {
+        DailyWidgetDataProvider.loadSolarArcState(context, nowMillis)
+    }
+    val stepsState = remember(refreshTrigger, nowMillis / 60_000L) {
+        DailyWidgetDataProvider.loadStepsState(context, nowMillis)
+    }
+    val batteryState = remember(refreshTrigger, nowMillis / 30_000L) {
+        DailyWidgetDataProvider.loadBatteryState(context)
+    }
+    val agendaState = remember(refreshTrigger, nowMillis / 60_000L) {
+        DailyWidgetDataProvider.loadAgendaState(nowMillis)
+    }
 
     var previewBgBitmap by remember { mutableStateOf<Bitmap?>(null) }
     LaunchedEffect(photoVersion, hasWallpaperPhoto) {
@@ -158,13 +191,42 @@ fun WallpaperStudioSection(
         }
     }
 
-    fun updateLayout(x: Float, y: Float, scale: Float) {
-        cubeCenterX = x
-        cubeCenterY = y
-        cubeScale = scale
-        WeatherPrefs.saveWallpaperCubeLayout(context, x, y, scale)
+    fun persistSlots(next: List<WallpaperWidgetSlot>) {
+        slots = next
+        WallpaperLayoutPrefs.saveSlots(context, next)
     }
 
+    fun updateSlot(uid: String, transform: (WallpaperWidgetSlot) -> WallpaperWidgetSlot) {
+        val next = slots.map { if (it.uid == uid) transform(it) else it }
+        persistSlots(next)
+    }
+
+    fun addWidget(type: DailyWidgetType) {
+        // Pick a smart non-overlapping vertical slot based on current count
+        val candidateYs = listOf(0.24f, 0.52f, 0.78f, 0.38f, 0.66f)
+        val chosenY = candidateYs.firstOrNull { cy ->
+            slots.none { kotlin.math.abs(it.centerY - cy) < 0.14f }
+        } ?: (0.25f + (slots.size % 4) * 0.18f).coerceAtMost(0.82f)
+
+        val newSlot = WallpaperWidgetSlot(
+            type = type,
+            centerX = 0.50f,
+            centerY = chosenY,
+            widthFraction = type.defaultWidthFraction,
+        )
+        persistSlots(slots + newSlot)
+        selectedUid = newSlot.uid
+    }
+
+    fun removeSlot(uid: String) {
+        val next = slots.filterNot { it.uid == uid }
+        persistSlots(next)
+        if (selectedUid == uid) {
+            selectedUid = next.lastOrNull()?.uid
+        }
+    }
+
+    val selectedSlot = slots.firstOrNull { it.uid == selectedUid }
     val tempText = "${snapshot.displayTemp(useFahrenheit)}${snapshot.unitSymbol(useFahrenheit)}"
     val highLowText = "H:${snapshot.displayHigh(useFahrenheit)}°  L:${snapshot.displayLow(useFahrenheit)}°"
 
@@ -183,9 +245,16 @@ fun WallpaperStudioSection(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = if (weatherEnabled) "Drag widget to place anywhere" else "Pick a photo & add widgets",
+                text = when {
+                    slots.isEmpty() -> "Pick a photo & tap + Widget"
+                    selectedSlot != null -> "Drag ${selectedSlot.type.title} · ${slots.size} on canvas"
+                    else -> "Tap a widget to select or drag (${slots.size})"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.extendedColors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
             if (isLiveActive) {
                 Row(
@@ -220,7 +289,10 @@ fun WallpaperStudioSection(
                         0.55f to Color(0xFF182C44),
                         1.0f to Color(0xFF0C141E),
                     ),
-                ),
+                )
+                .pointerInput(Unit) {
+                    detectTapGestures { selectedUid = null }
+                },
         ) {
             val density = LocalDensity.current
             val frameW = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
@@ -236,38 +308,52 @@ fun WallpaperStudioSection(
                 )
             }
 
-            if (weatherEnabled) {
-                val cardSizePx = (frameW * cubeScale).coerceIn(frameW * 0.35f, frameW * 0.92f)
-                val cardSizeDp = with(density) { cardSizePx.toDp() }
-                val cardCorner = cardSizeDp * 0.22f
-                val cardShape = RoundedCornerShape(cardCorner)
+            slots.forEach { slot ->
+                val isSelected = slot.uid == selectedUid
+                val cardWPx = (frameW * slot.widthFraction).coerceIn(frameW * 0.30f, frameW * 0.94f)
+                val cardHPx = (cardWPx / slot.type.aspectRatio).coerceIn(frameH * 0.10f, frameH * 0.62f)
+                val cardWDp = with(density) { cardWPx.toDp() }
+                val cardHDp = with(density) { cardHPx.toDp() }
+                val cornerDp = if (slot.type == DailyWidgetType.GLASS_WEATHER) cardWDp * 0.22f else cardHDp * 0.18f
+                val cardShape = RoundedCornerShape(cornerDp)
 
                 val marginX = frameW * 0.03f
                 val marginY = frameH * 0.04f
-                val leftPx = (frameW * cubeCenterX - cardSizePx * 0.5f)
-                    .coerceIn(marginX, (frameW - cardSizePx - marginX).coerceAtLeast(marginX))
-                val topPx = (frameH * cubeCenterY - cardSizePx * 0.5f)
-                    .coerceIn(marginY, (frameH - cardSizePx - marginY).coerceAtLeast(marginY))
+                val leftPx = (frameW * slot.centerX - cardWPx * 0.5f)
+                    .coerceIn(marginX, (frameW - cardWPx - marginX).coerceAtLeast(marginX))
+                val topPx = (frameH * slot.centerY - cardHPx * 0.5f)
+                    .coerceIn(marginY, (frameH - cardHPx - marginY).coerceAtLeast(marginY))
 
-                val latestX by rememberUpdatedState(cubeCenterX)
-                val latestY by rememberUpdatedState(cubeCenterY)
-                val latestScale by rememberUpdatedState(cubeScale)
+                val latestSlot by rememberUpdatedState(slot)
 
                 Box(
                     modifier = Modifier
                         .offset { IntOffset(leftPx.roundToInt(), topPx.roundToInt()) }
-                        .size(cardSizeDp)
+                        .size(width = cardWDp, height = cardHDp)
                         .clip(cardShape)
-                        .pointerInput(frameW, frameH) {
-                            detectDragGestures { change, dragAmount ->
+                        .then(
+                            if (isSelected) {
+                                Modifier.border(2.dp, Color(0xFF4C9BFF), cardShape)
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .pointerInput(slot.uid, frameW, frameH) {
+                            detectTapGestures { selectedUid = slot.uid }
+                        }
+                        .pointerInput(slot.uid, frameW, frameH) {
+                            detectDragGestures(
+                                onDragStart = { selectedUid = slot.uid },
+                            ) { change, dragAmount ->
                                 change.consume()
-                                val nextX = (latestX + dragAmount.x / frameW).coerceIn(0.15f, 0.85f)
-                                val nextY = (latestY + dragAmount.y / frameH).coerceIn(0.12f, 0.88f)
-                                updateLayout(nextX, nextY, latestScale)
+                                val cur = latestSlot
+                                val nextX = (cur.centerX + dragAmount.x / frameW).coerceIn(0.10f, 0.90f)
+                                val nextY = (cur.centerY + dragAmount.y / frameH).coerceIn(0.08f, 0.92f)
+                                updateSlot(cur.uid) { it.copy(centerX = nextX, centerY = nextY) }
                             }
                         },
                 ) {
-                    if (bg != null && !bg.isRecycled) {
+                    if (slot.type.style == DailyWidgetStyle.LIQUID_GLASS && bg != null && !bg.isRecycled) {
                         Image(
                             bitmap = bg.asImageBitmap(),
                             contentDescription = null,
@@ -277,43 +363,79 @@ fun WallpaperStudioSection(
                                 .blur(8.dp),
                         )
                     }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF14202F).copy(alpha = 0.45f))
-                            .border(1.25.dp, Color.White.copy(alpha = 0.72f), cardShape)
-                            .padding(cardSizeDp * 0.105f),
-                    ) {
-                        val textScale = (cubeScale / 0.68f).coerceIn(0.55f, 1.25f)
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            Text(
-                                text = snapshot.city,
-                                color = Color.White.copy(alpha = 0.92f),
-                                fontSize = (11f * textScale).sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = tempText,
-                                color = Color.White,
-                                fontSize = (26f * textScale).sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                            )
-                            Spacer(Modifier.weight(1f))
-                            Text(
-                                text = snapshot.conditionLabel,
-                                color = Color.White,
-                                fontSize = (11f * textScale).sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                            )
-                            Text(
-                                text = highLowText,
-                                color = Color.White.copy(alpha = 0.86f),
-                                fontSize = (9.5f * textScale).sp,
-                                maxLines = 1,
+
+                    if (slot.type == DailyWidgetType.GLASS_WEATHER) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0xFF14202F).copy(alpha = 0.45f))
+                                .border(1.25.dp, Color.White.copy(alpha = 0.72f), cardShape)
+                                .padding(cardWDp * 0.105f),
+                        ) {
+                            val textScale = (slot.widthFraction / 0.68f).coerceIn(0.50f, 1.25f)
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                Text(
+                                    text = snapshot.city,
+                                    color = Color.White.copy(alpha = 0.92f),
+                                    fontSize = (11f * textScale).sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = tempText,
+                                    color = Color.White,
+                                    fontSize = (24f * textScale).sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                )
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    text = snapshot.conditionLabel,
+                                    color = Color.White,
+                                    fontSize = (10.5f * textScale).sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    text = highLowText,
+                                    color = Color.White.copy(alpha = 0.86f),
+                                    fontSize = (9f * textScale).sp,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    } else {
+                        DailyWidgetLivePreview(
+                            type = slot.type,
+                            nowMillis = nowMillis,
+                            solarState = solarState,
+                            stepsState = stepsState,
+                            batteryState = batteryState,
+                            agendaState = agendaState,
+                            darkSurface = isDark,
+                            overWallpaperBlur = slot.type.style == DailyWidgetStyle.LIQUID_GLASS && bg != null,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+
+                    // Quick remove badge when selected
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xCC111418))
+                                .clickable { removeSlot(slot.uid) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = "Remove widget",
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp),
                             )
                         }
                     }
@@ -323,7 +445,7 @@ fun WallpaperStudioSection(
 
         Spacer(Modifier.height(Spacing.sm))
 
-        // Studio control chips: Photo, Widget layers, Page mode, Reset
+        // Studio control chips: + Widget, Pick Photo, Page mode, Clear Photo, Clear Widgets
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -332,6 +454,11 @@ fun WallpaperStudioSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilterChipButton(
+                text = "+ Widget",
+                selected = true,
+                onClick = { showAddWidgetDialog = true },
+            )
+            FilterChipButton(
                 text = if (hasWallpaperPhoto) "Change Photo" else "Pick Photo",
                 selected = hasWallpaperPhoto,
                 onClick = {
@@ -339,15 +466,6 @@ fun WallpaperStudioSection(
                     photoPickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
-                },
-            )
-            FilterChipButton(
-                text = if (weatherEnabled) "Weather ✓" else "+ Weather",
-                selected = weatherEnabled,
-                onClick = {
-                    val next = !weatherEnabled
-                    weatherEnabled = next
-                    WeatherPrefs.setWallpaperWeatherEnabled(context, next)
                 },
             )
             FilterChipButton(
@@ -374,29 +492,32 @@ fun WallpaperStudioSection(
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 )
             }
-            if (weatherEnabled) {
+            if (slots.isNotEmpty()) {
                 Text(
-                    text = "Reset",
+                    text = "Clear Widgets",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.extendedColors.textMuted,
                     modifier = Modifier
                         .clip(CircleShape)
-                        .clickable { updateLayout(0.50f, 0.28f, 0.68f) }
+                        .clickable {
+                            persistSlots(emptyList())
+                            selectedUid = null
+                        }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 )
             }
         }
 
-        if (weatherEnabled) {
+        if (selectedSlot != null) {
             Spacer(Modifier.height(Spacing.xs))
-            val normalizedSize = ((cubeScale - 0.35f) / (0.92f - 0.35f)).coerceIn(0f, 1f)
+            val normalizedSize = ((selectedSlot.widthFraction - 0.34f) / (0.94f - 0.34f)).coerceIn(0f, 1f)
             WallpaperSizeSlider(
-                label = "Widget Size",
+                label = "${selectedSlot.type.title} Size",
                 value = normalizedSize,
-                valueLabel = "${(cubeScale * 100).roundToInt()}%",
+                valueLabel = "${(selectedSlot.widthFraction * 100).roundToInt()}%",
                 onValueChange = { frac ->
-                    val nextScale = 0.35f + (0.92f - 0.35f) * frac.coerceIn(0f, 1f)
-                    updateLayout(cubeCenterX, cubeCenterY, nextScale)
+                    val nextW = 0.34f + (0.94f - 0.34f) * frac.coerceIn(0f, 1f)
+                    updateSlot(selectedSlot.uid) { it.copy(widthFraction = nextW) }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -477,6 +598,90 @@ fun WallpaperStudioSection(
             )
         }
     }
+
+    if (showAddWidgetDialog) {
+        AddWallpaperWidgetDialog(
+            existingTypes = slots.map { it.type }.toSet(),
+            onDismiss = { showAddWidgetDialog = false },
+            onSelect = { type ->
+                showAddWidgetDialog = false
+                addWidget(type)
+                onShowMessage("Added ${type.title} to wallpaper")
+            },
+        )
+    }
+}
+
+@Composable
+private fun AddWallpaperWidgetDialog(
+    existingTypes: Set<DailyWidgetType>,
+    onDismiss: () -> Unit,
+    onSelect: (DailyWidgetType) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add widget to wallpaper") },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(340.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(DailyWidgetType.entries, key = { it.id }) { type ->
+                    val alreadyAdded = type in existingTypes
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.extendedColors.inputField)
+                            .clickable { onSelect(type) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = type.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = "· ${type.style.label}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (type.style == DailyWidgetStyle.LIQUID_GLASS) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.extendedColors.textMuted
+                                    },
+                                )
+                            }
+                            Text(
+                                text = type.subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.extendedColors.textMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            imageVector = if (alreadyAdded) Icons.Rounded.Add else Icons.Rounded.Add,
+                            contentDescription = "Add ${type.title}",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
+    )
 }
 
 @Composable

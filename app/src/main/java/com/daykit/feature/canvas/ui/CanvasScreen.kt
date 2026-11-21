@@ -3,8 +3,11 @@ package com.daykit.feature.canvas.ui
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -48,10 +52,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -167,13 +176,6 @@ fun CanvasScreen(
         }
     }
 
-    val weatherWidgetCount = remember(refreshTrigger) {
-        val manager = AppWidgetManager.getInstance(context)
-        runCatching {
-            manager.getAppWidgetIds(ComponentName(context, WeatherGlassWidgetProvider::class.java)).size
-        }.getOrDefault(0)
-    }
-
     fun showSnack(message: String) {
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
@@ -261,9 +263,9 @@ fun CanvasScreen(
                 }
 
                 CanvasSection.DailyWidgets -> {
-                    DailyWeatherWidgetShowcase(
-                        pinnedCount = weatherWidgetCount,
-                        onPin = { requestPinProvider(WeatherGlassWidgetProvider::class.java) },
+                    DailyWidgetsGallery(
+                        refreshTrigger = refreshTrigger,
+                        onPinProvider = ::requestPinProvider,
                         onShowMessage = ::showSnack,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -353,6 +355,10 @@ private fun WidgetCatalogCard(
 
         Spacer(Modifier.height(Spacing.md))
 
+        DayKitToolMiniPreview(widgetId = item.id, accent = accent)
+
+        Spacer(Modifier.height(Spacing.md))
+
         Text(
             text = item.description,
             style = MaterialTheme.typography.bodyMedium,
@@ -402,6 +408,138 @@ private fun WidgetCatalogCard(
                 },
                 onClick = onPin,
             )
+        }
+    }
+}
+
+@Composable
+private fun DayKitToolMiniPreview(
+    widgetId: String,
+    accent: Color,
+) {
+    val isDark = isSystemInDarkTheme()
+    val cardBg = if (isDark) Color(0xFF17191D) else Color(0xFFF7F7F5)
+    val fg = if (isDark) Color(0xFFF3F4F6) else Color(0xFF14161A)
+    val muted = if (isDark) Color(0xFF8E95A2) else Color(0xFF7B808A)
+    val track = if (isDark) Color(0xFF2A2E35) else Color(0xFFE5E7EC)
+    val shape = RoundedCornerShape(18.dp)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(cardBg)
+            .border(1.dp, if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f), shape)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        when (widgetId) {
+            "dayflow" -> {
+                // Editorial 60-tick radial Focus Timer preview (inspired by Reference Image 5)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val cx = size.width / 2f
+                            val cy = size.height / 2f
+                            val outer = size.minDimension * 0.48f
+                            val inner = size.minDimension * 0.36f
+                            for (i in 0 until 40) {
+                                val deg = -90.0 + i * (360.0 / 40.0)
+                                val rad = Math.toRadians(deg)
+                                drawLine(
+                                    color = if (i < 16) accent else track,
+                                    start = Offset(cx + (kotlin.math.cos(rad) * inner).toFloat(), cy + (kotlin.math.sin(rad) * inner).toFloat()),
+                                    end = Offset(cx + (kotlin.math.cos(rad) * outer).toFloat(), cy + (kotlin.math.sin(rad) * outer).toFloat()),
+                                    strokeWidth = if (i % 5 == 0) 3.2f else 2f,
+                                    cap = StrokeCap.Round,
+                                )
+                            }
+                        }
+                        Text(text = "24:43", color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(Modifier.size(6.dp).background(accent, CircleShape))
+                            Text("Focus timer", color = muted, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text("Deep work", color = fg, style = MaterialTheme.typography.titleSmall)
+                        Text("Tap Start 25m or Break 5m right on Home", color = muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            "habits" -> {
+                // Clean bento bar checklist preview
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.size(6.dp).background(accent, CircleShape))
+                        Text("Today's habits", color = muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    listOf("Hydrate · 6/8" to 0.78f, "Read 20m · Done" to 1.0f).forEachIndexed { idx, (label, frac) ->
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(label, color = fg, style = MaterialTheme.typography.labelMedium)
+                                Text("${(frac * 100).toInt()}%", color = muted, style = MaterialTheme.typography.labelSmall)
+                            }
+                            Box(Modifier.fillMaxWidth().height(5.dp).clip(CircleShape).background(track)) {
+                                Box(Modifier.fillMaxWidth(frac).height(5.dp).clip(CircleShape).background(if (idx == 0) accent else fg))
+                            }
+                        }
+                    }
+                }
+            }
+
+            "expenses" -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(Modifier.size(6.dp).background(accent, CircleShape))
+                            Text("Quick expense", color = muted, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text("Instant one-tap entry", color = fg, style = MaterialTheme.typography.titleSmall)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(accent),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+
+            else -> {
+                // Editorial timeline preview for Reminders
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.size(6.dp).background(accent, CircleShape))
+                        Text("Upcoming", color = muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    listOf("10:00" to "Pay utility bill", "16:30" to "Evening walk").forEachIndexed { idx, (time, title) ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(time, color = muted, style = MaterialTheme.typography.labelSmall)
+                            Box(Modifier.width(2.5.dp).height(16.dp).clip(CircleShape).background(if (idx == 0) accent else track))
+                            Text(title, color = fg, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                            if (idx == 0) {
+                                Box(Modifier.clip(CircleShape).background(accent).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                    Text("Soon", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

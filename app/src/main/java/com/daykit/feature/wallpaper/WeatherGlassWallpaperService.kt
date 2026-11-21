@@ -16,9 +16,20 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.content.res.Configuration
 import android.service.wallpaper.WallpaperService
 import android.view.Choreographer
 import android.view.SurfaceHolder
+import com.daykit.feature.dailywidgets.AgendaState
+import com.daykit.feature.dailywidgets.BatteryState
+import com.daykit.feature.dailywidgets.DailyWidgetDataProvider
+import com.daykit.feature.dailywidgets.DailyWidgetRenderer
+import com.daykit.feature.dailywidgets.DailyWidgetStyle
+import com.daykit.feature.dailywidgets.DailyWidgetType
+import com.daykit.feature.dailywidgets.SolarArcState
+import com.daykit.feature.dailywidgets.StepsChartState
+import com.daykit.feature.dailywidgets.WallpaperLayoutPrefs
+import com.daykit.feature.dailywidgets.WallpaperWidgetSlot
 import com.daykit.feature.weather.WeatherPrefs
 import com.daykit.feature.weather.WeatherSnapshot
 import com.daykit.feature.weather.WeatherSyncWorker
@@ -59,11 +70,14 @@ class WeatherGlassWallpaperService : WallpaperService() {
         private var snapshot: WeatherSnapshot = WeatherPrefs.loadSnapshot(applicationContext)
         private var useFahrenheit: Boolean = WeatherPrefs.useFahrenheit(applicationContext)
         private var onlyOnFirstPage: Boolean = WeatherPrefs.onlyOnFirstPage(applicationContext)
-        private var weatherEnabled: Boolean = WeatherPrefs.wallpaperWeatherEnabled(applicationContext)
-        private var cubeCenterX: Float = WeatherPrefs.wallpaperCubeX(applicationContext)
-        private var cubeCenterY: Float = WeatherPrefs.wallpaperCubeY(applicationContext)
-        private var cubeScale: Float = WeatherPrefs.wallpaperCubeScale(applicationContext)
+        private var widgetSlots: List<WallpaperWidgetSlot> = WallpaperLayoutPrefs.loadSlots(applicationContext)
         private var loadedPhotoVersion: Long = -1L
+
+        private var cachedDataAt = 0L
+        private var cachedSolar: SolarArcState = DailyWidgetDataProvider.loadSolarArcState(applicationContext)
+        private var cachedBattery: BatteryState = DailyWidgetDataProvider.loadBatteryState(applicationContext)
+        private var cachedSteps: StepsChartState = DailyWidgetDataProvider.loadStepsState(applicationContext)
+        private var cachedAgenda: AgendaState = DailyWidgetDataProvider.loadAgendaState()
 
         private var bgBitmap: Bitmap? = null
         private var bgBlurredBitmap: Bitmap? = null
@@ -184,13 +198,21 @@ class WeatherGlassWallpaperService : WallpaperService() {
         private fun reloadPrefs() {
             snapshot = WeatherPrefs.loadSnapshot(applicationContext)
             nightCheckedAt = 0L
+            cachedDataAt = 0L
             useFahrenheit = WeatherPrefs.useFahrenheit(applicationContext)
             onlyOnFirstPage = WeatherPrefs.onlyOnFirstPage(applicationContext)
-            weatherEnabled = WeatherPrefs.wallpaperWeatherEnabled(applicationContext)
-            cubeCenterX = WeatherPrefs.wallpaperCubeX(applicationContext)
-            cubeCenterY = WeatherPrefs.wallpaperCubeY(applicationContext)
-            cubeScale = WeatherPrefs.wallpaperCubeScale(applicationContext)
+            widgetSlots = WallpaperLayoutPrefs.loadSlots(applicationContext)
             reloadWallpaperPhotoIfNeeded(force = false)
+        }
+
+        private fun refreshWidgetDataIfNeeded(nowMillis: Long) {
+            if (nowMillis - cachedDataAt > 30_000L || nowMillis < cachedDataAt) {
+                cachedSolar = DailyWidgetDataProvider.loadSolarArcState(applicationContext, nowMillis)
+                cachedBattery = DailyWidgetDataProvider.loadBatteryState(applicationContext)
+                cachedSteps = DailyWidgetDataProvider.loadStepsState(applicationContext, nowMillis)
+                cachedAgenda = DailyWidgetDataProvider.loadAgendaState(nowMillis)
+                cachedDataAt = nowMillis
+            }
         }
 
         private fun reloadWallpaperPhotoIfNeeded(force: Boolean) {
@@ -264,15 +286,11 @@ class WeatherGlassWallpaperService : WallpaperService() {
                 drawDefaultBackdrop(canvas, w, h, t)
             }
 
-            // 2. If weather widget is toggled off for the wallpaper, show just the clean backdrop
-            if (!weatherEnabled) return
+            // 2. If no widgets are placed on the wallpaper, show just the clean backdrop
+            val slots = widgetSlots
+            if (slots.isEmpty()) return
 
-            // 3. Compute "Page 1 only" slide/fade factor (never hide in preview; works even on launchers that omit xOffsetStep)
-            //    Page 1 is always xOffset == 0 (xOffset == 1 for RTL launchers), so measure the
-            //    distance from that absolute edge instead of the smallest offset seen so far
-            //    (which broke when the wallpaper was applied from any page other than page 1).
-            //    Only hide once we know the launcher actually scrolls the wallpaper, otherwise
-            //    launchers that report a constant 0.5 would hide the cube everywhere.
+            // 3. Compute "Page 1 only" slide/fade factor (never hide in preview)
             val pageProgress = if (onlyOnFirstPage && !isPreview && seenOffsetChange) {
                 val isRtl = resources.configuration.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL
                 val distFromPage1 = if (isRtl) 1f - pageXOffset else pageXOffset
@@ -281,61 +299,103 @@ class WeatherGlassWallpaperService : WallpaperService() {
             } else {
                 0f
             }
-            val cubeAlpha = (1f - pageProgress * 1.15f).coerceIn(0f, 1f)
-            if (cubeAlpha <= 0.01f) return
+            val widgetAlpha = (1f - pageProgress * 1.15f).coerceIn(0f, 1f)
+            if (widgetAlpha <= 0.01f) return
 
-            // 3. Position & size the rounded-square frosted-glass weather cube using user's custom layout
-            val maxCardSize = min(w * 0.92f, h * 0.68f).coerceAtLeast(220f)
-            val cardSize = (w * cubeScale).coerceIn(220f, maxCardSize)
-            val cornerRadius = cardSize * 0.22f
+            val nowMillis = System.currentTimeMillis()
+            refreshWidgetDataIfNeeded(nowMillis)
+
             val slideOffsetX = -pageProgress * w * 0.75f
             val marginX = w * 0.03f
             val marginY = h * 0.04f
-            val baseLeft = (w * cubeCenterX - cardSize * 0.5f)
-                .coerceIn(marginX, (w - cardSize - marginX).coerceAtLeast(marginX))
-            val cardLeft = baseLeft + slideOffsetX
-            val cardTop = (h * cubeCenterY - cardSize * 0.5f)
-                .coerceIn(marginY, (h - cardSize - marginY).coerceAtLeast(marginY))
-            val cardRect = RectF(cardLeft, cardTop, cardLeft + cardSize, cardTop + cardSize)
-
-            sim.updateBounds(cardSize, cardSize, cornerRadius)
-            sim.step(dt, intensity = t, windStrength = wind)
-
-            val layerSave = if (cubeAlpha < 0.99f) {
-                canvas.saveLayerAlpha(
-                    cardLeft - 48f,
-                    cardTop - 48f,
-                    cardRect.right + 48f,
-                    cardRect.bottom + 48f,
-                    (cubeAlpha * 255).toInt(),
-                )
-            } else {
-                canvas.save()
-            }
-
-            val clipPath = Path().apply {
-                addRoundRect(cardRect, cornerRadius, cornerRadius, Path.Direction.CW)
-            }
-            canvas.clipPath(clipPath)
-
-            // 3a. Pixel-aligned frosted blur of the user's wallpaper photo inside the cube
             val blurred = bgBlurredBitmap
-            if (blurred != null && !blurred.isRecycled) {
-                drawCenterCrop(canvas, blurred, w, h, bgPaint)
+            val isDarkUi = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+
+            // Step weather physics once per frame if any weather cube is placed
+            var steppedWeather = false
+            for (slot in slots) {
+                val cardW = (w * slot.widthFraction).coerceIn(w * 0.30f, w * 0.94f)
+                val cardH = (cardW / slot.type.aspectRatio).coerceIn(120f, h * 0.65f)
+                val baseLeft = (w * slot.centerX - cardW * 0.5f)
+                    .coerceIn(marginX, (w - cardW - marginX).coerceAtLeast(marginX))
+                val cardLeft = baseLeft + slideOffsetX
+                val cardTop = (h * slot.centerY - cardH * 0.5f)
+                    .coerceIn(marginY, (h - cardH - marginY).coerceAtLeast(marginY))
+                val cardRect = RectF(cardLeft, cardTop, cardLeft + cardW, cardTop + cardH)
+
+                val layerSave = if (widgetAlpha < 0.99f) {
+                    canvas.saveLayerAlpha(
+                        cardLeft - 32f,
+                        cardTop - 32f,
+                        cardRect.right + 32f,
+                        cardRect.bottom + 32f,
+                        (widgetAlpha * 255).toInt(),
+                    )
+                } else {
+                    canvas.save()
+                }
+
+                if (slot.type == DailyWidgetType.GLASS_WEATHER) {
+                    val cardSize = min(cardW, cardH)
+                    val cornerRadius = cardSize * 0.22f
+                    val sqRect = RectF(cardLeft, cardTop, cardLeft + cardSize, cardTop + cardSize)
+                    if (!steppedWeather) {
+                        sim.updateBounds(cardSize, cardSize, cornerRadius)
+                        sim.step(dt, intensity = t, windStrength = wind)
+                        steppedWeather = true
+                    }
+                    val clipPath = Path().apply {
+                        addRoundRect(sqRect, cornerRadius, cornerRadius, Path.Direction.CW)
+                    }
+                    canvas.clipPath(clipPath)
+                    if (blurred != null && !blurred.isRecycled) {
+                        drawCenterCrop(canvas, blurred, w, h, bgPaint)
+                    }
+                    canvas.save()
+                    canvas.translate(cardLeft, cardTop)
+                    drawAtmosphericSky(canvas, cardSize, t)
+                    drawClouds(canvas, cardSize, t)
+                    drawRainAndSplashes(canvas, cardSize, t)
+                    drawGlassOptics(canvas, cardSize, cornerRadius, t)
+                    drawCubeTextAndIcon(canvas, cardSize, t, wind)
+                    canvas.restore()
+                } else {
+                    // For Liquid Glass widgets, draw pixel-aligned frosted blur of user photo first
+                    val hasBlurBackdrop = slot.type.style == DailyWidgetStyle.LIQUID_GLASS &&
+                        blurred != null && !blurred.isRecycled
+                    if (hasBlurBackdrop) {
+                        val cr = when (slot.type) {
+                            DailyWidgetType.LIQUID_GLASS_CLOCK -> cardH * 0.24f
+                            DailyWidgetType.SOLAR_ARC -> cardH * 0.20f
+                            else -> cardH * 0.18f
+                        }
+                        canvas.save()
+                        val clipPath = Path().apply { addRoundRect(cardRect, cr, cr, Path.Direction.CW) }
+                        canvas.clipPath(clipPath)
+                        drawCenterCrop(canvas, blurred!!, w, h, bgPaint)
+                        canvas.restore()
+                    }
+
+                    when (slot.type) {
+                        DailyWidgetType.SOLAR_ARC ->
+                            DailyWidgetRenderer.drawSolarArc(canvas, cardRect, cachedSolar, overWallpaperBlur = hasBlurBackdrop)
+                        DailyWidgetType.RADIAL_DIAL_CLOCK ->
+                            DailyWidgetRenderer.drawRadialDialClock(canvas, cardRect, nowMillis, overWallpaperBlur = hasBlurBackdrop)
+                        DailyWidgetType.LIQUID_GLASS_CLOCK ->
+                            DailyWidgetRenderer.drawLiquidGlassClock(canvas, cardRect, nowMillis, overWallpaperBlur = hasBlurBackdrop)
+                        DailyWidgetType.STEPS_BAR_CHART ->
+                            DailyWidgetRenderer.drawStepsBarChart(canvas, cardRect, cachedSteps)
+                        DailyWidgetType.BENTO_BATTERY ->
+                            DailyWidgetRenderer.drawBentoBattery(canvas, cardRect, cachedBattery, darkSurface = isDarkUi)
+                        DailyWidgetType.BENTO_AGENDA ->
+                            DailyWidgetRenderer.drawBentoAgenda(canvas, cardRect, cachedAgenda, darkSurface = isDarkUi)
+                        DailyWidgetType.GLASS_WEATHER -> Unit
+                    }
+                }
+
+                canvas.restoreToCount(layerSave)
             }
-
-            // Translate into cube-local coordinates (0..cardSize)
-            canvas.save()
-            canvas.translate(cardLeft, cardTop)
-
-            drawAtmosphericSky(canvas, cardSize, t)
-            drawClouds(canvas, cardSize, t)
-            drawRainAndSplashes(canvas, cardSize, t)
-            drawGlassOptics(canvas, cardSize, cornerRadius, t)
-            drawCubeTextAndIcon(canvas, cardSize, t, wind)
-
-            canvas.restore()
-            canvas.restoreToCount(layerSave)
         }
 
         private fun drawCenterCrop(canvas: Canvas, bmp: Bitmap, viewW: Float, viewH: Float, paint: Paint) {
