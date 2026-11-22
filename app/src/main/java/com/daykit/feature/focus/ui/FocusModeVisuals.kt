@@ -60,9 +60,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.PaddingValues
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.asAccentContainer
+import com.daykit.core.designsystem.components.AccentIconTile
+import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.designsystem.pressScale
 import com.daykit.feature.focus.data.FocusGroup
 import com.daykit.feature.focus.data.FocusRecurrence
 import kotlinx.coroutines.launch
@@ -78,16 +82,16 @@ import java.time.DayOfWeek
  * [example] is a sample value shown on the tile instead of a description.
  */
 enum class FocusMode(val label: String, val example: String, val icon: ImageVector) {
-    LockNow("Lock now", "Instagram · 1h", Icons.Rounded.HourglassTop),
-    DailyLimit("Daily limit", "YouTube · 30m a day", Icons.Rounded.DataUsage),
-    Routine("Routine", "Social · Mon–Fri 9–5", Icons.Rounded.EventRepeat),
+    LockNow("Lock now", "Block on a timer", Icons.Rounded.HourglassTop),
+    DailyLimit("Daily limit", "Cap daily time", Icons.Rounded.DataUsage),
+    Routine("Routine", "Schedule app sets", Icons.Rounded.EventRepeat),
     ;
 
     val accent: Color
         @Composable get() = when (this) {
             LockNow -> MaterialTheme.extendedColors.accents.orange
             DailyLimit -> MaterialTheme.extendedColors.accents.teal
-            Routine -> MaterialTheme.extendedColors.accents.purple
+            Routine -> MaterialTheme.extendedColors.accents.indigo
         }
 }
 
@@ -108,71 +112,48 @@ fun focusSetColor(colorIndex: Int): Color {
 }
 
 /**
- * Entry point for one [FocusMode]. [expanded] is the first-visit form — a full
- * row with the example underneath — and doubles as onboarding; once the user has
- * anything set up the tiles collapse to compact pills side by side.
+ * Clean Apple HIG neutral action card for one [FocusMode]: uses standard [AppCard]
+ * surface with a vibrant [AccentIconTile] squircle instead of a tinted chip wash.
  */
 @Composable
-fun FocusModeTile(
+fun FocusActionCard(
     mode: FocusMode,
-    expanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitle: String = mode.example,
 ) {
     val accent = mode.accent
-    val shape = MaterialTheme.shapes.large
-    if (expanded) {
-        Row(
-            modifier = modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(accent.asAccentContainer())
-                .clickable(onClick = onClick)
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(mode.icon, contentDescription = null, tint = accent, modifier = Modifier.size(26.dp))
-            Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = mode.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = mode.example,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = accent,
-                )
-            }
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = accent)
-        }
-    } else {
-        Row(
-            modifier = modifier
-                .clip(shape)
-                .background(accent.asAccentContainer())
-                .clickable(onClick = onClick)
-                .heightIn(min = 44.dp)
-                .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Icon(mode.icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = mode.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+    AppCard(
+        modifier = modifier,
+        onClick = onClick,
+        contentPadding = PaddingValues(14.dp),
+    ) {
+        AccentIconTile(
+            icon = mode.icon,
+            accent = accent,
+            size = 38.dp,
+            iconSize = 21.dp,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = mode.label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.extendedColors.textMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
-/** Section title prefixed by its mode's icon, so lists inherit the tile's color. */
+/** Section title with optional mode badge and trailing action button. */
 @Composable
 fun FocusModeHeader(
     mode: FocusMode?,
@@ -181,7 +162,9 @@ fun FocusModeHeader(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(top = Spacing.sm),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.xs, start = 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (mode != null) {
@@ -191,6 +174,7 @@ fun FocusModeHeader(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.extendedColors.textMuted,
             modifier = Modifier.weight(1f),
         )
@@ -320,12 +304,16 @@ fun HoldToConfirmButton(
     val latestConfirm by rememberUpdatedState(onConfirm)
     var holding by remember { mutableStateOf(false) }
 
+    val shape = MaterialTheme.shapes.medium
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(if (enabled) accent.asAccentContainer() else MaterialTheme.extendedColors.inputField)
+            .heightIn(min = 50.dp)
+            .clip(shape)
+            .background(MaterialTheme.extendedColors.inputField)
+            .then(
+                if (enabled) Modifier.border(1.dp, accent.copy(alpha = 0.45f), shape) else Modifier
+            )
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = "$text. Press and hold for ${holdMillis / 1000} seconds"
@@ -366,7 +354,7 @@ fun HoldToConfirmButton(
                 .matchParentSize()
                 .drawBehind {
                     drawRect(
-                        color = accent.copy(alpha = 0.35f),
+                        color = accent,
                         size = Size(size.width * progress.value, size.height),
                     )
                 },
@@ -375,7 +363,11 @@ fun HoldToConfirmButton(
             text = if (holding) "Keep holding…" else text,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
-            color = if (enabled) accent else MaterialTheme.extendedColors.textMuted,
+            color = when {
+                !enabled -> MaterialTheme.extendedColors.textMuted
+                holding || progress.value > 0.35f -> Color.White
+                else -> accent
+            },
         )
     }
 }
@@ -384,7 +376,7 @@ fun HoldToConfirmButton(
 internal fun holdProgress(startProgress: Float, heldMillis: Long, holdMillis: Int): Float =
     (startProgress + heldMillis.toFloat() / holdMillis).coerceIn(0f, 1f)
 
-/** A plain tap button in a mode's accent, for the reversible saves (limits, routines). */
+/** A solid vibrant button in a mode's accent, for the reversible saves (limits, routines). */
 @Composable
 fun FocusAccentButton(
     text: String,
@@ -395,10 +387,11 @@ fun FocusAccentButton(
 ) {
     Box(
         modifier = modifier
+            .pressScale(enabled = enabled, pressedScale = 0.96f)
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .heightIn(min = 50.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(if (enabled) accent.asAccentContainer() else MaterialTheme.extendedColors.inputField)
+            .background(if (enabled) accent else MaterialTheme.extendedColors.inputField)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -406,7 +399,7 @@ fun FocusAccentButton(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
-            color = if (enabled) accent else MaterialTheme.extendedColors.textMuted,
+            color = if (enabled) Color.White else MaterialTheme.extendedColors.textMuted,
         )
     }
 }

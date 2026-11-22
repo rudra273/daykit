@@ -38,8 +38,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.daykit.core.designsystem.AppleSystemGrays
 import com.daykit.core.designsystem.LocalReduceMotion
+import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.extendedColors
 
 /**
@@ -172,5 +174,30 @@ fun SegmentedControl(
                 }
             }
         }
+    }
+}
+
+/**
+ * Compact Apple-style "BETA" pill badge for experimental tools (Canvas, Image Tool).
+ */
+@Composable
+fun BetaBadge(modifier: Modifier = Modifier) {
+    val accent = MaterialTheme.extendedColors.accents.orange
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(accent.asAccentContainer())
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "BETA",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
+            ),
+            color = accent,
+            maxLines = 1,
+        )
     }
 }

@@ -30,6 +30,7 @@ data class ToolTile(
     val icon: ImageVector,
     val accent: @Composable () -> Color,
     val keywords: List<String>,
+    val isBeta: Boolean = false,
 )
 
 data class ToolSection(val title: String, val tools: List<ToolTile>)
@@ -66,7 +67,7 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
         "Utilities",
         listOf(
             ToolTile(Routes.TOOL_CANVAS, "Canvas", "Home widgets & wallpapers", Icons.Rounded.Widgets, { accents.purple },
-                listOf("canvas", "widget", "widgets", "wallpaper", "wallpapers", "home screen")),
+                listOf("canvas", "widget", "widgets", "wallpaper", "wallpapers", "home screen"), isBeta = true),
             ToolTile(Routes.TOOL_DEVICE_MANAGER, "Device Manager", "Usage, storage & battery", Icons.Rounded.PhoneAndroid, { accents.cyan },
                 listOf("device manager", "usage", "storage", "battery", "largest files", "apps")),
             ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
@@ -74,7 +75,7 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
             ToolTile(Routes.TOOL_SCANNER, "Document Scanner", "Scan documents", Icons.Rounded.DocumentScanner, { accents.blue },
                 listOf("scanner", "scan document", "document", "camera", "pdf")),
             ToolTile(Routes.TOOL_IMAGE, "Image Tool", "Resize, compress & strip location", Icons.Rounded.CropRotate, { accents.mint },
-                listOf("image", "photo", "resize", "compress", "convert", "exif", "location", "metadata", "jpeg", "png", "webp")),
+                listOf("image", "photo", "resize", "compress", "convert", "exif", "location", "metadata", "jpeg", "png", "webp"), isBeta = true),
             ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.orange },
                 listOf("editor", "document", "text", "pdf")),
             ToolTile(Routes.TOOL_DNS, "DNS Manager", "Set up Private DNS", Icons.Rounded.Dns, { accents.teal },

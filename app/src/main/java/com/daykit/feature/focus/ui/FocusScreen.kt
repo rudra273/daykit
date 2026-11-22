@@ -22,15 +22,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.SlowMotionVideo
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.daykit.core.designsystem.components.AccentIconTile
+import com.daykit.core.designsystem.components.SegmentedControl
+import com.daykit.core.designsystem.tabularNums
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.material.icons.rounded.Warning
@@ -92,9 +98,14 @@ import java.time.ZoneId
 
 /** Which nested editor, if any, has replaced the list. */
 private sealed interface FocusEditor {
-    data object ShortVideos : FocusEditor
     data class Group(val existing: FocusGroup?) : FocusEditor
     data class Schedule(val existing: FocusSchedule?) : FocusEditor
+}
+
+private enum class FocusTab(val label: String) {
+    Apps("Apps"),
+    Routines("Routines"),
+    Shorts("Shorts"),
 }
 
 /**
@@ -159,12 +170,6 @@ fun FocusScreen(
     }
 
     when (val current = editor) {
-        FocusEditor.ShortVideos -> ShortVideoBlockerScreen(
-            onBack = { editor = null },
-            onOpeningSettings = { container.sensitiveKeyManager.expectingActivityResult = it },
-        )
-
-
         is FocusEditor.Group -> FocusGroupEditorHost(
             container = container,
             existing = current.existing,
@@ -337,188 +342,264 @@ private fun FocusHome(
         nowMillis = nowMillis,
     )
 
-    val isFirstRun = appLimits.isEmpty() && schedules.isEmpty() && focusBlocks.isEmpty() &&
-        activeSessions.isEmpty()
+    var selectedTab by rememberSaveable { mutableStateOf(FocusTab.Apps) }
+    val shortVideoState = rememberShortVideoUiState(
+        onOpeningSettings = { container.sensitiveKeyManager.expectingActivityResult = it },
+        onLockedMessage = { errors.show(it) },
+    )
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(errors.host) },
         topBar = { AppTopBar(title = "Focus", onBack = onBack) },
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = Spacing.lg,
-                end = Spacing.lg,
-                top = innerPadding.calculateTopPadding() + Spacing.sm,
-                bottom = innerPadding.calculateBottomPadding() + Spacing.xxl,
-            ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = innerPadding.calculateTopPadding()),
         ) {
-            if (!hasUsageAccess) {
-                item(key = "perm-usage") {
-                    WarningCard(
-                        title = "Focus can't see which app is open",
-                        body = "Grant Usage Access, or nothing here will actually block.",
-                        actionText = "Grant Usage Access",
-                        onAction = {
-                            container.sensitiveKeyManager.expectingActivityResult = true
-                            runCatching { context.startActivity(PermissionIntents.usageAccessSettings()) }
-                        },
-                    )
-                }
-            }
+            SegmentedControl(
+                items = FocusTab.entries.map { it.label },
+                selectedIndex = FocusTab.entries.indexOf(selectedTab).coerceAtLeast(0),
+                onSelect = { index -> selectedTab = FocusTab.entries[index] },
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            )
 
-            item(key = "now") {
-                RightNowCard(
-                    blocked = blockedNow,
-                    appsByPackage = appsByPackage,
-                    activeSessions = activeSessions,
-                    nextSession = nextSession,
-                    nowMillis = nowMillis,
-                    onEndEarly = { session ->
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        errors.launchGuarded("Couldn't end the routine.") {
-                            container.focusScheduleRepository.endSessionEarly(
-                                scheduleId = session.scheduleId,
-                                startMillis = session.startMillis,
-                            )
-                            armed = container.focusScheduleRepository.armedSchedules()
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = Spacing.lg,
+                    end = Spacing.lg,
+                    top = Spacing.xs,
+                    bottom = innerPadding.calculateBottomPadding() + Spacing.xxl,
+                ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                when (selectedTab) {
+                    FocusTab.Apps -> {
+                        if (!hasUsageAccess) {
+                            item(key = "perm-usage") {
+                                WarningCard(
+                                    title = "Focus can't see which app is open",
+                                    body = "Grant Usage Access, or nothing here will actually block.",
+                                    actionText = "Grant Usage Access",
+                                    onAction = {
+                                        container.sensitiveKeyManager.expectingActivityResult = true
+                                        runCatching { context.startActivity(PermissionIntents.usageAccessSettings()) }
+                                    },
+                                )
+                            }
                         }
-                    },
-                )
-            }
 
-            item(key = "modes") {
-                val onMode: (FocusMode) -> Unit = { mode ->
-                    when (mode) {
-                        FocusMode.LockNow -> lockPickerOpen = true
-                        FocusMode.DailyLimit -> appLimitPickerOpen = true
-                        FocusMode.Routine -> onEdit(FocusEditor.Schedule(null))
-                    }
-                }
-                if (isFirstRun) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        FocusMode.entries.forEach { mode ->
-                            FocusModeTile(mode = mode, expanded = true, onClick = { onMode(mode) })
-                        }
-                    }
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        FocusMode.entries.forEach { mode ->
-                            FocusModeTile(
-                                mode = mode,
-                                expanded = false,
-                                onClick = { onMode(mode) },
-                                modifier = Modifier.weight(1f),
+                        item(key = "now") {
+                            RightNowCard(
+                                blocked = blockedNow,
+                                appsByPackage = appsByPackage,
+                                activeSessions = activeSessions,
+                                nextSession = nextSession,
+                                nowMillis = nowMillis,
+                                shortVideoActiveCount = shortVideoState.activeCount,
+                                onOpenShorts = { selectedTab = FocusTab.Shorts },
+                                onEndEarly = { session ->
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    errors.launchGuarded("Couldn't end the routine.") {
+                                        container.focusScheduleRepository.endSessionEarly(
+                                            scheduleId = session.scheduleId,
+                                            startMillis = session.startMillis,
+                                        )
+                                        armed = container.focusScheduleRepository.armedSchedules()
+                                    }
+                                },
                             )
                         }
-                    }
-                }
-            }
 
-            item(key = "short-video-blocker") {
-                ShortVideoBlockerEntry(onClick = { onEdit(FocusEditor.ShortVideos) })
-            }
-
-            if (hasUsageAccess) {
-                item(key = "suggestions") {
-                    when (scan) {
-                        SuggestScan.Idle -> SuggestButton(onClick = onScan)
-                        SuggestScan.Scanning -> ScanningCard()
-                        SuggestScan.Done -> MostUsedCard(
-                            apps = suggestions,
-                            weeklyUsage = weeklyUsage,
-                            onRescan = onScan,
-                            onLock = { quickBlockApp = it },
-                            onLimit = { app ->
-                                appLimitToEdit = null
-                                appLimitTargetApp = app
-                            },
-                        )
-                    }
-                }
-            }
-
-            if (appLimits.isNotEmpty()) {
-                item(key = "header-limits") {
-                    FocusModeHeader(mode = FocusMode.DailyLimit, title = "Daily limits")
-                }
-                items(sortedLimits, key = { "limit-${it.packageName}" }) { limit ->
-                    val app = appsByPackage[limit.packageName]
-                    val usageMillis = todayUsage[limit.packageName] ?: 0L
-                    val isExceeded = limit.enabled && usageMillis >= limit.dailyLimitMinutes * 60_000L
-                    AppLimitRow(
-                        limit = limit,
-                        app = app,
-                        usageMillis = usageMillis,
-                        onToggle = { enabled ->
-                            if (isExceeded) {
-                                errors.show("Limit reached. Locked until midnight.")
-                                return@AppLimitRow
+                        item(key = "actions") {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                FocusActionCard(
+                                    mode = FocusMode.LockNow,
+                                    onClick = { lockPickerOpen = true },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                FocusActionCard(
+                                    mode = FocusMode.DailyLimit,
+                                    onClick = { appLimitPickerOpen = true },
+                                    modifier = Modifier.weight(1f),
+                                )
                             }
-                            errors.launchGuarded("Couldn't update limit.") {
-                                container.focusAppLimitRepository.setEnabled(limit.packageName, enabled)
-                                if (enabled) onMonitorNeeded()
-                            }
-                        },
-                        onEdit = {
-                            if (isExceeded) {
-                                errors.show("Limit reached. Editing is locked until midnight.")
-                                return@AppLimitRow
-                            }
-                            appLimitToEdit = limit
-                            appLimitTargetApp = app ?: InstalledApp(limit.packageName, limit.packageName, null)
-                        },
-                    )
-                }
-            }
+                        }
 
-            if (schedules.isNotEmpty()) {
-                item(key = "header-routines") {
-                    FocusModeHeader(mode = FocusMode.Routine, title = "Routines")
-                }
-                if (!canScheduleExact) {
-                    item(key = "perm-alarm") {
-                        WarningCard(
-                            title = "Routines may start late",
-                            body = "Android can delay them by minutes without exact alarms.",
-                            actionText = "Allow exact alarms",
-                            onAction = {
-                                container.sensitiveKeyManager.expectingActivityResult = true
-                                runCatching { context.startActivity(PermissionIntents.exactAlarmSettings(context)) }
-                            },
-                        )
-                    }
-                }
-                items(schedules, key = { "schedule-${it.scheduleId}" }) { schedule ->
-                    RoutineCard(
-                        schedule = schedule,
-                        group = groupsById[schedule.groupId],
-                        isLive = schedule.scheduleId in activeScheduleIds,
-                        nowMillis = nowMillis,
-                        onToggle = { enabled ->
-                            errors.launchGuarded("Couldn't update the routine.") {
-                                container.focusScheduleRepository.setEnabled(schedule.scheduleId, enabled)
+                        if (appLimits.isNotEmpty()) {
+                            item(key = "header-limits") {
+                                FocusModeHeader(
+                                    mode = FocusMode.DailyLimit,
+                                    title = "Daily limits",
+                                    trailing = {
+                                        AppTextButton(
+                                            text = "Add",
+                                            onClick = { appLimitPickerOpen = true },
+                                        )
+                                    },
+                                )
                             }
-                        },
-                        onEdit = { onEdit(FocusEditor.Schedule(schedule)) },
-                    )
-                }
-            }
+                            items(sortedLimits, key = { "limit-${it.packageName}" }) { limit ->
+                                val app = appsByPackage[limit.packageName]
+                                val usageMillis = todayUsage[limit.packageName] ?: 0L
+                                val isExceeded = limit.enabled && usageMillis >= limit.dailyLimitMinutes * 60_000L
+                                AppLimitRow(
+                                    limit = limit,
+                                    app = app,
+                                    usageMillis = usageMillis,
+                                    onToggle = { enabled ->
+                                        if (isExceeded) {
+                                            errors.show("Limit reached. Locked until midnight.")
+                                            return@AppLimitRow
+                                        }
+                                        errors.launchGuarded("Couldn't update limit.") {
+                                            container.focusAppLimitRepository.setEnabled(limit.packageName, enabled)
+                                            if (enabled) onMonitorNeeded()
+                                        }
+                                    },
+                                    onEdit = {
+                                        if (isExceeded) {
+                                            errors.show("Limit reached. Editing is locked until midnight.")
+                                            return@AppLimitRow
+                                        }
+                                        appLimitToEdit = limit
+                                        appLimitTargetApp = app ?: InstalledApp(limit.packageName, limit.packageName, null)
+                                    },
+                                )
+                            }
+                        }
 
-            item(key = "header-sets") {
-                FocusModeHeader(mode = null, title = "App sets")
-            }
-            item(key = "sets") {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    groups.forEach { group ->
-                        FocusSetChip(set = group, onClick = { onEdit(FocusEditor.Group(group)) })
+                        if (hasUsageAccess) {
+                            item(key = "suggestions") {
+                                when (scan) {
+                                    SuggestScan.Idle -> SuggestButton(onClick = onScan)
+                                    SuggestScan.Scanning -> ScanningCard()
+                                    SuggestScan.Done -> MostUsedCard(
+                                        apps = suggestions,
+                                        weeklyUsage = weeklyUsage,
+                                        onRescan = onScan,
+                                        onLock = { quickBlockApp = it },
+                                        onLimit = { app ->
+                                            appLimitToEdit = null
+                                            appLimitTargetApp = app
+                                        },
+                                    )
+                                }
+                            }
+                        }
                     }
-                    FocusNewSetChip(onClick = { onEdit(FocusEditor.Group(null)) })
+
+                    FocusTab.Routines -> {
+                        if (!canScheduleExact && schedules.isNotEmpty()) {
+                            item(key = "perm-alarm") {
+                                WarningCard(
+                                    title = "Routines may start late",
+                                    body = "Android can delay them by minutes without exact alarms.",
+                                    actionText = "Allow exact alarms",
+                                    onAction = {
+                                        container.sensitiveKeyManager.expectingActivityResult = true
+                                        runCatching { context.startActivity(PermissionIntents.exactAlarmSettings(context)) }
+                                    },
+                                )
+                            }
+                        }
+
+                        item(key = "header-routines") {
+                            FocusModeHeader(
+                                mode = FocusMode.Routine,
+                                title = "Routines",
+                                trailing = {
+                                    AppTextButton(
+                                        text = "New routine",
+                                        onClick = { onEdit(FocusEditor.Schedule(null)) },
+                                    )
+                                },
+                            )
+                        }
+
+                        if (schedules.isEmpty()) {
+                            item(key = "routines-empty") {
+                                AppCard(modifier = Modifier.fillMaxWidth()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                                    ) {
+                                        AccentIconTile(
+                                            icon = FocusMode.Routine.icon,
+                                            accent = FocusMode.Routine.accent,
+                                            size = 42.dp,
+                                            iconSize = 22.dp,
+                                        )
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Schedule focus routines",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                            )
+                                            Text(
+                                                text = "Block an app set automatically on recurring days and hours.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.extendedColors.textMuted,
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(Spacing.md))
+                                    PrimaryButton(
+                                        text = "Create routine",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = { onEdit(FocusEditor.Schedule(null)) },
+                                    )
+                                }
+                            }
+                        } else {
+                            items(schedules, key = { "schedule-${it.scheduleId}" }) { schedule ->
+                                RoutineCard(
+                                    schedule = schedule,
+                                    group = groupsById[schedule.groupId],
+                                    isLive = schedule.scheduleId in activeScheduleIds,
+                                    nowMillis = nowMillis,
+                                    onToggle = { enabled ->
+                                        errors.launchGuarded("Couldn't update the routine.") {
+                                            container.focusScheduleRepository.setEnabled(schedule.scheduleId, enabled)
+                                        }
+                                    },
+                                    onEdit = { onEdit(FocusEditor.Schedule(schedule)) },
+                                )
+                            }
+                        }
+
+                        item(key = "header-sets") {
+                            FocusModeHeader(
+                                mode = null,
+                                title = "App sets",
+                                trailing = {
+                                    AppTextButton(
+                                        text = "New set",
+                                        onClick = { onEdit(FocusEditor.Group(null)) },
+                                    )
+                                },
+                            )
+                        }
+
+                        item(key = "sets-card") {
+                            AppSetsCard(
+                                groups = groups,
+                                onEditSet = { onEdit(FocusEditor.Group(it)) },
+                                onLockSet = { groupToBlock = it },
+                                onNewSet = { onEdit(FocusEditor.Group(null)) },
+                            )
+                        }
+                    }
+
+                    FocusTab.Shorts -> {
+                        shortVideoTabItems(state = shortVideoState)
+                    }
                 }
             }
         }
@@ -643,40 +724,79 @@ private fun RightNowCard(
     activeSessions: List<ArmedSchedule>,
     nextSession: ArmedSchedule?,
     nowMillis: Long,
+    shortVideoActiveCount: Int,
+    onOpenShorts: () -> Unit,
     onEndEarly: (ArmedSchedule) -> Unit,
 ) {
+    val pink = MaterialTheme.extendedColors.accents.pink
     AppCard(modifier = Modifier.fillMaxWidth()) {
         if (blocked.isEmpty()) {
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.SelfImprovement,
-                    contentDescription = null,
-                    tint = MaterialTheme.extendedColors.success,
-                    modifier = Modifier.size(28.dp),
+                AccentIconTile(
+                    icon = Icons.Rounded.SelfImprovement,
+                    accent = MaterialTheme.extendedColors.accents.green,
+                    size = 42.dp,
+                    iconSize = 22.dp,
                 )
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    text = "All apps open",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (nextSession != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = FocusMode.Routine.icon,
-                            contentDescription = null,
-                            tint = FocusMode.Routine.accent,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(Spacing.xs))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "All apps open",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (nextSession != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = FocusMode.Routine.icon,
+                                contentDescription = null,
+                                tint = FocusMode.Routine.accent,
+                                modifier = Modifier.size(13.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "${nextSession.label} starts ${formatOpensAt(nextSession.startMillis)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.extendedColors.textMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    } else {
                         Text(
-                            text = "${nextSession.label} starts ${formatOpensAt(nextSession.startMillis)}",
+                            text = "Lock an app on a timer or set a daily limit below",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.extendedColors.textMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (shortVideoActiveCount > 0) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(pink.asAccentContainer())
+                            .clickable(onClick = onOpenShorts)
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SlowMotionVideo,
+                            contentDescription = null,
+                            tint = pink,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            text = "$shortVideoActiveCount",
+                            style = MaterialTheme.typography.labelSmall.tabularNums,
+                            fontWeight = FontWeight.Bold,
+                            color = pink,
                         )
                     }
                 }
@@ -684,11 +804,42 @@ private fun RightNowCard(
             return@AppCard
         }
 
-        Text(
-            text = "Right now",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.extendedColors.textMuted,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Right now",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.extendedColors.textMuted,
+                modifier = Modifier.weight(1f),
+            )
+            if (shortVideoActiveCount > 0) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(pink.asAccentContainer())
+                        .clickable(onClick = onOpenShorts)
+                        .padding(horizontal = 9.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.SlowMotionVideo,
+                        contentDescription = null,
+                        tint = pink,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Text(
+                        text = "Shorts · $shortVideoActiveCount",
+                        style = MaterialTheme.typography.labelSmall.tabularNums,
+                        fontWeight = FontWeight.SemiBold,
+                        color = pink,
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(Spacing.sm))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             items(blocked, key = { it.key }) { item ->
@@ -703,7 +854,7 @@ private fun RightNowCard(
                     Spacer(Modifier.height(Spacing.xs))
                     Text(
                         text = item.caption,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelSmall.tabularNums,
                         color = item.mode.accent,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -733,7 +884,7 @@ private fun RightNowCard(
                     )
                     Text(
                         text = "${formatFocusRemaining((session.endMillis - nowMillis).coerceAtLeast(0L))} left",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.tabularNums,
                         color = MaterialTheme.extendedColors.textMuted,
                     )
                 }
@@ -747,6 +898,83 @@ private fun RightNowCard(
                 } else {
                     SecondaryButton(text = "End early", onClick = { onEndEarly(session) })
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppSetsCard(
+    groups: List<FocusGroup>,
+    onEditSet: (FocusGroup) -> Unit,
+    onLockSet: (FocusGroup) -> Unit,
+    onNewSet: () -> Unit,
+) {
+    val muted = MaterialTheme.extendedColors.textMuted
+    if (groups.isEmpty()) {
+        AppCard(modifier = Modifier.fillMaxWidth(), onClick = onNewSet) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Create your first app set",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = muted)
+            }
+        }
+        return
+    }
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs),
+    ) {
+        groups.forEachIndexed { index, group ->
+            val setColor = focusSetColor(group.colorIndex)
+            if (index > 0) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 52.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.extendedColors.divider,
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onEditSet(group) }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                SetSwatch(color = setColor, count = group.packageNames.size)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = group.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = if (group.packageNames.size == 1) "1 app" else "${group.packageNames.size} apps",
+                        style = MaterialTheme.typography.bodySmall.tabularNums,
+                        color = muted,
+                    )
+                }
+                if (group.packageNames.isNotEmpty()) {
+                    ModeIconButton(
+                        mode = FocusMode.LockNow,
+                        contentDescription = "Lock ${group.name} now",
+                        onClick = { onLockSet(group) },
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = muted,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }

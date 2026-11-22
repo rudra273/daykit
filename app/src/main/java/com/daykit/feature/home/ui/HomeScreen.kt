@@ -75,6 +75,7 @@ import com.daykit.core.designsystem.components.AppBottomSheet
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.BetaBadge
 import com.daykit.core.designsystem.components.EmptyState
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
@@ -558,13 +559,19 @@ private fun ToolCard(
                     AccentIconTile(icon = tile.icon, accent = tile.accent(), size = tileSize, iconSize = iconSize)
                     Spacer(Modifier.width(Spacing.md))
                     Column(Modifier.weight(1f)) {
-                        Text(
-                            text = tile.name,
-                            style = titleStyle,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = tile.name,
+                                style = titleStyle,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (tile.isBeta) {
+                                Spacer(Modifier.width(6.dp))
+                                BetaBadge()
+                            }
+                        }
                         if (cardSize != HomeCardSize.Compact) {
                             Text(
                                 text = tile.description,
@@ -637,6 +644,8 @@ private fun ToolCard(
                             tint = MaterialTheme.extendedColors.textMuted,
                             modifier = Modifier.size(18.dp),
                         )
+                    } else if (tile.isBeta) {
+                        BetaBadge()
                     }
                 }
                 Spacer(Modifier.height(iconTitleGap))
