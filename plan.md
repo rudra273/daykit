@@ -52,7 +52,7 @@ Please confirm your preferences on these 4 choices (or approve the **Recommended
 
 | # | Decision | Recommended (Apple HIG) | Alternative |
 | --- | --- | --- | --- |
-| 1 | **Dark Mode Base** | **Pure OLED Black (`#000000`)** → `#1C1C1E` cards → `#2C2C2E` elevated sheets | Deep Charcoal (`#0E1013`) → `#1B1D22` cards |
+| 1 | **Dark Mode Base** | **Apple `systemGray6` (`#1C1C1E`)** → `systemGray5` (`#2C2C2E`) cards → `systemGray4` (`#3A3A3C`) elevated sheets/pills | Pure OLED Black (`#000000`) → `#1C1C1E` cards |
 | 2 | **Primary Accent** | **Hinge Coast Blue (`#0088FF` light / `#0A84FF` dark)** + Cyan/Mint harmony | Pure Apple System Blue (`#007AFF` / `#0A84FF`) |
 | 3 | **In-App Tool Icon Tiles** | **Vibrant Apple Squircle Tiles** (rich saturated/subtle-gradient fill + white glyph) | Refined Soft-Tinted Tiles (higher-clarity pastel + saturated glyph) |
 | 4 | **Bottom Navigation Bar** | **Floating Liquid Glass Pill Dock** (iOS 26 style floating capsule + sliding active pill) | Full-width frosted edge-to-edge bar with hairline top border |
@@ -66,8 +66,8 @@ Please confirm your preferences on these 4 choices (or approve the **Recommended
 
 - **[MODIFY] `core/designsystem/Color.kt`**
   - Replace legacy "Meta Classic" Facebook palette with Apple HIG semantic Light/Dark tokens harmonized with Hinge Coast:
-    - **Light:** Grouped base `#F2F2F7`, Cards `#FFFFFF`, Elevated `#FFFFFF`, Input/Field `#E9E9EE`, Hairline divider `#3C3C43` (18%), Primary label `#000000`, Secondary `#57575C` (>= 6.5:1), Tertiary `#3C3C43` (42%), Primary action `#007AE5` (4.6:1 on white) / accent `#0088FF`.
-    - **Dark:** OLED Base `#000000`, Cards `#1C1C1E`, Elevated Sheets/Menus `#2C2C2E`, Input/Field `#2C2C2E`, Hairline divider `#545458` (42%), Primary label `#FFFFFF`, Secondary `#A1A1A8` (>= 7.5:1), Primary `#0A84FF` (5.1:1 on `#1C1C1E`), **`onPrimary = #FFFFFF`** (fixes the dark-navy `AppSwitch` thumb bug!).
+    - **Light (Apple Store iOS App Hierarchy):** Page base `#F2F2F7` (`systemGray6`), Cards `#FFFFFF` (Pure White), Input/Field `#E5E5EA` (`systemGray5`), Outline `#C7C7CC` (`systemGray3`), Hairline divider `#3C3C43` (16%), Primary label `#000000`, Secondary `#6C6C70` (`systemGray` High Contrast, >= 4.68:1 on `#F2F2F7`, 5.25:1 on `#FFFFFF`), Tertiary `#8E8E93` (`systemGray`), Primary action `#0070E0` / accent `#0088FF`.
+    - **Dark (Apple `systemGray` .. `systemGray6` Elevated Hierarchy):** Base `systemGray6` `#1C1C1E`, Cards `systemGray5` `#2C2C2E`, Elevated Sheets/Menus/Controls `systemGray4` `#3A3A3C`, Outline/Track `systemGray3` `#48484A`, Tertiary `systemGray2` `#7C7C80`, Secondary Label `systemGray` `#AEAEB2` (>= 5.3:1 on `#2C2C2E`, 7.0:1 on `#1C1C1E`), Hairline divider `#545458` (32%), Primary `#47A1FF` (5.3:1 on `#2C2C2E`), **`onPrimary = #FFFFFF`**.
     - **WCAG-Safe Status Colors:** Light Warning `#B25000` on `#FFF4E5` (5.1:1!), Light Success `#248A3D`, Light Danger `#D70015`; Dark Success `#30D158`, Dark Warning `#FF9F0A`, Dark Danger `#FF453A`.
     - **Calibrated Accents (11 hues including Hinge Coast `cyan` & `mint`):** iOS Light & Dark calibrated system hues.
   - Add `elevatedCard`, `textTertiary`, `hairlineBorder`, and `warningOnContainer` to `ExtendedColors`.

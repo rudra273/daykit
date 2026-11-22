@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -40,10 +42,10 @@ fun AppListRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            // Global 58dp floor; longer text may increase the measured height.
-            .defaultMinSize(minHeight = 58.dp)
+            // Global 56dp floor; longer text may increase the measured height.
+            .defaultMinSize(minHeight = 56.dp)
             .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier)
-            .padding(horizontal = Spacing.lg, vertical = 3.dp),
+            .padding(horizontal = Spacing.lg, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
@@ -60,7 +62,7 @@ fun AppListRow(
             Text(
                 text = headline,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.extendedColors.textMuted,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.extendedColors.textTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -93,8 +95,10 @@ fun SectionHeader(
         color = MaterialTheme.extendedColors.textMuted,
         // No start inset: callers already pad their content region, so the label
         // aligns flush with the cards' left edge instead of double-indenting.
-        // More space above than below so it hugs its group.
-        modifier = modifier.padding(end = Spacing.lg, top = topPadding, bottom = Spacing.xs),
+        // Marked as an accessibility heading so screen readers can jump by section.
+        modifier = modifier
+            .semantics { heading() }
+            .padding(end = Spacing.lg, top = topPadding, bottom = Spacing.xs),
     )
 }
 
@@ -107,7 +111,7 @@ fun RowDivider(
         modifier = modifier
             .fillMaxWidth()
             .padding(start = startIndent)
-            .height(1.dp)
+            .height(0.5.dp)
             .background(MaterialTheme.extendedColors.divider),
     )
 }

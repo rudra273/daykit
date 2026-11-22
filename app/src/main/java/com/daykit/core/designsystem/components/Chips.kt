@@ -3,8 +3,8 @@ package com.daykit.core.designsystem.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -36,12 +36,13 @@ fun FilterChipButton(
         else -> MaterialTheme.extendedColors.inputField
     }
     val content = when {
-        !enabled -> MaterialTheme.extendedColors.textMuted
+        !enabled -> MaterialTheme.extendedColors.textTertiary
         selected -> MaterialTheme.colorScheme.onPrimaryContainer
         else -> MaterialTheme.colorScheme.onSurface
     }
     Box(
         modifier = modifier
+            .defaultMinSize(minHeight = 38.dp)
             .glassControl(CircleShape)
             .clip(CircleShape)
             .background(container)

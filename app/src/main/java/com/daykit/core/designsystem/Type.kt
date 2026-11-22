@@ -7,43 +7,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * Full Material 3 type scale using the system font (Roboto / [FontFamily.Default]).
- * No custom font resources exist in the project.
+ * Apple HIG-calibrated type scale using the system sans font ([FontFamily.Default]).
+ * Enforces a minimum 12.sp floor for captions/labels and optical negative tracking on
+ * display/headline styles.
  */
 private val Default = FontFamily.Default
 
+/** Applies tabular numeral spacing (`tnum`) so timers, metrics, and currency columns never jitter. */
+val TextStyle.tabularNums: TextStyle
+    get() = copy(fontFeatureSettings = "tnum")
+
 val DayKitTypography = Typography(
     displayLarge = TextStyle(
-        fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 52.sp, lineHeight = 58.sp,
+        fontFamily = Default, fontWeight = FontWeight.SemiBold,
+        fontSize = 52.sp, lineHeight = 58.sp, letterSpacing = (-0.8).sp,
     ),
     displayMedium = TextStyle(
-        fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 40.sp, lineHeight = 46.sp,
+        fontFamily = Default, fontWeight = FontWeight.SemiBold,
+        fontSize = 40.sp, lineHeight = 46.sp, letterSpacing = (-0.6).sp,
     ),
     displaySmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 30.sp, lineHeight = 36.sp,
+        fontSize = 30.sp, lineHeight = 36.sp, letterSpacing = (-0.4).sp,
     ),
     headlineLarge = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Bold,
-        fontSize = 28.sp, lineHeight = 34.sp,
+        fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.4).sp,
     ),
     headlineMedium = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 23.sp, lineHeight = 28.sp,
+        fontSize = 23.sp, lineHeight = 28.sp, letterSpacing = (-0.3).sp,
     ),
     headlineSmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 20.sp, lineHeight = 25.sp,
+        fontSize = 20.sp, lineHeight = 25.sp, letterSpacing = (-0.2).sp,
     ),
     titleLarge = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 18.sp, lineHeight = 23.sp,
+        fontSize = 18.sp, lineHeight = 23.sp, letterSpacing = (-0.15).sp,
     ),
     titleMedium = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Medium,
-        fontSize = 15.sp, lineHeight = 20.sp,
+        fontSize = 15.sp, lineHeight = 20.sp, letterSpacing = (-0.1).sp,
     ),
     titleSmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
@@ -51,7 +56,7 @@ val DayKitTypography = Typography(
     ),
     bodyLarge = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 15.sp, lineHeight = 21.sp, letterSpacing = 0.1.sp,
+        fontSize = 15.sp, lineHeight = 21.sp,
     ),
     bodyMedium = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Normal,
@@ -59,7 +64,7 @@ val DayKitTypography = Typography(
     ),
     bodySmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Normal,
-        fontSize = 11.sp, lineHeight = 15.sp,
+        fontSize = 12.sp, lineHeight = 16.sp,
     ),
     labelLarge = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
@@ -67,10 +72,10 @@ val DayKitTypography = Typography(
     ),
     labelMedium = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 11.sp, lineHeight = 15.sp,
+        fontSize = 12.sp, lineHeight = 16.sp,
     ),
     labelSmall = TextStyle(
         fontFamily = Default, fontWeight = FontWeight.Medium,
-        fontSize = 10.sp, lineHeight = 13.sp,
+        fontSize = 12.sp, lineHeight = 15.sp,
     ),
 )
