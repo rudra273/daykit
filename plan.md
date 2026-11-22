@@ -90,8 +90,8 @@ Please confirm your preferences on these 4 choices (or approve the **Recommended
 **Scope:** Fix the bottom bar bleed-through, top bar alignment, and modal elevation hierarchy.
 
 - **[MODIFY] `navigation/RootScaffold.kt`**
-  - Replace full-width translucent slab with a **Floating Liquid Glass Pill Dock** (`RoundedCornerShape(32.dp)`, floating `12.dp` above the nav inset) with subtle bottom scroll-edge fade gradient, specular rim, and spring-sliding active tab capsule.
-  - Automatic solid elevated pill fallback under `LocalReduceTransparency`.
+  - **Default (`Flat` / `Clay`):** Clean Apple edge-to-edge bottom navigation bar (`chromeBackground()`) with a crisp `0.5.dp` top hairline separator (`extendedColors.divider`).
+  - **Liquid Glass (`isLiquidGlass() == true`):** iOS 26 **Floating Liquid Glass Pill Dock** (`RoundedCornerShape(32.dp)`, floating above the nav inset) with bottom scroll-edge fade gradient, specular rim, and spring-sliding active tab capsule.
 - **[MODIFY] `core/designsystem/components/TopBar.kt` & `Chrome.kt`**
   - Fix left-edge alignment so titles align flush with `Spacing.lg` (`16.dp`) content cards below (`Home`, `Today`, `Settings`).
   - Add scroll-reactive `0.5.dp` hairline / soft edge separation and capsule inline search bar in `SearchAppTopBar`.

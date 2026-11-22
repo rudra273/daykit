@@ -3,10 +3,13 @@ package com.daykit.core.designsystem.components
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -26,9 +29,12 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.ExtendedColors
+import com.daykit.core.designsystem.LocalReduceTransparency
 import com.daykit.core.designsystem.background.CardStyle
 import com.daykit.core.designsystem.background.LocalCardStyle
+import com.daykit.core.designsystem.background.LocalPageBackground
 import com.daykit.core.designsystem.background.frostedBackdrop
+import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.designsystem.isAppInDarkTheme
 
 /*
@@ -36,15 +42,16 @@ import com.daykit.core.designsystem.isAppInDarkTheme
  * different strength:
  *   frosted page background (window-aligned, see frostedBackdrop)
  *   + a tint for legibility
- *   + a dithered sheen across the top (cards only)
+ *   + a dithered sheen across the top (cards & floating dock)
  *   + a 1dp rim that catches light at the top-left.
- * Cards, controls and grouped panels differ only in tint and rim.
+ * Cards, controls, floating navigation chrome, and grouped panels differ only in tint and rim.
  */
 
-/** True while the user's card style is Liquid glass. */
+/** True while the user's card style is Liquid glass and Reduce Transparency is off. */
 @Composable
 @ReadOnlyComposable
-fun isLiquidGlass(): Boolean = LocalCardStyle.current == CardStyle.Glass
+fun isLiquidGlass(): Boolean =
+    LocalCardStyle.current == CardStyle.Glass && !LocalReduceTransparency.current
 
 /**
  * Glass variants of the shared fills, applied by `DayKitTheme` in Liquid glass
@@ -53,9 +60,9 @@ fun isLiquidGlass(): Boolean = LocalCardStyle.current == CardStyle.Glass
  * Text-field boxes ([ExtendedColors.fieldFill]) deliberately stay solid.
  */
 fun ExtendedColors.forLiquidGlass(): ExtendedColors = copy(
-    inputField = if (isDark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.55f),
+    inputField = if (isDark) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.62f),
     divider = if (isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.07f),
-    actionFill = actionFill.copy(alpha = 0.88f),
+    actionFill = actionFill.copy(alpha = 0.90f),
 )
 
 /** A glass card: the full recipe. */
@@ -67,6 +74,77 @@ internal fun Modifier.liquidGlassCard(shape: Shape): Modifier {
         .innerBevel(shape, tokens.rim(strength = 1f))
         .glassSheen(shape, tokens.sheen)
         .frostedBackdrop(shape, tokens.cardTint)
+}
+
+/**
+ * Surface treatment for the floating bottom navigation capsule dock.
+ * Keeps the floating capsule shape in every mode, while matching the active [CardStyle]:
+ * - [CardStyle.Flat]: crisp opaque card fill + subtle 1dp hairline border + soft elevation shadow.
+ * - [CardStyle.Clay]: opaque card fill + soft clay highlight/shade bevel + elevation shadow.
+ * - [CardStyle.Glass]: full iOS 26 Liquid Glass (frosted backdrop + specular rim + top sheen).
+ */
+@Composable
+fun Modifier.floatingDockSurface(shape: Shape, elevation: Dp = 12.dp): Modifier {
+    val dark = isAppInDarkTheme()
+    val style = LocalCardStyle.current
+    val ext = MaterialTheme.extendedColors
+    val tokens = GlassTokens.of(dark)
+    val ambientShadow = if (dark) Color.Black.copy(alpha = 0.50f) else Color(0xFF1C263B).copy(alpha = 0.16f)
+    val spotShadow = if (dark) Color.Black.copy(alpha = 0.62f) else Color(0xFF1C263B).copy(alpha = 0.22f)
+
+    return when (style) {
+        CardStyle.Flat -> {
+            val borderColor = if (dark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.07f)
+            this
+                .shadow(
+                    elevation = elevation,
+                    shape = shape,
+                    clip = false,
+                    ambientColor = ambientShadow,
+                    spotColor = spotShadow,
+                )
+                .clip(shape)
+                .background(ext.card)
+                .innerBevel(shape, Brush.verticalGradient(listOf(borderColor, borderColor)))
+        }
+        CardStyle.Clay -> {
+            val topHighlight = if (dark) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.90f)
+            val bottomShade = if (dark) Color.Black.copy(alpha = 0.28f) else Color(0xFF3A4A6B).copy(alpha = 0.12f)
+            this
+                .shadow(
+                    elevation = elevation,
+                    shape = shape,
+                    clip = false,
+                    ambientColor = ambientShadow,
+                    spotColor = spotShadow,
+                )
+                .clip(shape)
+                .background(ext.card)
+                .innerBevel(
+                    shape,
+                    Brush.verticalGradient(0.0f to topHighlight, 0.5f to Color.Transparent, 1.0f to bottomShade),
+                )
+        }
+        CardStyle.Glass -> {
+            val page = LocalPageBackground.current
+            val dockTint = when {
+                page.isDecorated -> if (dark) Color(0xFF242426).copy(alpha = 0.68f) else Color.White.copy(alpha = 0.68f)
+                dark -> Color(0xFF2C2C2E).copy(alpha = 0.88f)
+                else -> Color.White.copy(alpha = 0.88f)
+            }
+            this
+                .shadow(
+                    elevation = elevation,
+                    shape = shape,
+                    clip = false,
+                    ambientColor = ambientShadow,
+                    spotColor = spotShadow,
+                )
+                .innerBevel(shape, tokens.rim(strength = 1.05f))
+                .glassSheen(shape, tokens.sheen * 0.9f)
+                .frostedBackdrop(shape, dockTint)
+        }
+    }
 }
 
 /**
@@ -102,7 +180,7 @@ enum class GroupPosition { Single, First, Middle, Last }
  * only its outer edges get the rim. A no-op outside Liquid glass mode.
  */
 @Composable
-fun Modifier.glassGroupItem(position: GroupPosition, cornerRadius: Dp = 20.dp): Modifier {
+fun Modifier.glassGroupItem(position: GroupPosition, cornerRadius: Dp = 18.dp): Modifier {
     if (!isLiquidGlass()) return this
     val tokens = GlassTokens.of(isAppInDarkTheme())
     val top = position == GroupPosition.Single || position == GroupPosition.First
@@ -191,27 +269,27 @@ private class GlassTokens(
 ) {
     /** The rim: bright at the top-left, fading around the surface. [strength] scales it. */
     fun rim(strength: Float): Brush = Brush.linearGradient(
-        0.0f to rimLight.copy(alpha = rimLight.alpha * strength),
-        0.45f to rimMid.copy(alpha = rimMid.alpha * strength),
-        1.0f to rimShade.copy(alpha = rimShade.alpha * strength),
+        0.0f to rimLight.copy(alpha = (rimLight.alpha * strength).coerceAtMost(1f)),
+        0.45f to rimMid.copy(alpha = (rimMid.alpha * strength).coerceAtMost(1f)),
+        1.0f to rimShade.copy(alpha = (rimShade.alpha * strength).coerceAtMost(1f)),
     )
 
     companion object {
         private val Light = GlassTokens(
-            cardTint = Color.White.copy(alpha = 0.45f),
-            sheen = 0.22f,
-            rimLight = Color.White.copy(alpha = 0.85f),
-            rimMid = Color.White.copy(alpha = 0.13f),
-            rimShade = Color.White.copy(alpha = 0.30f),
-            shadow = Color(0xFF3A4A6B).copy(alpha = 0.18f),
+            cardTint = Color.White.copy(alpha = 0.52f),
+            sheen = 0.24f,
+            rimLight = Color.White.copy(alpha = 0.90f),
+            rimMid = Color.White.copy(alpha = 0.20f),
+            rimShade = Color(0xFFD1D1D6).copy(alpha = 0.42f),
+            shadow = Color(0xFF2C3A58).copy(alpha = 0.16f),
         )
         private val Dark = GlassTokens(
-            cardTint = Color(0xFF16171A).copy(alpha = 0.50f),
-            sheen = 0.08f,
-            rimLight = Color.White.copy(alpha = 0.32f),
-            rimMid = Color.White.copy(alpha = 0.05f),
-            rimShade = Color.White.copy(alpha = 0.10f),
-            shadow = Color.Black.copy(alpha = 0.35f),
+            cardTint = Color(0xFF2C2C2E).copy(alpha = 0.58f),
+            sheen = 0.10f,
+            rimLight = Color.White.copy(alpha = 0.34f),
+            rimMid = Color.White.copy(alpha = 0.08f),
+            rimShade = Color.White.copy(alpha = 0.14f),
+            shadow = Color.Black.copy(alpha = 0.42f),
         )
 
         fun of(dark: Boolean) = if (dark) Dark else Light
