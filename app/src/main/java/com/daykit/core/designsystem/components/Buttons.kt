@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.designsystem.pressScale
 
 private val ButtonHeight = 38.dp
 
@@ -42,6 +43,7 @@ fun PrimaryButton(
         onClick = onClick,
         enabled = enabled && !loading,
         modifier = modifier
+            .pressScale(enabled = enabled && !loading, pressedScale = 0.96f)
             .minimumInteractiveComponentSize()
             .height(compactButtonHeight())
             .glassControl(MaterialTheme.shapes.medium),
@@ -82,6 +84,7 @@ fun SecondaryButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
+            .pressScale(enabled = enabled, pressedScale = 0.96f)
             .minimumInteractiveComponentSize()
             .height(compactButtonHeight())
             .glassControl(MaterialTheme.shapes.medium),
@@ -121,6 +124,7 @@ fun DestructiveButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
+            .pressScale(enabled = enabled, pressedScale = 0.96f)
             .minimumInteractiveComponentSize()
             .height(compactButtonHeight())
             .glassControl(MaterialTheme.shapes.medium),

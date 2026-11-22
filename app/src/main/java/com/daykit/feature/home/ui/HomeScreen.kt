@@ -64,7 +64,11 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import com.daykit.AppContainer
+import com.daykit.core.designsystem.DayKitMotion
+import com.daykit.core.designsystem.LocalReduceMotion
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppBottomSheet
@@ -513,15 +517,21 @@ private fun ToolCard(
         else -> MaterialTheme.typography.titleMedium
     }
 
+    val reduceMotion = LocalReduceMotion.current
+    val dragScale by animateFloatAsState(
+        targetValue = if (editMode && isDragging) 1.06f else 1f,
+        animationSpec = if (reduceMotion) snap() else DayKitMotion.controlSpring(),
+        label = "dragScale",
+    )
     val dragModifier = if (editMode) {
         Modifier
             .zIndex(if (isDragging) 10f else 0f)
             .graphicsLayer {
                 translationX = dragOffset.x
                 translationY = dragOffset.y
-                scaleX = if (isDragging) 1.05f else 1f
-                scaleY = if (isDragging) 1.05f else 1f
-                shadowElevation = if (isDragging) 16f else 0f
+                scaleX = dragScale
+                scaleY = dragScale
+                shadowElevation = if (isDragging) 18f else 0f
             }
             .pointerInput(tile.route) {
                 detectDragGestures(

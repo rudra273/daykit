@@ -33,6 +33,7 @@ import com.daykit.core.designsystem.background.CardStyle
 import com.daykit.core.designsystem.background.LocalCardStyle
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.designsystem.isAppInDarkTheme
+import com.daykit.core.designsystem.pressScale
 import com.daykit.core.designsystem.tabularNums
 
 /**
@@ -71,7 +72,14 @@ fun AppCard(
         Column(Modifier.padding(contentPadding), content = content)
     }
     if (onClick != null) {
-        Card(onClick = onClick, modifier = surface, shape = shape, colors = colors, elevation = elevation, content = body)
+        Card(
+            onClick = onClick,
+            modifier = surface.pressScale(pressedScale = 0.97f),
+            shape = shape,
+            colors = colors,
+            elevation = elevation,
+            content = body,
+        )
     } else {
         Card(modifier = surface, shape = shape, colors = colors, elevation = elevation, content = body)
     }

@@ -1,5 +1,6 @@
 package com.daykit.core.designsystem.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
@@ -34,11 +34,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.MinTouchTarget
 import com.daykit.core.designsystem.Spacing
@@ -246,28 +252,51 @@ fun SearchAppTopBar(
     }
 }
 
-/** Apple-style circular back chevron button with a full 48dp touch target. */
+/**
+ * Apple-style circular back chevron button with a full 48dp touch target.
+ * Custom-drawn chevron path so the optical centroid of `<` sits dead-center inside
+ * the 34dp circular pill (avoiding Material's off-center `ArrowBackIos` viewport).
+ */
 @Composable
 fun AppBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val chevronColor = MaterialTheme.colorScheme.onSurface
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     IconButton(onClick = onClick, modifier = modifier.size(MinTouchTarget)) {
         Box(
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.extendedColors.inputField.copy(alpha = 0.75f)),
+                .background(MaterialTheme.extendedColors.inputField.copy(alpha = 0.85f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                Icons.AutoMirrored.Rounded.ArrowBackIos,
-                contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .padding(start = 5.dp)
-                    .size(16.dp),
-            )
+            Canvas(modifier = Modifier.size(18.dp)) {
+                val w = size.width
+                val h = size.height
+                // Optical center for a left chevron `<`: vertex at 33% width, arms at 63% width
+                // (centroid = 48% width, 50% height). Flips automatically in RTL.
+                val tipX = if (isRtl) w * 0.67f else w * 0.33f
+                val armX = if (isRtl) w * 0.37f else w * 0.63f
+                val topY = h * 0.22f
+                val midY = h * 0.50f
+                val botY = h * 0.78f
+                val path = Path().apply {
+                    moveTo(armX, topY)
+                    lineTo(tipX, midY)
+                    lineTo(armX, botY)
+                }
+                drawPath(
+                    path = path,
+                    color = chevronColor,
+                    style = Stroke(
+                        width = 2.1.dp.toPx(),
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round,
+                    ),
+                )
+            }
         }
     }
 }
