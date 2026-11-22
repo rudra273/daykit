@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.Wallpaper
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -74,7 +75,9 @@ import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.feature.eventlight.service.EventLightRingCanvas
 import com.daykit.feature.widget.DayflowWidgetProvider
+import com.daykit.feature.widget.EventLightWidgetProvider
 import com.daykit.feature.widget.ExpenseQuickAddWidgetProvider
 import com.daykit.feature.widget.HabitCheckInWidgetProvider
 import com.daykit.feature.widget.ReminderWidgetProvider
@@ -162,6 +165,16 @@ fun CanvasScreen(
                 icon = Icons.Rounded.NotificationsActive,
                 accent = { MaterialTheme.extendedColors.accents.orange },
                 providerClass = ReminderWidgetProvider::class.java,
+            ),
+            CanvasWidgetItem(
+                id = "eventlight",
+                title = "Edge Light",
+                toolName = "Event Light",
+                description = "Turn the glowing screen edge light on or off right from your home screen without opening DayKit.",
+                sizeLabel = "2 × 1",
+                icon = Icons.Rounded.WbSunny,
+                accent = { MaterialTheme.extendedColors.accents.teal },
+                providerClass = EventLightWidgetProvider::class.java,
             ),
         )
     }
@@ -515,6 +528,48 @@ private fun DayKitToolMiniPreview(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+
+            "eventlight" -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF121418)),
+                    ) {
+                        EventLightRingCanvas(
+                            thicknessDp = 3.5f,
+                            colorTemp = 0.18f,
+                            cornerRadiusDp = 8.dp,
+                            edgeInsetDp = 5.dp,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Event Light", color = fg, style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(2.dp))
+                        Text("Edge light active", color = muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(accent)
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "ON",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }

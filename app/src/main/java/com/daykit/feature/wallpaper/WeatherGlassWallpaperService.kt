@@ -71,7 +71,9 @@ class WeatherGlassWallpaperService : WallpaperService() {
         private var useFahrenheit: Boolean = WeatherPrefs.useFahrenheit(applicationContext)
         private var onlyOnFirstPage: Boolean = WeatherPrefs.onlyOnFirstPage(applicationContext)
         private var widgetSlots: List<WallpaperWidgetSlot> = WallpaperLayoutPrefs.loadSlots(applicationContext)
+        private var activePreset: WallpaperPreset? = WallpaperPreset.fromId(WeatherPrefs.wallpaperPresetId(applicationContext))
         private var loadedPhotoVersion: Long = -1L
+        private var elapsedSeconds: Float = 0f
 
         private var cachedDataAt = 0L
         private var cachedSolar: SolarArcState = DailyWidgetDataProvider.loadSolarArcState(applicationContext)
@@ -202,6 +204,7 @@ class WeatherGlassWallpaperService : WallpaperService() {
             useFahrenheit = WeatherPrefs.useFahrenheit(applicationContext)
             onlyOnFirstPage = WeatherPrefs.onlyOnFirstPage(applicationContext)
             widgetSlots = WallpaperLayoutPrefs.loadSlots(applicationContext)
+            activePreset = WallpaperPreset.fromId(WeatherPrefs.wallpaperPresetId(applicationContext))
             reloadWallpaperPhotoIfNeeded(force = false)
         }
 
@@ -224,6 +227,23 @@ class WeatherGlassWallpaperService : WallpaperService() {
             bgBlurredBitmap?.recycle()
             bgBitmap = null
             bgBlurredBitmap = null
+
+            val preset = activePreset
+            if (preset != null) {
+                if (preset.isLive) {
+                    // Live procedural presets render directly each frame at 60fps.
+                    return
+                }
+                // Static procedural preset: render once at surface resolution + blurred copy for Liquid Glass widgets.
+                runCatching {
+                    val targetW = surfaceW.coerceIn(360, 1440)
+                    val targetH = surfaceH.coerceIn(640, 2560)
+                    val rendered = LiquidGlassWallpaperRenderer.renderBitmap(preset, targetW, targetH)
+                    bgBitmap = rendered
+                    bgBlurredBitmap = createSoftBlurredCopy(rendered)
+                }
+                return
+            }
 
             val file = WeatherPrefs.wallpaperPhotoFile(applicationContext)
             if (!file.exists() || file.length() == 0L) return
@@ -277,13 +297,22 @@ class WeatherGlassWallpaperService : WallpaperService() {
             val h = canvas.height.toFloat()
             val t = snapshot.intensity.coerceIn(0f, 1f)
             val wind = snapshot.windStrength.coerceIn(0f, 1f)
+            elapsedSeconds += dt
 
-            // 1. Full-screen background (user's chosen photo or sleek atmospheric gradient)
+            // 1. Full-screen background (Live procedural preset, Static preset, user photo, or default)
+            val preset = activePreset
+            val isLiveBackdrop = preset != null && preset.isLive
             val photo = bgBitmap
-            if (photo != null && !photo.isRecycled) {
-                drawCenterCrop(canvas, photo, w, h, bgPaint)
-            } else {
-                drawDefaultBackdrop(canvas, w, h, t)
+            when {
+                isLiveBackdrop -> {
+                    LiquidGlassWallpaperRenderer.draw(canvas, preset!!, w, h, elapsedSeconds)
+                }
+                photo != null && !photo.isRecycled -> {
+                    drawCenterCrop(canvas, photo, w, h, bgPaint)
+                }
+                else -> {
+                    drawDefaultBackdrop(canvas, w, h, t)
+                }
             }
 
             // 2. If no widgets are placed on the wallpaper, show just the clean backdrop
@@ -361,9 +390,11 @@ class WeatherGlassWallpaperService : WallpaperService() {
                     drawCubeTextAndIcon(canvas, cardSize, t, wind)
                     canvas.restore()
                 } else {
-                    // For Liquid Glass widgets, draw pixel-aligned frosted blur of user photo first
+                    // For Liquid Glass widgets, draw pixel-aligned frosted blur of static/photo backdrop
                     val hasBlurBackdrop = slot.type.style == DailyWidgetStyle.LIQUID_GLASS &&
                         blurred != null && !blurred.isRecycled
+                    val useLiquidGlassBackdrop = hasBlurBackdrop ||
+                        (slot.type.style == DailyWidgetStyle.LIQUID_GLASS && isLiveBackdrop)
                     if (hasBlurBackdrop) {
                         val cr = when (slot.type) {
                             DailyWidgetType.LIQUID_GLASS_CLOCK -> cardH * 0.24f
@@ -379,11 +410,11 @@ class WeatherGlassWallpaperService : WallpaperService() {
 
                     when (slot.type) {
                         DailyWidgetType.SOLAR_ARC ->
-                            DailyWidgetRenderer.drawSolarArc(canvas, cardRect, cachedSolar, overWallpaperBlur = hasBlurBackdrop)
+                            DailyWidgetRenderer.drawSolarArc(canvas, cardRect, cachedSolar, overWallpaperBlur = useLiquidGlassBackdrop)
                         DailyWidgetType.RADIAL_DIAL_CLOCK ->
-                            DailyWidgetRenderer.drawRadialDialClock(canvas, cardRect, nowMillis, overWallpaperBlur = hasBlurBackdrop)
+                            DailyWidgetRenderer.drawRadialDialClock(canvas, cardRect, nowMillis, overWallpaperBlur = useLiquidGlassBackdrop)
                         DailyWidgetType.LIQUID_GLASS_CLOCK ->
-                            DailyWidgetRenderer.drawLiquidGlassClock(canvas, cardRect, nowMillis, overWallpaperBlur = hasBlurBackdrop)
+                            DailyWidgetRenderer.drawLiquidGlassClock(canvas, cardRect, nowMillis, overWallpaperBlur = useLiquidGlassBackdrop)
                         DailyWidgetType.STEPS_BAR_CHART ->
                             DailyWidgetRenderer.drawStepsBarChart(canvas, cardRect, cachedSteps)
                         DailyWidgetType.BENTO_BATTERY ->

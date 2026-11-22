@@ -67,8 +67,8 @@ enum class DailyWidgetType(
     ),
     STEPS_BAR_CHART(
         id = "steps_chart",
-        title = "Steps Tracker",
-        subtitle = "Daily activity bars & distance",
+        title = "Run & Walk Tracker",
+        subtitle = "Start/stop session steps, km & history",
         style = DailyWidgetStyle.SOLID,
         sizeLabel = "4 × 2",
         aspectRatio = 1.72f,
@@ -192,19 +192,26 @@ data class SolarArcState(
     val isDaytime: Boolean,
 )
 
-data class StepsBarDay(
-    val dayOfMonth: Int,
+data class StepRunSession(
+    val id: String,
+    val startMillis: Long,
+    val endMillis: Long,
     val steps: Int,
-    val isToday: Boolean,
-    val isFuture: Boolean,
-)
+    val isActive: Boolean = false,
+) {
+    val distanceKm: Float get() = steps * 0.00076f
+    val durationMinutes: Int get() = (((endMillis - startMillis).coerceAtLeast(0L)) / 60_000L).toInt()
+}
 
 data class StepsChartState(
-    val monthLabel: String,
-    val todaySteps: Int,
-    val distanceKm: Float,
-    val days: List<StepsBarDay>,
-)
+    val isRunning: Boolean,
+    val selectedIndex: Int,
+    val sessions: List<StepRunSession>,
+    val totalSlots: Int = 7,
+) {
+    val selectedSession: StepRunSession?
+        get() = sessions.getOrNull(selectedIndex) ?: sessions.lastOrNull()
+}
 
 data class BatteryState(
     val levelPercent: Int,
@@ -303,52 +310,8 @@ object DailyWidgetDataProvider {
         )
     }
 
-    fun loadStepsState(context: Context, nowMillis: Long = System.currentTimeMillis()): StepsChartState {
-        val cal = Calendar.getInstance().apply { timeInMillis = nowMillis }
-        val monthName = SimpleDateFormat("MMMM", Locale.getDefault()).format(cal.time)
-        val prefs = context.applicationContext.getSharedPreferences(STEPS_PREFS, Context.MODE_PRIVATE)
-        val dayKeyFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-
-        // 9 days window: 4 past days, today (index 4), 4 upcoming days
-        val days = mutableListOf<StepsBarDay>()
-        var todaySteps = 0
-        for (offset in -4..4) {
-            val c = Calendar.getInstance().apply {
-                timeInMillis = nowMillis
-                add(Calendar.DAY_OF_YEAR, offset)
-            }
-            val key = "steps_${dayKeyFmt.format(c.time)}"
-            val stored = prefs.getInt(key, -1)
-            val steps = when {
-                offset > 0 -> 0
-                stored >= 0 -> stored
-                else -> 0
-            }
-            if (offset == 0) todaySteps = steps
-            days.add(
-                StepsBarDay(
-                    dayOfMonth = c.get(Calendar.DAY_OF_MONTH),
-                    steps = steps,
-                    isToday = offset == 0,
-                    isFuture = offset > 0,
-                ),
-            )
-        }
-        return StepsChartState(
-            monthLabel = monthName,
-            todaySteps = todaySteps,
-            distanceKm = todaySteps * 0.00076f,
-            days = days,
-        )
-    }
-
-    fun recordTodaySteps(context: Context, steps: Int) {
-        val dayKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        context.applicationContext.getSharedPreferences(STEPS_PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putInt("steps_$dayKey", steps.coerceAtLeast(0))
-            .apply()
-    }
+    fun loadStepsState(context: Context, nowMillis: Long = System.currentTimeMillis()): StepsChartState =
+        DeviceStepCounter.loadSessionState(context, nowMillis)
 
     fun loadAgendaState(nowMillis: Long = System.currentTimeMillis()): AgendaState {
         val date = Date(nowMillis)

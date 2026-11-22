@@ -40,4 +40,10 @@ Open DayKit to add a reminder.</string>
     <string name="widget_bento_agenda_description">Minimalist editorial date and today schedule card.</string>
     <string name="wallpaper_weather_glass_title">DayKit Glass Weather</string>
     <string name="wallpaper_weather_glass_description">60fps animated frosted-glass weather cube over your chosen wallpaper photo.</string>
+    <string name="widget_event_light_title">Event Light</string>
+    <string name="widget_event_light_description">Toggle the screen edge light on or off right from your home screen.</string>
+    <string name="widget_event_light_on">Edge light active</string>
+    <string name="widget_event_light_off">Tap to turn on</string>
+    <string name="widget_event_light_badge_on">ON</string>
+    <string name="widget_event_light_badge_off">OFF</string>
 </resources>

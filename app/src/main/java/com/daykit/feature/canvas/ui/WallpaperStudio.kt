@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,9 +41,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -53,12 +58,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -66,6 +73,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -86,6 +95,8 @@ import com.daykit.feature.dailywidgets.DailyWidgetStyle
 import com.daykit.feature.dailywidgets.DailyWidgetType
 import com.daykit.feature.dailywidgets.WallpaperLayoutPrefs
 import com.daykit.feature.dailywidgets.WallpaperWidgetSlot
+import com.daykit.feature.wallpaper.LiquidGlassWallpaperRenderer
+import com.daykit.feature.wallpaper.WallpaperPreset
 import com.daykit.feature.wallpaper.WeatherGlassWallpaperService
 import com.daykit.feature.weather.WeatherPrefs
 import kotlinx.coroutines.Dispatchers
@@ -130,6 +141,9 @@ fun WallpaperStudioSection(
 
     var hasWallpaperPhoto by remember { mutableStateOf(WeatherPrefs.hasWallpaperPhoto(context)) }
     var photoVersion by remember { mutableLongStateOf(WeatherPrefs.wallpaperPhotoVersion(context)) }
+    var selectedPreset by remember {
+        mutableStateOf(WallpaperPreset.fromId(WeatherPrefs.wallpaperPresetId(context)))
+    }
     var onlyOnFirstPage by remember { mutableStateOf(WeatherPrefs.onlyOnFirstPage(context)) }
     var slots by remember { mutableStateOf(WallpaperLayoutPrefs.loadSlots(context)) }
     var selectedUid by remember { mutableStateOf(slots.firstOrNull()?.uid) }
@@ -137,6 +151,22 @@ fun WallpaperStudioSection(
 
     var isLiveActive by remember(refreshTrigger) { mutableStateOf(isDayKitLiveWallpaperActive(context)) }
     var isRemoving by remember { mutableStateOf(false) }
+    var isApplyingStatic by remember { mutableStateOf(false) }
+
+    var liveAnimSeconds by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(selectedPreset) {
+        if (selectedPreset?.isLive == true) {
+            var startNanos = 0L
+            while (true) {
+                withFrameNanos { frameNanos ->
+                    if (startNanos == 0L) startNanos = frameNanos
+                    liveAnimSeconds = (frameNanos - startNanos) / 1_000_000_000f
+                }
+            }
+        } else {
+            liveAnimSeconds = 0f
+        }
+    }
 
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -160,12 +190,28 @@ fun WallpaperStudioSection(
     }
 
     var previewBgBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(photoVersion, hasWallpaperPhoto) {
-        previewBgBitmap = if (hasWallpaperPhoto) {
-            withContext(Dispatchers.IO) {
+    var photoThumbBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(photoVersion, hasWallpaperPhoto, selectedPreset) {
+        val preset = selectedPreset
+        previewBgBitmap = when {
+            preset != null && preset.isLive -> null
+            preset != null && !preset.isLive -> withContext(Dispatchers.Default) {
+                LiquidGlassWallpaperRenderer.renderBitmap(preset, 540, 1170)
+            }
+            hasWallpaperPhoto -> withContext(Dispatchers.IO) {
                 val file = WeatherPrefs.wallpaperPhotoFile(context)
                 if (file.exists()) {
                     val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
+                    runCatching { BitmapFactory.decodeFile(file.absolutePath, opts) }.getOrNull()
+                } else null
+            }
+            else -> null
+        }
+        photoThumbBitmap = if (hasWallpaperPhoto) {
+            withContext(Dispatchers.IO) {
+                val file = WeatherPrefs.wallpaperPhotoFile(context)
+                if (file.exists()) {
+                    val opts = BitmapFactory.Options().apply { inSampleSize = 6 }
                     runCatching { BitmapFactory.decodeFile(file.absolutePath, opts) }.getOrNull()
                 } else null
             }
@@ -182,12 +228,32 @@ fun WallpaperStudioSection(
                 val ok = WeatherPrefs.importWallpaperPhoto(context, uri)
                 if (ok) {
                     hasWallpaperPhoto = true
+                    selectedPreset = null
                     photoVersion = WeatherPrefs.wallpaperPhotoVersion(context)
-                    onShowMessage("Wallpaper background updated")
+                    onShowMessage("Wallpaper photo updated")
                 } else {
                     onShowMessage("Could not load selected photo")
                 }
             }
+        }
+    }
+
+    fun selectPreset(preset: WallpaperPreset) {
+        selectedPreset = preset
+        WeatherPrefs.setWallpaperPreset(context, preset.id)
+        photoVersion = WeatherPrefs.wallpaperPhotoVersion(context)
+    }
+
+    fun selectPhotoBackdrop() {
+        if (hasWallpaperPhoto) {
+            selectedPreset = null
+            WeatherPrefs.setWallpaperPreset(context, null)
+            photoVersion = WeatherPrefs.wallpaperPhotoVersion(context)
+        } else {
+            markExpectingActivityResult(context)
+            photoPickerLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
         }
     }
 
@@ -298,8 +364,21 @@ fun WallpaperStudioSection(
             val frameW = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
             val frameH = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
 
+            val activeLivePreset = selectedPreset?.takeIf { it.isLive }
             val bg = previewBgBitmap
-            if (bg != null && !bg.isRecycled) {
+            if (activeLivePreset != null) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawIntoCanvas { canvas ->
+                        LiquidGlassWallpaperRenderer.draw(
+                            canvas = canvas.nativeCanvas,
+                            preset = activeLivePreset,
+                            width = size.width,
+                            height = size.height,
+                            timeSeconds = liveAnimSeconds,
+                        )
+                    }
+                }
+            } else if (bg != null && !bg.isRecycled) {
                 Image(
                     bitmap = bg.asImageBitmap(),
                     contentDescription = null,
@@ -417,8 +496,9 @@ fun WallpaperStudioSection(
                             stepsState = stepsState,
                             batteryState = batteryState,
                             agendaState = agendaState,
-                            darkSurface = isDark,
-                            overWallpaperBlur = slot.type.style == DailyWidgetStyle.LIQUID_GLASS && bg != null,
+                            darkSurface = selectedPreset?.isDark ?: isDark,
+                            overWallpaperBlur = slot.type.style == DailyWidgetStyle.LIQUID_GLASS &&
+                                (bg != null || activeLivePreset != null),
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -449,6 +529,17 @@ fun WallpaperStudioSection(
 
         Spacer(Modifier.height(Spacing.sm))
 
+        // DayKit procedural Liquid Glass wallpapers (2 Live + 2 Static, Light & Dark) + User Photo
+        WallpaperBackdropStrip(
+            selectedPreset = selectedPreset,
+            hasPhoto = hasWallpaperPhoto,
+            photoThumb = photoThumbBitmap,
+            onSelectPreset = ::selectPreset,
+            onSelectPhoto = ::selectPhotoBackdrop,
+        )
+
+        Spacer(Modifier.height(Spacing.xs))
+
         // Studio control chips: + Widget, Pick Photo, Page mode, Clear Photo, Clear Widgets
         Row(
             modifier = Modifier
@@ -464,7 +555,7 @@ fun WallpaperStudioSection(
             )
             FilterChipButton(
                 text = if (hasWallpaperPhoto) "Change Photo" else "Pick Photo",
-                selected = hasWallpaperPhoto,
+                selected = selectedPreset == null && hasWallpaperPhoto,
                 onClick = {
                     markExpectingActivityResult(context)
                     photoPickerLauncher.launch(
@@ -604,25 +695,60 @@ fun WallpaperStudioSection(
                 Text(text = if (isRemoving) "Removing…" else "Remove", maxLines = 1)
             }
 
+            val applyAsStaticDirect = selectedPreset != null && !selectedPreset!!.isLive && slots.isEmpty()
             PrimaryButton(
-                text = if (isLiveActive) "Re-apply" else "Apply Wallpaper",
+                text = when {
+                    isApplyingStatic -> "Applying…"
+                    applyAsStaticDirect -> "Set Static"
+                    isLiveActive -> "Re-apply"
+                    else -> "Apply Wallpaper"
+                },
                 leadingIcon = {
                     Icon(Icons.Rounded.Wallpaper, contentDescription = null, modifier = Modifier.size(17.dp))
                 },
+                enabled = !isApplyingStatic,
                 onClick = {
-                    markExpectingActivityResult(context)
-                    val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-                        putExtra(
-                            WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                            ComponentName(context, WeatherGlassWallpaperService::class.java),
-                        )
-                    }
-                    val started = runCatching { context.startActivity(intent) }.isSuccess
-                    if (!started) {
-                        runCatching {
-                            context.startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER))
-                        }.onFailure {
-                            onShowMessage("Live wallpaper picker is not available on this device.")
+                    val staticPreset = selectedPreset?.takeIf { !it.isLive && slots.isEmpty() }
+                    if (staticPreset != null) {
+                        scope.launch {
+                            isApplyingStatic = true
+                            val applied = withContext(Dispatchers.Default) {
+                                runCatching {
+                                    val dm = context.resources.displayMetrics
+                                    val targetW = dm.widthPixels.coerceIn(720, 1440)
+                                    val targetH = dm.heightPixels.coerceIn(1280, 2880)
+                                    val bmp = LiquidGlassWallpaperRenderer.renderBitmap(staticPreset, targetW, targetH)
+                                    try {
+                                        WallpaperManager.getInstance(context).setBitmap(bmp)
+                                        true
+                                    } finally {
+                                        bmp.recycle()
+                                    }
+                                }.getOrDefault(false)
+                            }
+                            isApplyingStatic = false
+                            isLiveActive = isDayKitLiveWallpaperActive(context)
+                            if (applied) {
+                                onShowMessage("${staticPreset.title} set as static wallpaper")
+                            } else {
+                                onShowMessage("Could not set static wallpaper on this device")
+                            }
+                        }
+                    } else {
+                        markExpectingActivityResult(context)
+                        val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                            putExtra(
+                                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                                ComponentName(context, WeatherGlassWallpaperService::class.java),
+                            )
+                        }
+                        val started = runCatching { context.startActivity(intent) }.isSuccess
+                        if (!started) {
+                            runCatching {
+                                context.startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER))
+                            }.onFailure {
+                                onShowMessage("Live wallpaper picker is not available on this device.")
+                            }
                         }
                     }
                 },
@@ -641,6 +767,227 @@ fun WallpaperStudioSection(
                 onShowMessage("Added ${type.title} to wallpaper")
             },
         )
+    }
+}
+
+@Composable
+private fun WallpaperBackdropStrip(
+    selectedPreset: WallpaperPreset?,
+    hasPhoto: Boolean,
+    photoThumb: Bitmap?,
+    onSelectPreset: (WallpaperPreset) -> Unit,
+    onSelectPhoto: () -> Unit,
+) {
+    val presetThumbs = remember {
+        WallpaperPreset.entries.associateWith { preset ->
+            LiquidGlassWallpaperRenderer.renderBitmap(preset, 200, 132, timeSeconds = 1.8f).asImageBitmap()
+        }
+    }
+    val cardShape = RoundedCornerShape(14.dp)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        WallpaperPreset.entries.forEach { preset ->
+            val isSelected = selectedPreset == preset
+            val borderColor = if (isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.extendedColors.divider
+            }
+            Box(
+                modifier = Modifier
+                    .width(106.dp)
+                    .height(62.dp)
+                    .clip(cardShape)
+                    .border(if (isSelected) 2.dp else 1.dp, borderColor, cardShape)
+                    .clickable { onSelectPreset(preset) },
+            ) {
+                presetThumbs[preset]?.let { bmp ->
+                    Image(
+                        bitmap = bmp,
+                        contentDescription = preset.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                // Bottom contrast scrim for title legibility
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0.0f to Color.Transparent,
+                                0.45f to Color.Black.copy(alpha = 0.12f),
+                                1.0f to Color.Black.copy(alpha = 0.62f),
+                            ),
+                        ),
+                )
+
+                // Top badges: Live/Static pill + Light/Dark icon
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.44f))
+                            .padding(horizontal = 5.dp, vertical = 1.5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        if (preset.isLive) {
+                            Icon(
+                                imageVector = Icons.Rounded.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color(0xFF7CE8FF),
+                                modifier = Modifier.size(9.dp),
+                            )
+                        }
+                        Text(
+                            text = if (preset.isLive) "Live" else "Static",
+                            color = Color.White,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.44f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (preset.isDark) Icons.Rounded.DarkMode else Icons.Rounded.LightMode,
+                            contentDescription = if (preset.isDark) "Dark theme" else "Light theme",
+                            tint = if (preset.isDark) Color(0xFFC8D8FF) else Color(0xFFFFE59E),
+                            modifier = Modifier.size(10.dp),
+                        )
+                    }
+                }
+
+                // Title + selection checkmark
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = preset.title,
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (isSelected) {
+                        Spacer(Modifier.width(3.dp))
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = "Selected",
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // Custom user photo swatch
+        val isPhotoSelected = selectedPreset == null && hasPhoto
+        Box(
+            modifier = Modifier
+                .width(86.dp)
+                .height(62.dp)
+                .clip(cardShape)
+                .background(MaterialTheme.extendedColors.inputField)
+                .border(
+                    width = if (isPhotoSelected) 2.dp else 1.dp,
+                    color = if (isPhotoSelected) MaterialTheme.colorScheme.primary else MaterialTheme.extendedColors.divider,
+                    shape = cardShape,
+                )
+                .clickable { onSelectPhoto() },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (photoThumb != null && !photoThumb.isRecycled) {
+                Image(
+                    bitmap = photoThumb.asImageBitmap(),
+                    contentDescription = "My Photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0.0f to Color.Transparent,
+                                1.0f to Color.Black.copy(alpha = 0.62f),
+                            ),
+                        ),
+                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "My Photo",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                    if (isPhotoSelected) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = "Selected",
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PhotoLibrary,
+                        contentDescription = null,
+                        tint = MaterialTheme.extendedColors.textMuted,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = "My Photo",
+                        color = MaterialTheme.extendedColors.textMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
     }
 }
 

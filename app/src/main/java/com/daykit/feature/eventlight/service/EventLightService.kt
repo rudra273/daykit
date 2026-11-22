@@ -16,6 +16,7 @@ import com.daykit.MainActivity
 import com.daykit.R
 import com.daykit.feature.eventlight.data.EventLightStore
 import com.daykit.feature.eventlight.data.PREF_EVENT_LIGHT
+import com.daykit.feature.widget.EventLightWidgetProvider
 
 /**
  * Keeps [EventLightOverlayController] alive while the user is in another app (e.g. a
@@ -35,10 +36,14 @@ class EventLightService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         overlayController = EventLightOverlayController(this)
         overlayController.show(EventLightStore.get(this))
+        EventLightWidgetProvider.refreshAll(this)
 
         val p = getSharedPreferences(PREF_EVENT_LIGHT, Context.MODE_PRIVATE)
         val l = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            mainHandler.post { overlayController.update(EventLightStore.get(this)) }
+            mainHandler.post {
+                overlayController.update(EventLightStore.get(this))
+                EventLightWidgetProvider.refreshAll(this)
+            }
         }
         p.registerOnSharedPreferenceChangeListener(l)
         prefs = p
@@ -54,6 +59,7 @@ class EventLightService : Service() {
         prefs = null
         listener = null
         mainHandler.post { overlayController.dismiss() }
+        EventLightWidgetProvider.refreshAll(this)
         super.onDestroy()
     }
 

@@ -120,6 +120,7 @@ object WeatherPrefs {
     private const val KEY_USE_FAHRENHEIT = "use_fahrenheit"
     private const val KEY_ONLY_FIRST_PAGE = "wallpaper_only_first_page"
     private const val KEY_WALLPAPER_PHOTO_VERSION = "wallpaper_photo_version"
+    private const val KEY_WALLPAPER_PRESET = "wallpaper_preset_id"
     private const val KEY_WALLPAPER_CUBE_X = "wallpaper_cube_x"
     private const val KEY_WALLPAPER_CUBE_Y = "wallpaper_cube_y"
     private const val KEY_WALLPAPER_CUBE_SCALE = "wallpaper_cube_scale"
@@ -240,6 +241,19 @@ object WeatherPrefs {
     fun wallpaperPhotoVersion(context: Context): Long =
         prefs(context).getLong(KEY_WALLPAPER_PHOTO_VERSION, 0L)
 
+    fun wallpaperPresetId(context: Context): String? =
+        prefs(context).getString(KEY_WALLPAPER_PRESET, null)?.takeIf { it.isNotBlank() }
+
+    fun setWallpaperPreset(context: Context, presetId: String?) {
+        prefs(context).edit()
+            .apply {
+                if (presetId.isNullOrBlank()) remove(KEY_WALLPAPER_PRESET)
+                else putString(KEY_WALLPAPER_PRESET, presetId)
+            }
+            .putLong(KEY_WALLPAPER_PHOTO_VERSION, System.currentTimeMillis())
+            .apply()
+    }
+
     suspend fun importWallpaperPhoto(context: Context, uri: Uri): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             val target = wallpaperPhotoFile(context)
@@ -247,6 +261,7 @@ object WeatherPrefs {
                 target.outputStream().use { output -> input.copyTo(output) }
             } ?: return@withContext false
             prefs(context).edit()
+                .remove(KEY_WALLPAPER_PRESET)
                 .putLong(KEY_WALLPAPER_PHOTO_VERSION, System.currentTimeMillis())
                 .apply()
             true

@@ -768,7 +768,7 @@ object DailyWidgetRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // 4. STEPS BAR CHART (Reference Image 4 — Solid Dark)
+    // 4. RUN & WALK SESSION TRACKER (Solid Dark — On-demand Start/Stop + Run Bars)
     // -------------------------------------------------------------------------
     fun drawStepsBarChart(
         canvas: Canvas,
@@ -788,9 +788,9 @@ object DailyWidgetRenderer {
         canvas.drawRect(rect, bgPaint)
 
         val padX = w * 0.055f
-        val topY = rect.top + h * 0.135f
+        val topY = rect.top + h * 0.145f
 
-        // Green footprints icon (two tiny stylized ovals)
+        // Green footprints icon (two stylized ovals)
         val fpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF39D92A.toInt() }
         val fpSize = h * 0.085f
         canvas.drawOval(padX, topY - fpSize * 0.9f, padX + fpSize * 0.42f, topY - fpSize * 0.15f, fpPaint)
@@ -804,75 +804,148 @@ object DailyWidgetRenderer {
         }
         canvas.drawText("Steps", padX + fpSize * 1.25f, topY, titlePaint)
 
-        // Month label on top-right
-        val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(220, 230, 235, 232)
-            textSize = h * 0.085f
-            textAlign = Paint.Align.RIGHT
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-        }
-        canvas.drawText("${state.monthLabel} ▾", rect.right - padX, topY, monthPaint)
+        // Top-right icon-only Start (▶) / Stop (■) circular button
+        val btnR = h * 0.092f
+        val btnCx = rect.right - padX - btnR
+        val btnCy = rect.top + h * 0.145f
+        val btnBgColor = if (state.isRunning) 0xFF361816.toInt() else 0xFF172C1A.toInt()
+        val btnAccent = if (state.isRunning) 0xFFFF5A4E.toInt() else 0xFF39D92A.toInt()
 
-        // Big stats row: "3,680" + "4.29"
+        if (state.isRunning) {
+            val pulseGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(
+                    btnCx, btnCy, btnR * 1.65f,
+                    Color.argb(110, 255, 90, 78),
+                    Color.TRANSPARENT,
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawCircle(btnCx, btnCy, btnR * 1.65f, pulseGlow)
+        }
+
+        val btnFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = btnBgColor }
+        canvas.drawCircle(btnCx, btnCy, btnR, btnFill)
+
+        val btnStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = (h * 0.008f).coerceAtLeast(1.5f)
+            color = btnAccent
+        }
+        canvas.drawCircle(btnCx, btnCy, btnR, btnStroke)
+
+        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = btnAccent }
+        if (state.isRunning) {
+            // Rounded Stop square icon
+            val sq = btnR * 0.42f
+            val sqRect = RectF(btnCx - sq, btnCy - sq, btnCx + sq, btnCy + sq)
+            canvas.drawRoundRect(sqRect, sq * 0.28f, sq * 0.28f, iconPaint)
+        } else {
+            // Crisp Play triangle icon (optically nudged slightly right)
+            val triR = btnR * 0.46f
+            val playPath = Path().apply {
+                moveTo(btnCx - triR * 0.58f, btnCy - triR * 0.85f)
+                lineTo(btnCx + triR * 0.92f, btnCy)
+                lineTo(btnCx - triR * 0.58f, btnCy + triR * 0.85f)
+                close()
+            }
+            canvas.drawPath(playPath, iconPaint)
+        }
+
+        // Big stats row for the selected (or active) run: steps + km + date/time
+        val selected = state.selectedSession
         val numFmt = NumberFormat.getIntegerInstance(Locale.US)
         val bigPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = h * 0.115f
+            textSize = h * 0.118f
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
         val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(135, 210, 215, 212)
-            textSize = h * 0.068f
+            textSize = h * 0.066f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         }
-        val statY = rect.top + h * 0.305f
-        val statSubY = rect.top + h * 0.39f
-        val stepsFormatted = numFmt.format(state.todaySteps)
-        val kmFormatted = String.format(Locale.US, "%.2f", state.distanceKm)
+        val statY = rect.top + h * 0.315f
+        val statSubY = rect.top + h * 0.398f
+        val displaySteps = selected?.steps ?: 0
+        val displayKm = selected?.distanceKm ?: 0f
 
-        canvas.drawText(stepsFormatted, padX, statY, bigPaint)
+        canvas.drawText(numFmt.format(displaySteps), padX, statY, bigPaint)
         canvas.drawText("steps", padX, statSubY, subPaint)
 
-        val col2X = padX + w * 0.25f
-        canvas.drawText(kmFormatted, col2X, statY, bigPaint)
+        val col2X = padX + w * 0.245f
+        canvas.drawText(String.format(Locale.US, "%.2f", displayKm), col2X, statY, bigPaint)
         canvas.drawText("km", col2X, statSubY, subPaint)
 
-        // Bar chart area
-        val days = state.days
-        val count = days.size.coerceAtLeast(1)
+        // Right-aligned selected run date + time range
+        val metaTopPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (selected?.isActive == true) 0xFF8CFF52.toInt() else Color.argb(225, 232, 238, 234)
+            textSize = h * 0.068f
+            textAlign = Paint.Align.RIGHT
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        val metaBotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(145, 200, 208, 204)
+            textSize = h * 0.064f
+            textAlign = Paint.Align.RIGHT
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        }
+        val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val dateFmt = SimpleDateFormat("d MMM", Locale.getDefault())
+        val rightEdge = rect.right - padX
+
+        if (selected == null) {
+            canvas.drawText("No runs yet", rightEdge, statY - h * 0.01f, metaTopPaint)
+            canvas.drawText("Tap ▶ to start", rightEdge, statSubY, metaBotPaint)
+        } else if (selected.isActive) {
+            val startStr = timeFmt.format(Date(selected.startMillis))
+            val mins = selected.durationMinutes
+            canvas.drawText("● Live · $startStr", rightEdge, statY - h * 0.01f, metaTopPaint)
+            canvas.drawText("${mins}m elapsed", rightEdge, statSubY, metaBotPaint)
+        } else {
+            val dateStr = dateFmt.format(Date(selected.startMillis))
+            val rangeStr = "${timeFmt.format(Date(selected.startMillis))}–${timeFmt.format(Date(selected.endMillis))}"
+            canvas.drawText(dateStr, rightEdge, statY - h * 0.01f, metaTopPaint)
+            canvas.drawText(rangeStr, rightEdge, statSubY, metaBotPaint)
+        }
+
+        // Session Bar Chart (7 fixed slots — oldest on left, newest/live on right)
+        val totalSlots = state.totalSlots.coerceAtLeast(1)
+        val sessions = state.sessions
         val chartLeft = rect.left + padX * 0.85f
         val chartRight = rect.right - padX * 0.85f
         val chartBottom = rect.bottom - h * 0.145f
-        val maxBarH = h * 0.43f
-        val minBarH = h * 0.16f
-        val maxSteps = days.maxOfOrNull { it.steps }?.coerceAtLeast(2000) ?: 5000
+        val maxBarH = h * 0.40f
+        val minBarH = h * 0.15f
+        val maxSteps = sessions.maxOfOrNull { it.steps }?.coerceAtLeast(100) ?: 1000
 
-        val slotW = (chartRight - chartLeft) / count
-        val barW = slotW * 0.80f
-        val barCr = barW * 0.34f
+        val slotW = (chartRight - chartLeft) / totalSlots
+        val barW = slotW * 0.78f
+        val barCr = barW * 0.32f
 
-        val dayLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val barLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.CENTER
-            textSize = h * 0.068f
+            textSize = h * 0.060f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         }
 
-        for (i in 0 until count) {
-            val d = days[i]
+        for (i in 0 until totalSlots) {
+            val session = sessions.getOrNull(i)
+            val isSelected = session != null && i == state.selectedIndex
             val cx = chartLeft + slotW * (i + 0.5f)
             val bLeft = cx - barW * 0.5f
             val bRight = cx + barW * 0.5f
-            val ratio = if (d.isFuture) {
-                0.55f + ((i % 3) * 0.12f)
+
+            val ratio = if (session == null) {
+                0.42f + ((i % 3) * 0.12f)
             } else {
-                (d.steps.toFloat() / maxSteps.toFloat()).coerceIn(0.28f, 1.0f)
+                (session.steps.toFloat() / maxSteps.toFloat()).coerceIn(0.24f, 1.0f)
             }
             val barH = minBarH + (maxBarH - minBarH) * ratio
             val bTop = chartBottom - barH
             val barRect = RectF(bLeft, bTop, bRight, chartBottom)
 
             when {
-                d.isToday -> {
+                isSelected -> {
                     val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         shader = LinearGradient(
                             cx, bTop, cx, chartBottom,
@@ -883,8 +956,8 @@ object DailyWidgetRenderer {
                     }
                     canvas.drawRoundRect(barRect, barCr, barCr, activePaint)
 
-                    // White glowing dot on top of active bar
-                    val dotR = barW * 0.16f
+                    // White glowing dot on top of selected bar
+                    val dotR = barW * 0.15f
                     val dotGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.argb(120, 255, 255, 255)
                     }
@@ -892,33 +965,34 @@ object DailyWidgetRenderer {
                     val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
                     canvas.drawCircle(cx, bTop + dotR * 0.2f, dotR, dotPaint)
 
-                    // Floating pill badge above active bar
-                    val pillText = numFmt.format(d.steps)
+                    // Floating pill badge above selected bar
+                    val pillText = numFmt.format(session!!.steps)
                     val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.WHITE
                         textAlign = Paint.Align.CENTER
-                        textSize = h * 0.068f
+                        textSize = h * 0.064f
                         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                     }
                     val tw = pillTextPaint.measureText(pillText)
-                    val pillW = tw + h * 0.10f
-                    val pillH = h * 0.115f
-                    val pillBottom = bTop - h * 0.045f
-                    val pillRect = RectF(cx - pillW * 0.5f, pillBottom - pillH, cx + pillW * 0.5f, pillBottom)
+                    val pillW = tw + h * 0.095f
+                    val pillH = h * 0.11f
+                    val pillBottom = bTop - h * 0.04f
+                    val pillCx = cx.coerceIn(chartLeft + pillW * 0.5f, chartRight - pillW * 0.5f)
+                    val pillRect = RectF(pillCx - pillW * 0.5f, pillBottom - pillH, pillCx + pillW * 0.5f, pillBottom)
                     val pillBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF232724.toInt() }
                     canvas.drawRoundRect(pillRect, pillH * 0.5f, pillH * 0.5f, pillBg)
-                    canvas.drawText(pillText, cx, pillRect.centerY() + pillTextPaint.textSize * 0.35f, pillTextPaint)
+                    canvas.drawText(pillText, pillCx, pillRect.centerY() + pillTextPaint.textSize * 0.35f, pillTextPaint)
                 }
 
-                d.isFuture -> {
-                    val futureFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF161817.toInt() }
-                    val futureStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                session == null -> {
+                    val emptyFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF161817.toInt() }
+                    val emptyStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         style = Paint.Style.STROKE
                         strokeWidth = 1.5f
                         color = 0xFF282C2A.toInt()
                     }
-                    canvas.drawRoundRect(barRect, barCr, barCr, futureFill)
-                    canvas.drawRoundRect(barRect, barCr, barCr, futureStroke)
+                    canvas.drawRoundRect(barRect, barCr, barCr, emptyFill)
+                    canvas.drawRoundRect(barRect, barCr, barCr, emptyStroke)
                 }
 
                 else -> {
@@ -940,14 +1014,17 @@ object DailyWidgetRenderer {
                 }
             }
 
-            // Day number under each bar
-            dayLabelPaint.color = when {
-                d.isToday -> Color.WHITE
-                d.isFuture -> Color.argb(85, 200, 205, 202)
-                else -> Color.argb(200, 225, 230, 226)
+            // Compact time label under each bar
+            if (session != null) {
+                barLabelPaint.color = if (isSelected) Color.WHITE else Color.argb(185, 215, 222, 218)
+                barLabelPaint.typeface = Typeface.create("sans-serif", if (isSelected) Typeface.BOLD else Typeface.NORMAL)
+                val label = timeFmt.format(Date(session.startMillis))
+                canvas.drawText(label, cx, rect.bottom - h * 0.045f, barLabelPaint)
+            } else {
+                barLabelPaint.color = Color.argb(75, 190, 196, 192)
+                barLabelPaint.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                canvas.drawText("·", cx, rect.bottom - h * 0.045f, barLabelPaint)
             }
-            dayLabelPaint.typeface = Typeface.create("sans-serif", if (d.isToday) Typeface.BOLD else Typeface.NORMAL)
-            canvas.drawText(d.dayOfMonth.toString(), cx, rect.bottom - h * 0.045f, dayLabelPaint)
         }
 
         // Subtle outer border

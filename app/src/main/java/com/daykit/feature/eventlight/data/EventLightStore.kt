@@ -7,36 +7,44 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 
 const val PREF_EVENT_LIGHT = "event_light_prefs"
 private const val KEY_ENABLED = "enabled"
-private const val KEY_COLOR_ARGB = "color_argb"
 private const val KEY_THICKNESS_DP = "thickness_dp"
-private const val KEY_BRIGHTNESS = "brightness"
-private const val KEY_OPACITY = "opacity"
-private const val KEY_TOP_ENABLED = "top_enabled"
-private const val KEY_BOTTOM_ENABLED = "bottom_enabled"
-private const val KEY_LEFT_ENABLED = "left_enabled"
-private const val KEY_RIGHT_ENABLED = "right_enabled"
+private const val KEY_COLOR_TEMP = "color_temp"
 
-private const val DEFAULT_COLOR_ARGB = 0xFFFFFFFF.toInt()
-private const val DEFAULT_THICKNESS_DP = 24f
-private const val DEFAULT_BRIGHTNESS = 1f
-private const val DEFAULT_OPACITY = 1f
+const val EVENT_LIGHT_MIN_THICKNESS_DP = 6f
+const val EVENT_LIGHT_MAX_THICKNESS_DP = 36f
+const val EVENT_LIGHT_DEFAULT_THICKNESS_DP = 14f
+const val EVENT_LIGHT_DEFAULT_COLOR_TEMP = 0.5f
+
+/**
+ * macOS Edge Light color temperature stops:
+ * 0.0 = warm amber/yellow, 0.5 = neutral white, 1.0 = cool ice blue.
+ */
+val EventLightGradientStops: List<Color> = listOf(
+    Color(0xFFFFAD3B), // 0.00 — warm golden amber
+    Color(0xFFFFD89E), // 0.25 — warm soft cream
+    Color(0xFFFFFFFF), // 0.50 — pure luminous white
+    Color(0xFFE0EEFF), // 0.75 — cool daylight white
+    Color(0xFFBCD8FF), // 1.00 — cool ice blue
+)
+
+fun edgeLightTintColor(colorTemp: Float): Color {
+    val t = colorTemp.coerceIn(0f, 1f)
+    val scaled = t * (EventLightGradientStops.lastIndex)
+    val index = scaled.toInt().coerceIn(0, EventLightGradientStops.lastIndex - 1)
+    val fraction = scaled - index
+    return lerp(EventLightGradientStops[index], EventLightGradientStops[index + 1], fraction)
+}
 
 data class EventLightSettings(
     val enabled: Boolean = false,
-    val colorArgb: Int = DEFAULT_COLOR_ARGB,
-    val thicknessDp: Float = DEFAULT_THICKNESS_DP,
-    val brightness: Float = DEFAULT_BRIGHTNESS,
-    // Independent of brightness: lets the border be see-through (down to fully
-    // transparent) instead of only dimming the light's intensity.
-    val opacity: Float = DEFAULT_OPACITY,
-    val topEnabled: Boolean = true,
-    val bottomEnabled: Boolean = true,
-    val leftEnabled: Boolean = true,
-    val rightEnabled: Boolean = true,
+    val thicknessDp: Float = EVENT_LIGHT_DEFAULT_THICKNESS_DP,
+    val colorTemp: Float = EVENT_LIGHT_DEFAULT_COLOR_TEMP,
 )
 
 /**
@@ -50,16 +58,12 @@ object EventLightStore {
 
     fun get(context: Context): EventLightSettings {
         val p = prefs(context)
+        val rawThickness = p.getFloat(KEY_THICKNESS_DP, EVENT_LIGHT_DEFAULT_THICKNESS_DP)
+        val rawTemp = p.getFloat(KEY_COLOR_TEMP, EVENT_LIGHT_DEFAULT_COLOR_TEMP)
         return EventLightSettings(
             enabled = p.getBoolean(KEY_ENABLED, false),
-            colorArgb = p.getInt(KEY_COLOR_ARGB, DEFAULT_COLOR_ARGB),
-            thicknessDp = p.getFloat(KEY_THICKNESS_DP, DEFAULT_THICKNESS_DP),
-            brightness = p.getFloat(KEY_BRIGHTNESS, DEFAULT_BRIGHTNESS),
-            opacity = p.getFloat(KEY_OPACITY, DEFAULT_OPACITY),
-            topEnabled = p.getBoolean(KEY_TOP_ENABLED, true),
-            bottomEnabled = p.getBoolean(KEY_BOTTOM_ENABLED, true),
-            leftEnabled = p.getBoolean(KEY_LEFT_ENABLED, true),
-            rightEnabled = p.getBoolean(KEY_RIGHT_ENABLED, true),
+            thicknessDp = rawThickness.coerceIn(EVENT_LIGHT_MIN_THICKNESS_DP, EVENT_LIGHT_MAX_THICKNESS_DP),
+            colorTemp = rawTemp.coerceIn(0f, 1f),
         )
     }
 
@@ -67,36 +71,14 @@ object EventLightStore {
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
     }
 
-    fun setColor(context: Context, colorArgb: Int) {
-        prefs(context).edit().putInt(KEY_COLOR_ARGB, colorArgb).apply()
-    }
-
     fun setThickness(context: Context, thicknessDp: Float) {
-        prefs(context).edit().putFloat(KEY_THICKNESS_DP, thicknessDp).apply()
+        val clamped = thicknessDp.coerceIn(EVENT_LIGHT_MIN_THICKNESS_DP, EVENT_LIGHT_MAX_THICKNESS_DP)
+        prefs(context).edit().putFloat(KEY_THICKNESS_DP, clamped).apply()
     }
 
-    fun setBrightness(context: Context, brightness: Float) {
-        prefs(context).edit().putFloat(KEY_BRIGHTNESS, brightness).apply()
-    }
-
-    fun setOpacity(context: Context, opacity: Float) {
-        prefs(context).edit().putFloat(KEY_OPACITY, opacity).apply()
-    }
-
-    fun setTopEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_TOP_ENABLED, enabled).apply()
-    }
-
-    fun setBottomEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_BOTTOM_ENABLED, enabled).apply()
-    }
-
-    fun setLeftEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_LEFT_ENABLED, enabled).apply()
-    }
-
-    fun setRightEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_RIGHT_ENABLED, enabled).apply()
+    fun setColorTemp(context: Context, colorTemp: Float) {
+        val clamped = colorTemp.coerceIn(0f, 1f)
+        prefs(context).edit().putFloat(KEY_COLOR_TEMP, clamped).apply()
     }
 
     @Composable

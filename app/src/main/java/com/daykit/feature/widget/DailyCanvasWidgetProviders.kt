@@ -243,14 +243,79 @@ class StepsChartWidgetProvider : BaseDailyCanvasWidgetProvider(
     bitmapWidth = 840,
     bitmapHeight = 488,
 ) {
-    override fun onEnabled(context: Context) {
-        super.onEnabled(context)
-        DeviceStepCounter.schedulePeriodicSync(context)
-    }
-
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        DeviceStepCounter.cancelPeriodicSync(context)
+        cancelSessionTick(context)
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action
+        when (action) {
+            ACTION_TOGGLE_SESSION -> {
+                val appCtx = context.applicationContext
+                if (!DeviceStepCounter.hasPermission(appCtx)) {
+                    // Open app so user can grant Physical Activity permission once
+                    val open = Intent(appCtx, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                    appCtx.startActivity(open)
+                    return
+                }
+                val pending = goAsync()
+                if (DeviceStepCounter.isRunning(appCtx)) {
+                    cancelSessionTick(appCtx)
+                    DeviceStepCounter.stopSession(appCtx) {
+                        try {
+                            renderAllStepsWidgets(appCtx)
+                        } finally {
+                            pending.finish()
+                        }
+                    }
+                } else {
+                    DeviceStepCounter.startSession(appCtx) {
+                        try {
+                            scheduleSessionTick(appCtx)
+                            renderAllStepsWidgets(appCtx)
+                        } finally {
+                            pending.finish()
+                        }
+                    }
+                }
+                return
+            }
+
+            ACTION_SELECT_BAR -> {
+                val barIndex = intent.getIntExtra(EXTRA_BAR_INDEX, -1)
+                if (barIndex >= 0) {
+                    DeviceStepCounter.selectBar(context, barIndex)
+                    renderAllStepsWidgets(context.applicationContext)
+                }
+                return
+            }
+
+            ACTION_SESSION_TICK -> {
+                val appCtx = context.applicationContext
+                val mgr = AppWidgetManager.getInstance(appCtx)
+                val ids = mgr.getAppWidgetIds(ComponentName(appCtx, StepsChartWidgetProvider::class.java))
+                if (ids.isEmpty() || !DeviceStepCounter.isRunning(appCtx)) {
+                    cancelSessionTick(appCtx)
+                    return
+                }
+                val pending = goAsync()
+                DeviceStepCounter.syncActiveSessionOneShot(appCtx, timeoutMs = 1500L) {
+                    try {
+                        renderAllStepsWidgets(appCtx)
+                        if (DeviceStepCounter.isRunning(appCtx)) {
+                            scheduleSessionTick(appCtx)
+                        }
+                    } finally {
+                        pending.finish()
+                    }
+                }
+                return
+            }
+        }
+        super.onReceive(context, intent)
     }
 
     override fun onUpdate(
@@ -258,24 +323,130 @@ class StepsChartWidgetProvider : BaseDailyCanvasWidgetProvider(
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray,
     ) {
-        DeviceStepCounter.schedulePeriodicSync(context)
-        if (!DeviceStepCounter.hasPermission(context) || !DeviceStepCounter.isSensorAvailable(context)) {
-            super.onUpdate(context, appWidgetManager, appWidgetIds)
-            return
-        }
-        val pending = goAsync()
-        DeviceStepCounter.syncOneShot(context, timeoutMs = 1800L) {
-            try {
-                for (id in appWidgetIds) {
-                    renderAndPush(context, appWidgetManager, id)
+        val appCtx = context.applicationContext
+        if (DeviceStepCounter.isRunning(appCtx)) {
+            scheduleSessionTick(appCtx)
+            val pending = goAsync()
+            DeviceStepCounter.syncActiveSessionOneShot(appCtx, timeoutMs = 1500L) {
+                try {
+                    for (id in appWidgetIds) {
+                        renderStepsWidget(appCtx, appWidgetManager, id)
+                    }
+                } finally {
+                    pending.finish()
                 }
-            } finally {
-                pending.finish()
+            }
+        } else {
+            cancelSessionTick(appCtx)
+            for (id in appWidgetIds) {
+                renderStepsWidget(appCtx, appWidgetManager, id)
             }
         }
     }
 
+    private fun renderAllStepsWidgets(context: Context) {
+        val mgr = AppWidgetManager.getInstance(context)
+        val ids = mgr.getAppWidgetIds(ComponentName(context, StepsChartWidgetProvider::class.java))
+        for (id in ids) {
+            renderStepsWidget(context, mgr, id)
+        }
+    }
+
+    private fun renderStepsWidget(
+        context: Context,
+        manager: AppWidgetManager,
+        appWidgetId: Int,
+    ) {
+        val bmp = Bitmap.createBitmap(840, 488, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val pad = 8f
+        val rect = RectF(pad, pad, 840f - pad, 488f - pad)
+        val state = DailyWidgetDataProvider.loadStepsState(context)
+        DailyWidgetRenderer.drawStepsBarChart(canvas, rect, state)
+
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPi = PendingIntent.getActivity(
+            context,
+            710,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val togglePi = PendingIntent.getBroadcast(
+            context,
+            711,
+            Intent(context, StepsChartWidgetProvider::class.java).apply {
+                action = ACTION_TOGGLE_SESSION
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val barViewIds = intArrayOf(
+            R.id.steps_bar_hit_0,
+            R.id.steps_bar_hit_1,
+            R.id.steps_bar_hit_2,
+            R.id.steps_bar_hit_3,
+            R.id.steps_bar_hit_4,
+            R.id.steps_bar_hit_5,
+            R.id.steps_bar_hit_6,
+        )
+
+        val views = RemoteViews(context.packageName, R.layout.widget_steps_session).apply {
+            setImageViewBitmap(R.id.steps_widget_canvas, bmp)
+            setOnClickPendingIntent(R.id.steps_hit_open, openPi)
+            setOnClickPendingIntent(R.id.steps_hit_toggle, togglePi)
+            barViewIds.forEachIndexed { index, viewId ->
+                val barPi = PendingIntent.getBroadcast(
+                    context,
+                    720 + index,
+                    Intent(context, StepsChartWidgetProvider::class.java).apply {
+                        action = ACTION_SELECT_BAR
+                        putExtra(EXTRA_BAR_INDEX, index)
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                setOnClickPendingIntent(viewId, barPi)
+            }
+        }
+        manager.updateAppWidget(appWidgetId, views)
+    }
+
     companion object {
+        const val ACTION_TOGGLE_SESSION = "com.daykit.feature.widget.ACTION_STEPS_TOGGLE_SESSION"
+        const val ACTION_SELECT_BAR = "com.daykit.feature.widget.ACTION_STEPS_SELECT_BAR"
+        const val ACTION_SESSION_TICK = "com.daykit.feature.widget.ACTION_STEPS_SESSION_TICK"
+        const val EXTRA_BAR_INDEX = "extra_bar_index"
+
+        private fun sessionTickPi(context: Context): PendingIntent = PendingIntent.getBroadcast(
+            context.applicationContext,
+            712,
+            Intent(context.applicationContext, StepsChartWidgetProvider::class.java).apply {
+                action = ACTION_SESSION_TICK
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        fun scheduleSessionTick(context: Context) {
+            val alarm = context.applicationContext.getSystemService(AlarmManager::class.java) ?: return
+            val nextAt = System.currentTimeMillis() + 60_000L
+            val pi = sessionTickPi(context)
+            val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
+            runCatching {
+                if (canExact) {
+                    alarm.setExactAndAllowWhileIdle(AlarmManager.RTC, nextAt, pi)
+                } else {
+                    alarm.setAndAllowWhileIdle(AlarmManager.RTC, nextAt, pi)
+                }
+            }
+        }
+
+        fun cancelSessionTick(context: Context) {
+            val alarm = context.applicationContext.getSystemService(AlarmManager::class.java) ?: return
+            runCatching { alarm.cancel(sessionTickPi(context)) }
+        }
+
         fun refreshAll(context: Context) {
             val appCtx = context.applicationContext
             val mgr = AppWidgetManager.getInstance(appCtx)

@@ -11,31 +11,32 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
-import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.WorkerParameters
-import com.daykit.feature.widget.StepsChartWidgetProvider
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.TimeUnit
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
 
 /**
- * Reads real hardware step counts via Android's low-power [Sensor.TYPE_STEP_COUNTER],
- * handles midnight rollovers and device reboots, and persists daily totals into [STEPS_PREFS].
+ * On-demand Walk / Run Session step counter powered by Android's hardware [Sensor.TYPE_STEP_COUNTER].
+ *
+ * Zero battery usage when stopped: no background listeners or workers run unless a session is
+ * actively recording. While running, counts steps from 0 using the hardware step-counter delta
+ * and saves completed sessions (steps, distance, date, start & end time) for bar-chart inspection.
  */
 object DeviceStepCounter {
-    internal const val STEPS_PREFS = "daykit_daily_steps_v1"
-    private const val KEY_SENSOR_DATE = "sensor_date"
-    private const val KEY_BASELINE_RAW = "sensor_baseline_raw"
-    private const val KEY_LAST_RAW = "sensor_last_raw"
-    private const val KEY_CARRIED_STEPS = "sensor_carried_steps"
-    private const val WORK_NAME = "daykit_steps_widget_sync"
+    private const val PREFS_NAME = "daykit_step_sessions_v1"
+    private const val KEY_ACTIVE_RUNNING = "active_running"
+    private const val KEY_ACTIVE_ID = "active_id"
+    private const val KEY_ACTIVE_START_MS = "active_start_ms"
+    private const val KEY_ACTIVE_START_RAW = "active_start_raw"
+    private const val KEY_ACTIVE_LAST_RAW = "active_last_raw"
+    private const val KEY_ACTIVE_CARRIED = "active_carried"
+    private const val KEY_ACTIVE_STEPS = "active_steps"
+    private const val KEY_HISTORY_JSON = "history_json"
+    private const val KEY_SELECTED_INDEX = "selected_index"
+
+    const val VISIBLE_SLOTS = 7
+    private const val MAX_STORED_SESSIONS = 20
 
     fun hasPermission(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
@@ -51,89 +52,224 @@ object DeviceStepCounter {
         return mgr.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) != null
     }
 
-    /**
-     * Converts cumulative hardware [rawTotal] (steps since boot) into today's step count,
-     * handling midnight date transitions and mid-day device reboots.
-     */
-    fun ingestRawSensorValue(
+    fun isRunning(context: Context): Boolean =
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_ACTIVE_RUNNING, false)
+
+    fun startSession(
         context: Context,
-        rawTotal: Int,
         nowMillis: Long = System.currentTimeMillis(),
-    ): Int {
-        if (rawTotal < 0) return 0
-        val prefs = context.applicationContext.getSharedPreferences(STEPS_PREFS, Context.MODE_PRIVATE)
-        val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(nowMillis))
-        val savedDate = prefs.getString(KEY_SENSOR_DATE, null)
-        val savedBaseline = prefs.getInt(KEY_BASELINE_RAW, -1)
-        val savedLastRaw = prefs.getInt(KEY_LAST_RAW, -1)
-        val savedCarried = prefs.getInt(KEY_CARRIED_STEPS, 0)
+        onStarted: () -> Unit = {},
+    ) {
+        val appCtx = context.applicationContext
+        val prefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(KEY_ACTIVE_RUNNING, true)
+            .putString(KEY_ACTIVE_ID, UUID.randomUUID().toString().take(8))
+            .putLong(KEY_ACTIVE_START_MS, nowMillis)
+            .putInt(KEY_ACTIVE_START_RAW, -1)
+            .putInt(KEY_ACTIVE_LAST_RAW, -1)
+            .putInt(KEY_ACTIVE_CARRIED, 0)
+            .putInt(KEY_ACTIVE_STEPS, 0)
+            .putInt(KEY_SELECTED_INDEX, -1)
+            .apply()
 
-        var baseline = savedBaseline
-        var carried = savedCarried
-        val todaySteps: Int
+        // Immediately anchor hardware baseline at 0 steps
+        readRawOneShot(appCtx, timeoutMs = 1500L) { raw ->
+            if (raw != null && raw >= 0 && isRunning(appCtx)) {
+                prefs.edit()
+                    .putInt(KEY_ACTIVE_START_RAW, raw)
+                    .putInt(KEY_ACTIVE_LAST_RAW, raw)
+                    .putInt(KEY_ACTIVE_STEPS, 0)
+                    .apply()
+            }
+            onStarted()
+        }
+    }
 
-        when {
-            savedDate == null || baseline < 0 -> {
-                // First ever reading: anchor baseline at current hardware counter
-                baseline = rawTotal
-                carried = 0
-                todaySteps = prefs.getInt("steps_$todayKey", 0).coerceAtLeast(0)
-                carried = todaySteps
+    fun stopSession(
+        context: Context,
+        nowMillis: Long = System.currentTimeMillis(),
+        onStopped: (StepRunSession?) -> Unit = {},
+    ) {
+        val appCtx = context.applicationContext
+        val prefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(KEY_ACTIVE_RUNNING, false)) {
+            onStopped(null)
+            return
+        }
+
+        readRawOneShot(appCtx, timeoutMs = 1500L) { raw ->
+            if (raw != null && raw >= 0) {
+                ingestActiveRaw(appCtx, raw)
             }
-            savedDate != todayKey -> {
-                // New calendar day
-                if (savedLastRaw >= 0 && rawTotal < savedLastRaw) {
-                    // Rebooted overnight: rawTotal is already fresh steps since boot
-                    baseline = 0
-                    carried = 0
-                    todaySteps = rawTotal
-                } else {
-                    baseline = rawTotal
-                    carried = 0
-                    todaySteps = 0
-                }
+            val id = prefs.getString(KEY_ACTIVE_ID, null) ?: UUID.randomUUID().toString().take(8)
+            val startMs = prefs.getLong(KEY_ACTIVE_START_MS, nowMillis)
+            val finalSteps = prefs.getInt(KEY_ACTIVE_STEPS, 0).coerceAtLeast(0)
+            val endMs = nowMillis.coerceAtLeast(startMs + 1000L)
+
+            val completed = StepRunSession(
+                id = id,
+                startMillis = startMs,
+                endMillis = endMs,
+                steps = finalSteps,
+                isActive = false,
+            )
+
+            val history = loadHistory(appCtx).toMutableList()
+            history.add(completed)
+            val trimmed = history.takeLast(MAX_STORED_SESSIONS)
+            saveHistory(appCtx, trimmed)
+
+            prefs.edit()
+                .putBoolean(KEY_ACTIVE_RUNNING, false)
+                .putInt(KEY_SELECTED_INDEX, -1) // auto-select newly completed run
+                .apply()
+
+            onStopped(completed)
+        }
+    }
+
+    fun syncActiveSessionOneShot(
+        context: Context,
+        timeoutMs: Long = 1600L,
+        onComplete: (Int?) -> Unit = {},
+    ) {
+        val appCtx = context.applicationContext
+        if (!isRunning(appCtx)) {
+            onComplete(null)
+            return
+        }
+        readRawOneShot(appCtx, timeoutMs) { raw ->
+            val steps = if (raw != null && raw >= 0) ingestActiveRaw(appCtx, raw) else null
+            onComplete(steps)
+        }
+    }
+
+    fun selectBar(context: Context, slotIndex: Int) {
+        val appCtx = context.applicationContext
+        val state = loadSessionState(appCtx)
+        if (slotIndex !in state.sessions.indices) return
+        appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_SELECTED_INDEX, slotIndex)
+            .apply()
+    }
+
+    fun loadSessionState(
+        context: Context,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): StepsChartState {
+        val appCtx = context.applicationContext
+        val prefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val running = prefs.getBoolean(KEY_ACTIVE_RUNNING, false)
+        val history = loadHistory(appCtx)
+
+        val visible = if (running) {
+            val active = StepRunSession(
+                id = prefs.getString(KEY_ACTIVE_ID, "live") ?: "live",
+                startMillis = prefs.getLong(KEY_ACTIVE_START_MS, nowMillis),
+                endMillis = nowMillis,
+                steps = prefs.getInt(KEY_ACTIVE_STEPS, 0).coerceAtLeast(0),
+                isActive = true,
+            )
+            (history.takeLast(VISIBLE_SLOTS - 1) + active)
+        } else {
+            history.takeLast(VISIBLE_SLOTS)
+        }
+
+        val savedSelected = prefs.getInt(KEY_SELECTED_INDEX, -1)
+        val resolvedIndex = when {
+            visible.isEmpty() -> -1
+            savedSelected in visible.indices -> savedSelected
+            else -> visible.lastIndex
+        }
+
+        return StepsChartState(
+            isRunning = running,
+            selectedIndex = resolvedIndex,
+            sessions = visible,
+            totalSlots = VISIBLE_SLOTS,
+        )
+    }
+
+    /**
+     * Registers a live foreground listener ONLY while a session is actively running.
+     */
+    fun registerLiveListener(
+        context: Context,
+        onStepsUpdated: (Int) -> Unit,
+    ): () -> Unit {
+        val appCtx = context.applicationContext
+        if (!isRunning(appCtx) || !hasPermission(appCtx) || !isSensorAvailable(appCtx)) return {}
+        val mgr = appCtx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return {}
+        val sensor = mgr.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return {}
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                if (!isRunning(appCtx)) return
+                val raw = event.values.firstOrNull()?.toInt() ?: return
+                val steps = ingestActiveRaw(appCtx, raw)
+                onStepsUpdated(steps)
             }
-            savedLastRaw >= 0 && rawTotal < savedLastRaw -> {
-                // Device rebooted mid-day: preserve steps already counted today
-                val priorToday = prefs.getInt("steps_$todayKey", 0).coerceAtLeast(0)
-                carried = priorToday
-                baseline = 0
-                todaySteps = (carried + rawTotal).coerceAtLeast(0)
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+
+        runCatching { mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI) }
+        return { runCatching { mgr.unregisterListener(listener) } }
+    }
+
+    private fun ingestActiveRaw(context: Context, rawTotal: Int): Int {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(KEY_ACTIVE_RUNNING, false)) return 0
+
+        var startRaw = prefs.getInt(KEY_ACTIVE_START_RAW, -1)
+        val lastRaw = prefs.getInt(KEY_ACTIVE_LAST_RAW, -1)
+        var carried = prefs.getInt(KEY_ACTIVE_CARRIED, 0)
+        val prevSteps = prefs.getInt(KEY_ACTIVE_STEPS, 0).coerceAtLeast(0)
+
+        val steps = when {
+            startRaw < 0 -> {
+                startRaw = rawTotal
+                0
+            }
+            lastRaw >= 0 && rawTotal < lastRaw -> {
+                // Device rebooted mid-session
+                carried = prevSteps
+                startRaw = 0
+                (carried + rawTotal).coerceAtLeast(0)
             }
             else -> {
-                todaySteps = (carried + (rawTotal - baseline)).coerceAtLeast(0)
+                (carried + (rawTotal - startRaw)).coerceAtLeast(0)
             }
         }
 
         prefs.edit()
-            .putString(KEY_SENSOR_DATE, todayKey)
-            .putInt(KEY_BASELINE_RAW, baseline)
-            .putInt(KEY_LAST_RAW, rawTotal)
-            .putInt(KEY_CARRIED_STEPS, carried)
-            .putInt("steps_$todayKey", todaySteps)
+            .putInt(KEY_ACTIVE_START_RAW, startRaw)
+            .putInt(KEY_ACTIVE_LAST_RAW, rawTotal)
+            .putInt(KEY_ACTIVE_CARRIED, carried)
+            .putInt(KEY_ACTIVE_STEPS, steps)
             .apply()
 
-        return todaySteps
+        return steps
     }
 
-    /**
-     * Reads a single cached sample from [Sensor.TYPE_STEP_COUNTER] (usually < 50ms)
-     * with a safety timeout so the listener never leaks.
-     */
-    fun syncOneShot(
+    private fun readRawOneShot(
         context: Context,
-        timeoutMs: Long = 2000L,
-        onComplete: (Int?) -> Unit = {},
+        timeoutMs: Long,
+        onResult: (Int?) -> Unit,
     ) {
         val appCtx = context.applicationContext
         if (!hasPermission(appCtx) || !isSensorAvailable(appCtx)) {
-            onComplete(null)
+            onResult(null)
             return
         }
         val mgr = appCtx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         val sensor = mgr?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
         if (mgr == null || sensor == null) {
-            onComplete(null)
+            onResult(null)
             return
         }
 
@@ -144,7 +280,7 @@ object DeviceStepCounter {
         val timeoutRunnable = Runnable {
             if (done.compareAndSet(false, true)) {
                 runCatching { mgr.unregisterListener(listener) }
-                onComplete(null)
+                onResult(null)
             }
         }
 
@@ -153,9 +289,8 @@ object DeviceStepCounter {
                 if (!done.compareAndSet(false, true)) return
                 mainHandler.removeCallbacks(timeoutRunnable)
                 runCatching { mgr.unregisterListener(this) }
-                val raw = event.values.firstOrNull()?.toInt() ?: -1
-                val today = if (raw >= 0) ingestRawSensorValue(appCtx, raw) else null
-                onComplete(today)
+                val raw = event.values.firstOrNull()?.toInt()
+                onResult(raw)
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -166,66 +301,50 @@ object DeviceStepCounter {
         }.getOrDefault(false)
 
         if (!registered) {
-            if (done.compareAndSet(false, true)) onComplete(null)
+            if (done.compareAndSet(false, true)) onResult(null)
             return
         }
-
         mainHandler.postDelayed(timeoutRunnable, timeoutMs)
     }
 
-    /**
-     * Registers a live listener while a screen is visible; returns an unregister callback.
-     */
-    fun registerLiveListener(
-        context: Context,
-        onStepsUpdated: (Int) -> Unit,
-    ): () -> Unit {
-        val appCtx = context.applicationContext
-        if (!hasPermission(appCtx) || !isSensorAvailable(appCtx)) return {}
-        val mgr = appCtx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return {}
-        val sensor = mgr.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return {}
-
-        val listener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-                val raw = event.values.firstOrNull()?.toInt() ?: return
-                val today = ingestRawSensorValue(appCtx, raw)
-                onStepsUpdated(today)
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-        }
-
-        runCatching { mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI) }
-        return { runCatching { mgr.unregisterListener(listener) } }
-    }
-
-    fun schedulePeriodicSync(context: Context) {
-        val request = PeriodicWorkRequestBuilder<StepsSyncWorker>(15, TimeUnit.MINUTES).build()
-        WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
-            WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            request,
-        )
-    }
-
-    fun cancelPeriodicSync(context: Context) {
-        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_NAME)
-    }
-}
-
-class StepsSyncWorker(
-    appContext: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(appContext, params) {
-    override suspend fun doWork(): Result {
-        if (DeviceStepCounter.hasPermission(applicationContext)) {
-            suspendCancellableCoroutine<Unit> { cont ->
-                DeviceStepCounter.syncOneShot(applicationContext, timeoutMs = 2500L) {
-                    if (cont.isActive) cont.resume(Unit)
+    private fun loadHistory(context: Context): List<StepRunSession> {
+        val raw = context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_HISTORY_JSON, null) ?: return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    add(
+                        StepRunSession(
+                            id = obj.optString("id", "s_$i"),
+                            startMillis = obj.optLong("start", 0L),
+                            endMillis = obj.optLong("end", 0L),
+                            steps = obj.optInt("steps", 0).coerceAtLeast(0),
+                            isActive = false,
+                        ),
+                    )
                 }
             }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun saveHistory(context: Context, sessions: List<StepRunSession>) {
+        val arr = JSONArray()
+        for (s in sessions) {
+            arr.put(
+                JSONObject()
+                    .put("id", s.id)
+                    .put("start", s.startMillis)
+                    .put("end", s.endMillis)
+                    .put("steps", s.steps),
+            )
         }
-        StepsChartWidgetProvider.refreshAll(applicationContext)
-        return Result.success()
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_HISTORY_JSON, arr.toString())
+            .apply()
     }
 }

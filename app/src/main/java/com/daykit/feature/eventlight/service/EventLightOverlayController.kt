@@ -1,26 +1,27 @@
 package com.daykit.feature.eventlight.service
 
 import android.content.Context
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.view.Gravity
 import android.view.WindowManager
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -34,12 +35,13 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.daykit.feature.eventlight.data.EventLightSettings
+import com.daykit.feature.eventlight.data.edgeLightTintColor
 
 /**
- * Draws a colored border overlay on top of every other app. Unlike
- * [com.daykit.feature.applock.service.LockOverlayController], this overlay must never
- * intercept touches or keys — the app underneath (e.g. a video call app) needs all
- * input — so it is not-focusable/not-touchable and skips FLAG_SECURE entirely.
+ * Draws a continuous macOS-style glowing rounded-rectangle ring light overlay on top
+ * of every other app. Unlike [com.daykit.feature.applock.service.LockOverlayController],
+ * this overlay must never intercept touches or keys — the app underneath (e.g. a video
+ * call app) needs all input — so it is not-focusable/not-touchable and skips FLAG_SECURE.
  */
 class EventLightOverlayController(private val context: Context) {
     private val windowManager = context.getSystemService(WindowManager::class.java)
@@ -62,7 +64,13 @@ class EventLightOverlayController(private val context: Context) {
             setViewTreeSavedStateRegistryOwner(owner)
             setContent {
                 val current by state
-                EventLightBorderContent(current)
+                EventLightRingCanvas(
+                    thicknessDp = current.thicknessDp,
+                    colorTemp = current.colorTemp,
+                    cornerRadiusDp = 42.dp,
+                    edgeInsetDp = 8.dp,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
 
@@ -96,66 +104,104 @@ class EventLightOverlayController(private val context: Context) {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.CENTER
-            // Window-level alpha is separate from per-pixel content alpha and defaults
-            // to 1f, but set it explicitly so nothing can cap the border below fully
-            // opaque regardless of the opacity setting.
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             alpha = 1f
         }
     }
 }
 
+/**
+ * Renders the multi-layered feathered macOS Edge Light ring:
+ * - Wide ambient glow in the selected color temperature
+ * - Soft mid bloom blending the tint into white
+ * - Bright incandescent core tube with slight feathering (no hard harsh edge)
+ * - Subtle inner white highlight giving luminous LED depth
+ */
 @Composable
-private fun EventLightBorderContent(settings: EventLightSettings) {
-    // Brightness scales color intensity (toward black), independent of opacity, so
-    // "fully solid" on the transparency control always means alpha = 1 regardless of
-    // where brightness is set — the two controls no longer multiply into one alpha.
-    val base = Color(settings.colorArgb)
-    val color = Color(
-        red = base.red * settings.brightness,
-        green = base.green * settings.brightness,
-        blue = base.blue * settings.brightness,
-        alpha = settings.opacity,
-    )
-    val thickness = settings.thicknessDp.dp
+fun EventLightRingCanvas(
+    thicknessDp: Float,
+    colorTemp: Float,
+    cornerRadiusDp: Dp = 42.dp,
+    edgeInsetDp: Dp = 8.dp,
+    modifier: Modifier = Modifier,
+) {
+    val tint = edgeLightTintColor(colorTemp)
+    val outerGlowColor = tint.copy(alpha = 0.52f).toArgb()
+    val midBloomColor = lerp(tint, Color.White, 0.30f).copy(alpha = 0.82f).toArgb()
+    val coreTubeColor = lerp(Color.White, tint, 0.24f).copy(alpha = 0.97f).toArgb()
+    val innerFilamentColor = Color.White.copy(alpha = 0.84f).toArgb()
 
-    Box(Modifier.fillMaxSize()) {
-        if (settings.topEnabled) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(thickness)
-                    .align(Alignment.TopCenter)
-                    .background(color),
-            )
-        }
-        if (settings.bottomEnabled) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(thickness)
-                    .align(Alignment.BottomCenter)
-                    .background(color),
-            )
-        }
-        if (settings.leftEnabled) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .width(thickness)
-                    .align(Alignment.CenterStart)
-                    .background(color),
-            )
-        }
-        if (settings.rightEnabled) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .width(thickness)
-                    .align(Alignment.CenterEnd)
-                    .background(color),
-            )
+    val outerPaint = remember { createRingPaint() }
+    val midPaint = remember { createRingPaint() }
+    val corePaint = remember { createRingPaint() }
+    val innerPaint = remember { createRingPaint() }
+    val rect = remember { RectF() }
+
+    Canvas(modifier = modifier) {
+        if (size.width <= 0f || size.height <= 0f) return@Canvas
+
+        val thicknessPx = thicknessDp.dp.toPx().coerceAtLeast(2f)
+        val inset = edgeInsetDp.toPx() + thicknessPx * 0.55f
+        val maxInset = (size.minDimension * 0.35f).coerceAtLeast(1f)
+        val safeInset = inset.coerceAtMost(maxInset)
+
+        rect.set(
+            safeInset,
+            safeInset,
+            size.width - safeInset,
+            size.height - safeInset,
+        )
+        if (rect.width() <= 0f || rect.height() <= 0f) return@Canvas
+
+        val cornerRadius = cornerRadiusDp.toPx()
+            .coerceAtMost(minOf(rect.width(), rect.height()) * 0.28f)
+
+        // 1. Wide ambient glow
+        outerPaint.color = outerGlowColor
+        outerPaint.strokeWidth = thicknessPx * 2.15f
+        outerPaint.maskFilter = BlurMaskFilter(
+            (thicknessPx * 1.45f).coerceAtLeast(1f),
+            BlurMaskFilter.Blur.NORMAL,
+        )
+
+        // 2. Mid bloom halo
+        midPaint.color = midBloomColor
+        midPaint.strokeWidth = thicknessPx * 1.30f
+        midPaint.maskFilter = BlurMaskFilter(
+            (thicknessPx * 0.65f).coerceAtLeast(1f),
+            BlurMaskFilter.Blur.NORMAL,
+        )
+
+        // 3. Incandescent luminous core tube
+        corePaint.color = coreTubeColor
+        corePaint.strokeWidth = thicknessPx * 0.78f
+        corePaint.maskFilter = BlurMaskFilter(
+            (thicknessPx * 0.20f).coerceAtLeast(0.5f),
+            BlurMaskFilter.Blur.NORMAL,
+        )
+
+        // 4. Inner bright specular filament
+        innerPaint.color = innerFilamentColor
+        innerPaint.strokeWidth = thicknessPx * 0.36f
+        innerPaint.maskFilter = BlurMaskFilter(
+            (thicknessPx * 0.08f).coerceAtLeast(0.5f),
+            BlurMaskFilter.Blur.NORMAL,
+        )
+
+        drawIntoCanvas { canvas ->
+            val nc = canvas.nativeCanvas
+            nc.drawRoundRect(rect, cornerRadius, cornerRadius, outerPaint)
+            nc.drawRoundRect(rect, cornerRadius, cornerRadius, midPaint)
+            nc.drawRoundRect(rect, cornerRadius, cornerRadius, corePaint)
+            nc.drawRoundRect(rect, cornerRadius, cornerRadius, innerPaint)
         }
     }
+}
+
+private fun createRingPaint(): Paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+    style = Paint.Style.STROKE
+    strokeJoin = Paint.Join.ROUND
+    strokeCap = Paint.Cap.ROUND
 }
 
 private class OverlayLifecycleOwner :

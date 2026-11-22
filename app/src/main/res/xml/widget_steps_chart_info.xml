@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_steps_chart_description"
-    android:initialLayout="@layout/widget_canvas_bitmap"
-    android:previewLayout="@layout/widget_canvas_bitmap"
+    android:initialLayout="@layout/widget_steps_session"
+    android:previewLayout="@layout/widget_steps_session"
     android:minWidth="250dp"
     android:minHeight="140dp"
     android:resizeMode="horizontal|vertical"

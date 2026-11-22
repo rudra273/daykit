@@ -12,6 +12,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
@@ -99,24 +101,44 @@ fun DailyWidgetsGallery(
     var hasStepPermission by remember { mutableStateOf(DeviceStepCounter.hasPermission(context)) }
     val hasStepSensor = remember { DeviceStepCounter.isSensorAvailable(context) }
     var stepTick by remember { mutableIntStateOf(0) }
+    var sessionRunning by remember { mutableStateOf(DeviceStepCounter.isRunning(context)) }
+
+    val startOrStopRun: () -> Unit = {
+        if (DeviceStepCounter.isRunning(context)) {
+            StepsChartWidgetProvider.cancelSessionTick(context)
+            DeviceStepCounter.stopSession(context) { saved ->
+                sessionRunning = false
+                stepTick++
+                StepsChartWidgetProvider.refreshAll(context)
+                if (saved != null) {
+                    onShowMessage("Saved run: ${saved.steps} steps")
+                }
+            }
+        } else {
+            DeviceStepCounter.startSession(context) {
+                sessionRunning = true
+                StepsChartWidgetProvider.scheduleSessionTick(context)
+                stepTick++
+                StepsChartWidgetProvider.refreshAll(context)
+                onShowMessage("Run started from 0 steps")
+            }
+        }
+    }
 
     val stepPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasStepPermission = granted || DeviceStepCounter.hasPermission(context)
         if (hasStepPermission) {
-            DeviceStepCounter.syncOneShot(context) {
-                stepTick++
-                StepsChartWidgetProvider.refreshAll(context)
-            }
-            onShowMessage("Step sensor enabled — counting live steps")
+            startOrStopRun()
         } else {
-            onShowMessage("Physical activity permission is needed for real step counts")
+            onShowMessage("Physical activity permission is needed to count steps")
         }
     }
 
-    DisposableEffect(hasStepPermission, hasStepSensor) {
-        if (hasStepPermission && hasStepSensor) {
+    // Only listen to the hardware step sensor while a walk/run session is actively running
+    DisposableEffect(sessionRunning, hasStepPermission, hasStepSensor) {
+        if (sessionRunning && hasStepPermission && hasStepSensor) {
             val unregister = DeviceStepCounter.registerLiveListener(context) {
                 stepTick++
                 StepsChartWidgetProvider.refreshAll(context)
@@ -311,64 +333,11 @@ fun DailyWidgetsGallery(
                                         }
                                     }
                                 }
-                            } else if (type == DailyWidgetType.STEPS_BAR_CHART) {
-                                {
-                                    when {
-                                        !hasStepSensor -> {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(CircleShape)
-                                                    .background(MaterialTheme.extendedColors.inputField)
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                                            ) {
-                                                Text(
-                                                    text = "No sensor",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.extendedColors.textMuted,
-                                                )
-                                            }
-                                        }
-                                        !hasStepPermission -> {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(CircleShape)
-                                                    .background(MaterialTheme.colorScheme.primary)
-                                                    .clickable {
-                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                                            stepPermissionLauncher.launch(
-                                                                Manifest.permission.ACTIVITY_RECOGNITION,
-                                                            )
-                                                        }
-                                                    }
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                                            ) {
-                                                Text(
-                                                    text = "Enable Steps",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onPrimary,
-                                                )
-                                            }
-                                        }
-                                        else -> {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(CircleShape)
-                                                    .background(MaterialTheme.extendedColors.accents.green.copy(alpha = 0.16f))
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                                            ) {
-                                                Text(
-                                                    text = "Live Sensor",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.extendedColors.accents.green,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
                             } else {
                                 null
                             },
                         )
+
                         Spacer(Modifier.height(Spacing.sm))
 
                         // Showcase stage backdrop tailored to Liquid Glass vs Solid widgets
@@ -422,6 +391,44 @@ fun DailyWidgetsGallery(
                             contentAlignment = Alignment.Center,
                         ) {
                             val widthFraction = if (previewAspect <= 1.1f) 0.62f else 1.0f
+                            val previewModifier = Modifier
+                                .fillMaxWidth(widthFraction)
+                                .aspectRatio(previewAspect)
+                                .then(
+                                    if (type == DailyWidgetType.STEPS_BAR_CHART) {
+                                        Modifier.pointerInput(Unit) {
+                                            detectTapGestures { offset ->
+                                                val w = size.width.toFloat().coerceAtLeast(1f)
+                                                val h = size.height.toFloat().coerceAtLeast(1f)
+                                                val nx = offset.x / w
+                                                val ny = offset.y / h
+                                                // Top-right circular Play/Stop icon hit zone
+                                                if (nx >= 0.76f && ny <= 0.36f) {
+                                                    if (!hasStepSensor) {
+                                                        onShowMessage("No step counter sensor on this device")
+                                                    } else if (!DeviceStepCounter.hasPermission(context) &&
+                                                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                                                    ) {
+                                                        stepPermissionLauncher.launch(
+                                                            Manifest.permission.ACTIVITY_RECOGNITION,
+                                                        )
+                                                    } else {
+                                                        startOrStopRun()
+                                                    }
+                                                } else if (ny >= 0.42f) {
+                                                    // 7 bar slots across the chart width
+                                                    val chartNorm = ((nx - 0.045f) / 0.91f).coerceIn(0f, 0.999f)
+                                                    val slotIdx = (chartNorm * DeviceStepCounter.VISIBLE_SLOTS).toInt()
+                                                    DeviceStepCounter.selectBar(context, slotIdx)
+                                                    stepTick++
+                                                    StepsChartWidgetProvider.refreshAll(context)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Modifier
+                                    },
+                                )
                             DailyWidgetLivePreview(
                                 type = type,
                                 nowMillis = nowMillis,
@@ -430,9 +437,7 @@ fun DailyWidgetsGallery(
                                 batteryState = batteryState,
                                 agendaState = agendaState,
                                 darkSurface = isDark,
-                                modifier = Modifier
-                                    .fillMaxWidth(widthFraction)
-                                    .aspectRatio(previewAspect),
+                                modifier = previewModifier,
                             )
                         }
 

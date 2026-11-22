@@ -184,6 +184,19 @@
                 android:resource="@xml/widget_expense_quick_add_info" />
         </receiver>
 
+        <receiver
+            android:name=".feature.widget.EventLightWidgetProvider"
+            android:label="@string/widget_event_light_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.daykit.feature.widget.ACTION_TOGGLE_EVENT_LIGHT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_event_light_info" />
+        </receiver>
+
         <receiver android:name=".feature.widget.DayflowWidgetProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -295,6 +308,9 @@
                 <action android:name="android.intent.action.DATE_CHANGED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="com.daykit.feature.widget.ACTION_STEPS_TOGGLE_SESSION" />
+                <action android:name="com.daykit.feature.widget.ACTION_STEPS_SELECT_BAR" />
+                <action android:name="com.daykit.feature.widget.ACTION_STEPS_SESSION_TICK" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
