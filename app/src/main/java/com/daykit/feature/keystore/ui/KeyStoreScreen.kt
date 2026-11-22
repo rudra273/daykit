@@ -99,7 +99,7 @@ private sealed interface KeyEditorState {
 @Composable
 fun KeyStoreScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -127,7 +127,7 @@ fun KeyStoreScreen(
         scope.launch { snackbarHostState.showSnackbar("$label copied") }
     }
 
-    BackHandler {
+    BackHandler(enabled = searchActive || query.isNotEmpty() || pagerState.currentPage != 0 || onBack != null) {
         if (searchActive) {
             searchActive = false
             query = ""
@@ -135,7 +135,7 @@ fun KeyStoreScreen(
             query = ""
             scope.launch { pagerState.animateScrollToPage(0) }
         } else {
-            onBack()
+            onBack?.invoke()
         }
     }
 

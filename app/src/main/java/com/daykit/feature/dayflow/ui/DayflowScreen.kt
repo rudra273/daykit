@@ -65,7 +65,7 @@ private val moodRows = listOf(
 )
 
 @Composable
-fun DayflowScreen(container: AppContainer, onBack: () -> Unit) {
+fun DayflowScreen(container: AppContainer, onBack: (() -> Unit)?) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current

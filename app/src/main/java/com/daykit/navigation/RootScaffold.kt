@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,8 +105,13 @@ fun RootScaffold(
     LaunchedEffect(Unit) {
         if (!startTabApplied) {
             startTabApplied = true
-            if (AppPreferences.startTab == StartTab.Today) {
-                navController.navigate(Routes.TODAY) {
+            val initialRoute = when (AppPreferences.startTab) {
+                StartTab.Home -> null
+                StartTab.Today -> Routes.TODAY
+                StartTab.Custom -> Routes.CUSTOM_TAB
+            }
+            if (initialRoute != null) {
+                navController.navigate(initialRoute) {
                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                     launchSingleTop = true
                 }
@@ -166,6 +172,9 @@ fun RootScaffold(
         if (onTopLevel) {
             val baseSolid = LocalPageBackground.current.solid
             val ext = MaterialTheme.extendedColors
+            val customNavTab by AppPreferences.rememberPreference(AppPreferences.KEY_CUSTOM_NAV_TAB) {
+                AppPreferences.customNavTab
+            }
             val tabs = TopLevelDestination.entries
             val selectedIndex = tabs.indexOfFirst { dest ->
                 currentDestination?.hierarchy?.any { it.route == dest.route } == true
@@ -196,8 +205,8 @@ fun RootScaffold(
                 BoxWithConstraints(
                     modifier = Modifier
                         .navigationBarsPadding()
-                        .padding(start = 32.dp, end = 32.dp, bottom = 10.dp)
-                        .widthIn(max = 360.dp)
+                        .padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
+                        .widthIn(max = 400.dp)
                         .fillMaxWidth()
                         .height(DockHeight)
                         .floatingDockSurface(shape = DockOuterShape)
@@ -238,6 +247,9 @@ fun RootScaffold(
                     ) {
                         tabs.forEachIndexed { index, dest ->
                             val selected = index == selectedIndex
+                            val tabLabel = if (dest == TopLevelDestination.CUSTOM) customNavTab.navLabel else dest.label
+                            val activeIcon = if (dest == TopLevelDestination.CUSTOM) customNavTab.activeIcon() else dest.icon
+                            val inactiveIcon = if (dest == TopLevelDestination.CUSTOM) customNavTab.inactiveIcon() else dest.inactiveIcon
                             val tint by animateColorAsState(
                                 targetValue = if (selected) ext.accents.blue else ext.textMuted,
                                 animationSpec = if (reduceMotion) snap() else tween(180),
@@ -262,7 +274,7 @@ fun RootScaffold(
                                         interactionSource = interactionSource,
                                         indication = null,
                                         role = Role.Tab,
-                                        onClickLabel = dest.label,
+                                        onClickLabel = tabLabel,
                                     ) {
                                         navigateTab(dest.route)
                                     }
@@ -276,7 +288,7 @@ fun RootScaffold(
                                     label = "tab icon",
                                 ) { active ->
                                     Icon(
-                                        imageVector = if (active) dest.icon else dest.inactiveIcon,
+                                        imageVector = if (active) activeIcon else inactiveIcon,
                                         contentDescription = null,
                                         tint = tint,
                                         modifier = Modifier.size(22.dp).scale(iconScale),
@@ -284,12 +296,13 @@ fun RootScaffold(
                                 }
                                 Spacer(Modifier.height(2.dp))
                                 Text(
-                                    text = dest.label,
+                                    text = tabLabel,
                                     color = tint,
                                     fontSize = 11.sp,
                                     lineHeight = 13.sp,
                                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                                     maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }

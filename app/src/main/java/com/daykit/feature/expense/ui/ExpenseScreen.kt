@@ -132,7 +132,7 @@ private val EXPENSE_CATEGORIES = listOf(
 @Composable
 fun ExpenseScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val errors = rememberErrorReporter()
     var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
@@ -156,11 +156,11 @@ fun ExpenseScreen(
     var stopBill by remember { mutableStateOf<MonthlyBill?>(null) }
     var editBill by remember { mutableStateOf<MonthlyBill?>(null) }
 
-    BackHandler {
+    BackHandler(enabled = manageBillsOpen || onBack != null) {
         if (manageBillsOpen) {
             manageBillsOpen = false
         } else {
-            onBack()
+            onBack?.invoke()
         }
     }
 

@@ -7,8 +7,10 @@ import org.junit.Test
 class TabSwipeNavigationTest {
     @Test fun swipesMoveInTheBottomNavigationOrder() {
         assertEquals(Routes.TODAY, adjacentTopLevelRoute(Routes.HOME, forward = true))
-        assertEquals(Routes.SETTINGS, adjacentTopLevelRoute(Routes.TODAY, forward = true))
-        assertEquals(Routes.TODAY, adjacentTopLevelRoute(Routes.SETTINGS, forward = false))
+        assertEquals(Routes.CUSTOM_TAB, adjacentTopLevelRoute(Routes.TODAY, forward = true))
+        assertEquals(Routes.SETTINGS, adjacentTopLevelRoute(Routes.CUSTOM_TAB, forward = true))
+        assertEquals(Routes.CUSTOM_TAB, adjacentTopLevelRoute(Routes.SETTINGS, forward = false))
+        assertEquals(Routes.TODAY, adjacentTopLevelRoute(Routes.CUSTOM_TAB, forward = false))
         assertEquals(Routes.HOME, adjacentTopLevelRoute(Routes.TODAY, forward = false))
     }
 

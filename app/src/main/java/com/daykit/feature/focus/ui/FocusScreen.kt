@@ -119,7 +119,7 @@ private sealed interface FocusEditor {
 @Composable
 fun FocusScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onMonitorNeeded: () -> Unit,
 ) {
     var editor by remember { mutableStateOf<FocusEditor?>(null) }
@@ -215,7 +215,7 @@ private fun FocusHome(
     suggestionExclusions: Set<String>,
     scan: SuggestScan,
     onScan: () -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onMonitorNeeded: () -> Unit,
     onEdit: (FocusEditor) -> Unit,
 ) {
@@ -301,7 +301,7 @@ private fun FocusHome(
         }
     }
 
-    BackHandler { onBack() }
+    BackHandler(enabled = onBack != null) { onBack?.invoke() }
 
     val appsByPackage = remember(installedApps) {
         installedApps.orEmpty().associateBy { it.packageName }

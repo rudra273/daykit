@@ -10,17 +10,25 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.daykit.AppContainer
+import com.daykit.core.data.AppPreferences
+import com.daykit.core.data.CustomNavTab
 import com.daykit.core.designsystem.SolidPage
 import com.daykit.core.designsystem.background.LocalPageBackground
 import com.daykit.core.designsystem.background.pageBackground
@@ -100,6 +108,40 @@ fun DayKitNavHost(
                 bottomBarPadding = bottomBarPadding,
                 onOpenTool = { navController.navigate(it) },
             )
+        }
+        opaqueComposable(Routes.CUSTOM_TAB) {
+            val customNavTab by AppPreferences.rememberPreference(AppPreferences.KEY_CUSTOM_NAV_TAB) {
+                AppPreferences.customNavTab
+            }
+            val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val dockClearance = (bottomBarPadding.calculateBottomPadding() - navBarInset).coerceAtLeast(0.dp)
+            Box(Modifier.fillMaxSize().padding(bottom = dockClearance)) {
+                when (customNavTab) {
+                    CustomNavTab.Focus -> FocusScreen(
+                        container = container,
+                        onBack = null,
+                        onMonitorNeeded = onAppLockSelectionChanged,
+                    )
+                    CustomNavTab.Habits -> HabitScreen(container = container, onBack = null)
+                    CustomNavTab.Dayflow -> DayflowScreen(container = container, onBack = null)
+                    CustomNavTab.Expenses -> ExpenseScreen(container = container, onBack = null)
+                    CustomNavTab.Reminders -> ReminderScreen(container = container, onBack = null)
+                    CustomNavTab.Notes -> SecureNotesScreen(container = container, onBack = null)
+                    CustomNavTab.KeyStore -> KeyStoreScreen(container = container, onBack = null)
+                    CustomNavTab.FileVault -> FileLockerScreen(container = container, onBack = null)
+                    CustomNavTab.AppLock -> AppLockScreen(
+                        container = container,
+                        onBack = null,
+                        onSelectionChanged = onAppLockSelectionChanged,
+                    )
+                    CustomNavTab.DeviceManager -> DeviceManagerScreen(
+                        onBack = null,
+                        onExpectActivityResult = { container.sensitiveKeyManager.expectingActivityResult = true },
+                    )
+                    CustomNavTab.DnsManager -> DnsManagerScreen(onBack = null)
+                    CustomNavTab.Canvas -> CanvasScreen(onBack = null)
+                }
+            }
         }
         opaqueComposable(Routes.SETTINGS) {
             SettingsScreen(

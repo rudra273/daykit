@@ -111,7 +111,7 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun ReminderScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

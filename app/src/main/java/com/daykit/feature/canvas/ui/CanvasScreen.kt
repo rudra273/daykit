@@ -104,7 +104,7 @@ private data class CanvasWidgetItem(
 
 @Composable
 fun CanvasScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }

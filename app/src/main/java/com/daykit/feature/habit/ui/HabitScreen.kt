@@ -157,7 +157,7 @@ private val quotes = listOf(
 @Composable
 fun HabitScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val errors = rememberErrorReporter()
     val context = LocalContext.current
@@ -179,7 +179,7 @@ fun HabitScreen(
     val nestedUiOpen = addOpen || editHabit != null || deleteHabit != null || logHabit != null ||
         relapseHabit != null || progressOpen || quitDetailId != null
 
-    BackHandler(enabled = !nestedUiOpen, onBack = onBack)
+    BackHandler(enabled = !nestedUiOpen && onBack != null) { onBack?.invoke() }
 
     when {
         addOpen -> HabitEditorPage(
@@ -413,7 +413,7 @@ fun HabitScreen(
 private fun HabitHome(
     snackbarHostState: SnackbarHostState,
     dashboard: HabitDashboard?,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     selectedDate: LocalDate,
     onSelectDate: (LocalDate) -> Unit,
     onOpenProgress: () -> Unit,

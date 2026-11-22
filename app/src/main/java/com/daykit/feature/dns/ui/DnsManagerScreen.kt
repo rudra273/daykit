@@ -78,7 +78,7 @@ private val HowToSteps = listOf(
 
 @Composable
 fun DnsManagerScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }

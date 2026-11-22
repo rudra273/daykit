@@ -66,7 +66,7 @@ private enum class AppLockTab {
 @Composable
 fun AppLockScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onSelectionChanged: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -106,14 +106,14 @@ fun AppLockScreen(
     // The app targeted by the duration-picker sheet, or null when it's closed.
     var focusSheetApp by remember { mutableStateOf<InstalledApp?>(null) }
 
-    BackHandler {
+    BackHandler(enabled = searchActive || query.isNotBlank() || onBack != null) {
         if (searchActive) {
             searchActive = false
             query = ""
         } else if (query.isNotBlank()) {
             query = ""
         } else {
-            onBack()
+            onBack?.invoke()
         }
     }
 

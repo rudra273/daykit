@@ -103,7 +103,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun FileLockerScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

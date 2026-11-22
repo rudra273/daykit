@@ -113,7 +113,7 @@ private sealed interface NoteEditorState {
 @Composable
 fun SecureNotesScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val errors = rememberErrorReporter()
@@ -134,7 +134,7 @@ fun SecureNotesScreen(
         .observeTrash()
         .collectAsStateWithLifecycle(initialValue = emptyList())
 
-    BackHandler {
+    BackHandler(enabled = searchActive || query.isNotBlank() || selectedLabel != null || onBack != null) {
         when {
             searchActive -> {
                 searchActive = false
@@ -145,7 +145,7 @@ fun SecureNotesScreen(
                 query = ""
                 selectedLabel = null
             }
-            else -> onBack()
+            else -> onBack?.invoke()
         }
     }
 

@@ -1,18 +1,44 @@
 package com.daykit.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Today
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.outlined.TrackChanges
+import androidx.compose.material.icons.outlined.VpnKey
+import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Notes
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.Today
+import androidx.compose.material.icons.rounded.TrackChanges
+import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.daykit.core.data.CustomNavTab
 
 /** Route constants for the NavHost. All destinations are parameter-less. */
 object Routes {
     const val HOME = "home"
     const val TODAY = "today"
+    const val CUSTOM_TAB = "custom_tab"
     const val SETTINGS = "settings"
 
     const val TOOL_APPLOCK = "tool/applock"
@@ -43,7 +69,7 @@ object Routes {
     const val SETTINGS_PRIVACY = "settings/privacy"
 }
 
-/** The three bottom-navigation destinations. */
+/** The four bottom-navigation destinations. */
 enum class TopLevelDestination(
     val route: String,
     val label: String,
@@ -52,7 +78,38 @@ enum class TopLevelDestination(
 ) {
     HOME(Routes.HOME, "Home", Icons.Rounded.GridView, Icons.Outlined.GridView),
     TODAY(Routes.TODAY, "Today", Icons.Rounded.Today, Icons.Outlined.Today),
+    CUSTOM(Routes.CUSTOM_TAB, CustomNavTab.Focus.navLabel, Icons.Rounded.Timer, Icons.Outlined.Timer),
     SETTINGS(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
+}
+
+fun CustomNavTab.activeIcon(): ImageVector = when (this) {
+    CustomNavTab.Focus -> Icons.Rounded.Timer
+    CustomNavTab.Habits -> Icons.Rounded.TrackChanges
+    CustomNavTab.Dayflow -> Icons.Rounded.AutoAwesome
+    CustomNavTab.Expenses -> Icons.Rounded.Payments
+    CustomNavTab.Reminders -> Icons.Rounded.NotificationsActive
+    CustomNavTab.Notes -> Icons.Rounded.Notes
+    CustomNavTab.KeyStore -> Icons.Rounded.VpnKey
+    CustomNavTab.FileVault -> Icons.Rounded.Folder
+    CustomNavTab.AppLock -> Icons.Rounded.Lock
+    CustomNavTab.DeviceManager -> Icons.Rounded.PhoneAndroid
+    CustomNavTab.DnsManager -> Icons.Rounded.Dns
+    CustomNavTab.Canvas -> Icons.Rounded.Widgets
+}
+
+fun CustomNavTab.inactiveIcon(): ImageVector = when (this) {
+    CustomNavTab.Focus -> Icons.Outlined.Timer
+    CustomNavTab.Habits -> Icons.Outlined.TrackChanges
+    CustomNavTab.Dayflow -> Icons.Outlined.AutoAwesome
+    CustomNavTab.Expenses -> Icons.Outlined.Payments
+    CustomNavTab.Reminders -> Icons.Outlined.NotificationsActive
+    CustomNavTab.Notes -> Icons.Outlined.Notes
+    CustomNavTab.KeyStore -> Icons.Outlined.VpnKey
+    CustomNavTab.FileVault -> Icons.Outlined.Folder
+    CustomNavTab.AppLock -> Icons.Outlined.Lock
+    CustomNavTab.DeviceManager -> Icons.Outlined.PhoneAndroid
+    CustomNavTab.DnsManager -> Icons.Outlined.Dns
+    CustomNavTab.Canvas -> Icons.Outlined.Widgets
 }
 
 val TOP_LEVEL_ROUTES: Set<String> = TopLevelDestination.entries.map { it.route }.toSet()
