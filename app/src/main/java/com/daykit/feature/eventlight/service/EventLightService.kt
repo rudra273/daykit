@@ -16,6 +16,7 @@ import com.daykit.MainActivity
 import com.daykit.R
 import com.daykit.feature.eventlight.data.EventLightStore
 import com.daykit.feature.eventlight.data.PREF_EVENT_LIGHT
+import com.daykit.feature.widget.EventLightWidgetProvider
 
 /**
  * Keeps [EventLightOverlayController] alive while the user is in another app (e.g. a
@@ -35,10 +36,15 @@ class EventLightService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         overlayController = EventLightOverlayController(this)
         overlayController.show(EventLightStore.get(this))
+        FrontCameraMonitor.dismissNotification(this)
+        EventLightWidgetProvider.refreshAll(this)
 
         val p = getSharedPreferences(PREF_EVENT_LIGHT, Context.MODE_PRIVATE)
         val l = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            mainHandler.post { overlayController.update(EventLightStore.get(this)) }
+            mainHandler.post {
+                overlayController.update(EventLightStore.get(this))
+                EventLightWidgetProvider.refreshAll(this)
+            }
         }
         p.registerOnSharedPreferenceChangeListener(l)
         prefs = p
@@ -54,6 +60,7 @@ class EventLightService : Service() {
         prefs = null
         listener = null
         mainHandler.post { overlayController.dismiss() }
+        EventLightWidgetProvider.refreshAll(this)
         super.onDestroy()
     }
 
@@ -74,10 +81,25 @@ class EventLightService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val turnOffIntent = PendingIntent.getBroadcast(
+            this,
+            NOTIFICATION_ID,
+            Intent(this, EventLightWidgetProvider::class.java).apply {
+                action = EventLightWidgetProvider.ACTION_TURN_OFF
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         return Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Event Light is on")
+            .setContentTitle("Edge Light is on")
             .setContentIntent(contentIntent)
+            .addAction(
+                Notification.Action.Builder(
+                    null,
+                    "Turn off",
+                    turnOffIntent,
+                ).build(),
+            )
             .setOngoing(true)
             .build()
     }

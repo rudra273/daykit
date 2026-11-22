@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.PhotoSizeSelectLarge
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -64,6 +65,8 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
     ToolSection(
         "Utilities",
         listOf(
+            ToolTile(Routes.TOOL_CANVAS, "Canvas", "Home widgets & wallpapers", Icons.Rounded.Widgets, { accents.purple },
+                listOf("canvas", "widget", "widgets", "wallpaper", "wallpapers", "home screen")),
             ToolTile(Routes.TOOL_DEVICE_MANAGER, "Device Manager", "Usage, storage & battery", Icons.Rounded.PhoneAndroid, { accents.teal },
                 listOf("device manager", "usage", "storage", "battery", "largest files", "apps")),
             ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },

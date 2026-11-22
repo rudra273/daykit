@@ -23,3 +23,7 @@ internal fun updateReminderWidgets(context: Context) {
     val ids = manager.getAppWidgetIds(ComponentName(context, ReminderWidgetProvider::class.java))
     ReminderWidgetProvider.updateWidgets(context, manager, ids)
 }
+
+internal fun updateEventLightWidgets(context: Context) {
+    EventLightWidgetProvider.refreshAll(context)
+}

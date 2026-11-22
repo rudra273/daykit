@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
@@ -181,6 +184,23 @@
                 android:resource="@xml/widget_expense_quick_add_info" />
         </receiver>
 
+        <receiver
+            android:name=".feature.widget.EventLightWidgetProvider"
+            android:label="@string/widget_event_light_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.daykit.feature.widget.ACTION_TOGGLE_EVENT_LIGHT" />
+                <action android:name="com.daykit.feature.widget.ACTION_TURN_ON_EVENT_LIGHT" />
+                <action android:name="com.daykit.feature.widget.ACTION_TURN_OFF_EVENT_LIGHT" />
+                <action android:name="com.daykit.feature.widget.ACTION_SET_EVENT_LIGHT_THICKNESS" />
+                <action android:name="com.daykit.feature.widget.ACTION_SET_EVENT_LIGHT_TEMP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_event_light_info" />
+        </receiver>
+
         <receiver android:name=".feature.widget.DayflowWidgetProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -216,7 +236,7 @@
         <receiver
             android:name=".feature.widget.ReminderWidgetProvider"
             android:label="@string/widget_reminders_title"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.DATE_CHANGED" />
@@ -225,6 +245,117 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_reminders_info" />
         </receiver>
+        <receiver
+            android:name=".feature.widget.WeatherGlassWidgetProvider"
+            android:label="@string/widget_weather_glass_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_weather_glass_info" />
+        </receiver>
+        <receiver
+            android:name=".feature.widget.SolarArcWidgetProvider"
+            android:label="@string/widget_solar_arc_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_solar_arc_info" />
+        </receiver>
+        <receiver
+            android:name=".feature.widget.RadialClockWidgetProvider"
+            android:label="@string/widget_radial_clock_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="com.daykit.feature.widget.ACTION_CLOCK_MINUTE_TICK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_radial_clock_info" />
+        </receiver>
+        <receiver
+            android:name=".feature.widget.GlassClockWidgetProvider"
+            android:label="@string/widget_glass_clock_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="com.daykit.feature.widget.ACTION_CLOCK_MINUTE_TICK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_glass_clock_info" />
+        </receiver>
+        <receiver
+            android:name=".feature.widget.StepsChartWidgetProvider"
+            android:label="@string/widget_steps_chart_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="com.daykit.feature.widget.ACTION_STEPS_TOGGLE_SESSION" />
+                <action android:name="com.daykit.feature.widget.ACTION_STEPS_SELECT_BAR" />
+                <action android:name="com.daykit.feature.widget.ACTION_STEPS_SESSION_TICK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_steps_chart_info" />
+        </receiver>
+        <receiver
+            android:name=".feature.widget.BatteryBentoWidgetProvider"
+            android:label="@string/widget_bento_battery_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_bento_battery_info" />
+        </receiver>
+        <receiver
+            android:name=".feature.widget.AgendaBentoWidgetProvider"
+            android:label="@string/widget_bento_agenda_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_bento_agenda_info" />
+        </receiver>
+        <service
+            android:name=".feature.wallpaper.WeatherGlassWallpaperService"
+            android:label="@string/wallpaper_weather_glass_title"
+            android:exported="true"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/weather_glass_wallpaper" />
+        </service>
     </application>
 
 </manifest>

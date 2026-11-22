@@ -24,4 +24,26 @@ Open DayKit to add a reminder.</string>
     <string name="widget_reminder_snoozed">Snoozed · %1$s</string>
     <string name="widget_reminder_overdue">Overdue · %1$s</string>
     <string name="widget_reminder_upcoming">Upcoming · %1$s</string>
+    <string name="widget_weather_glass_title">Glass Weather</string>
+    <string name="widget_weather_glass_description">Transparent frosted-glass weather cube that blends with your home screen wallpaper.</string>
+    <string name="widget_solar_arc_title">Solar Arc</string>
+    <string name="widget_solar_arc_description">Liquid-glass sunrise and sunset horizon curve.</string>
+    <string name="widget_radial_clock_title">Radial Dial Clock</string>
+    <string name="widget_radial_clock_description">Liquid-glass curved hour dial with glowing arc.</string>
+    <string name="widget_glass_clock_title">Liquid 7-Seg Clock</string>
+    <string name="widget_glass_clock_description">Refractive frosted-glass 7-segment digital clock.</string>
+    <string name="widget_steps_chart_title">Steps Tracker</string>
+    <string name="widget_steps_chart_description">Solid dark daily steps bar chart and distance.</string>
+    <string name="widget_bento_battery_title">Batteries</string>
+    <string name="widget_bento_battery_description">Minimalist solid battery and charging card.</string>
+    <string name="widget_bento_agenda_title">Day Agenda</string>
+    <string name="widget_bento_agenda_description">Minimalist editorial date and today schedule card.</string>
+    <string name="wallpaper_weather_glass_title">DayKit Glass Weather</string>
+    <string name="wallpaper_weather_glass_description">60fps animated frosted-glass weather cube over your chosen wallpaper photo.</string>
+    <string name="widget_event_light_title">Event Light</string>
+    <string name="widget_event_light_description">Toggle the screen edge light on or off right from your home screen.</string>
+    <string name="widget_event_light_on">Edge light active</string>
+    <string name="widget_event_light_off">Tap to turn on</string>
+    <string name="widget_event_light_badge_on">ON</string>
+    <string name="widget_event_light_badge_off">OFF</string>
 </resources>

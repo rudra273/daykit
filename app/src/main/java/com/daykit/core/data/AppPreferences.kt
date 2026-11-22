@@ -57,6 +57,19 @@ enum class StartTab(val label: String) {
     Today("Today"),
 }
 
+enum class HomeCardSize(val label: String) {
+    Compact("Compact"),
+    Default("Default"),
+    Large("Large"),
+}
+
+object HomeColumns {
+    const val DEFAULT = 2
+    val OPTIONS = listOf(1, 2, 3, 4)
+
+    fun sanitize(columns: Int): Int = if (columns in OPTIONS) columns else DEFAULT
+}
+
 object ReminderSnooze {
     const val DEFAULT_MINUTES = 10
     val OPTIONS_MINUTES = listOf(5, 10, 15, 30)
@@ -84,6 +97,8 @@ object AppPreferences {
     const val KEY_START_TAB = "start_tab"
     const val KEY_HOME_HIDDEN_TOOLS = "home_hidden_tools"
     const val KEY_HOME_TOOL_ORDER = "home_tool_order"
+    const val KEY_HOME_CARD_SIZE = "home_card_size"
+    const val KEY_HOME_COLUMNS = "home_columns"
 
     /** Existing data was entered in rupees, so INR stays the default rather than the locale's. */
     const val DEFAULT_CURRENCY = "INR"
@@ -179,9 +194,19 @@ object AppPreferences {
             ?: emptyList()
         set(value) = edit { putString(KEY_HOME_TOOL_ORDER, value.joinToString(",")) }
 
+    var homeCardSize: HomeCardSize
+        get() = enumOrDefault(prefs?.getString(KEY_HOME_CARD_SIZE, null), HomeCardSize.Default)
+        set(value) = edit { putString(KEY_HOME_CARD_SIZE, value.name) }
+
+    var homeColumns: Int
+        get() = HomeColumns.sanitize(prefs?.getInt(KEY_HOME_COLUMNS, HomeColumns.DEFAULT) ?: HomeColumns.DEFAULT)
+        set(value) = edit { putInt(KEY_HOME_COLUMNS, HomeColumns.sanitize(value)) }
+
     fun resetHomeLayout() = edit {
         remove(KEY_HOME_HIDDEN_TOOLS)
         remove(KEY_HOME_TOOL_ORDER)
+        remove(KEY_HOME_CARD_SIZE)
+        remove(KEY_HOME_COLUMNS)
     }
 
     /**

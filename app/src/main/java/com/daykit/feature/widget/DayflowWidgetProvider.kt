@@ -145,20 +145,37 @@ class DayflowWidgetProvider : AppWidgetProvider() {
         private fun progressRing(context: Context, progress: Float): Bitmap {
             val density = context.resources.displayMetrics.density
             val pixels = (112 * density).toInt().coerceAtLeast(1)
-            val stroke = 8 * density
-            val bounds = RectF(stroke / 2, stroke / 2, pixels - stroke / 2, pixels - stroke / 2)
             val bitmap = Bitmap.createBitmap(pixels, pixels, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
+
+            val cx = pixels * 0.5f
+            val cy = pixels * 0.5f
+            val outerR = pixels * 0.47f
+            val innerR = pixels * 0.37f
+            val totalTicks = 60
+            val activeTicks = (progress.coerceIn(0f, 1f) * totalTicks).toInt()
+
+            val inactiveColor = context.getColor(R.color.divider)
+            val activeColor = context.getColor(R.color.brand_primary)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = stroke
                 strokeCap = Paint.Cap.ROUND
-                color = context.getColor(R.color.divider)
             }
-            canvas.drawArc(bounds, 0f, 360f, false, paint)
-            if (progress > 0f) {
-                paint.color = context.getColor(R.color.brand_primary)
-                canvas.drawArc(bounds, -90f, progress * 360f, false, paint)
+
+            for (i in 0 until totalTicks) {
+                val deg = -90.0 + i * (360.0 / totalTicks)
+                val rad = Math.toRadians(deg)
+                val isMajor = i % 5 == 0
+                val isActive = i < activeTicks
+                paint.color = if (isActive) activeColor else inactiveColor
+                paint.strokeWidth = (if (isMajor) 2.2f else 1.5f) * density
+                val rIn = if (isMajor) innerR - 2f * density else innerR
+                canvas.drawLine(
+                    cx + (kotlin.math.cos(rad) * rIn).toFloat(),
+                    cy + (kotlin.math.sin(rad) * rIn).toFloat(),
+                    cx + (kotlin.math.cos(rad) * outerR).toFloat(),
+                    cy + (kotlin.math.sin(rad) * outerR).toFloat(),
+                    paint,
+                )
             }
             return bitmap
         }

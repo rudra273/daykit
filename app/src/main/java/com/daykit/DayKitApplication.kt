@@ -37,6 +37,7 @@ class DayKitApplication : Application() {
         container = AppContainer(this)
         AppLockSessionManager.clearAll()
         registerScreenOffLock()
+        com.daykit.feature.eventlight.service.FrontCameraMonitor.register(this)
         warmUp()
         applicationScope.launch {
             runCatching {
