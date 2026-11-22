@@ -19,8 +19,8 @@ import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Snooze
-import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -94,7 +94,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     trailing = { NavChevron() },
                     onClick = { showSnoozePicker = true },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "Full-Screen Alarm",
                     supporting = if (fullScreen) "Ring over the lock screen" else "Notification only",
@@ -108,11 +108,11 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                         )
                     },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "Sound & Vibration",
                     supporting = "Android's settings for reminder alerts",
-                    leadingIcon = Icons.Rounded.VolumeUp,
+                    leadingIcon = Icons.AutoMirrored.Rounded.VolumeUp,
                     leadingAccent = accents.purple,
                     trailing = { NavChevron() },
                     onClick = { context.startActivity(reminderChannelSettings(context)) },
@@ -132,7 +132,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                         trailing = { StatusPill(if (row.granted) "Allowed" else "Off", ok = row.granted) },
                         onClick = { runCatching { context.startActivity(row.intent(context)) } },
                     )
-                    if (index < permissions.lastIndex) RowDivider(startIndent = Spacing.lg)
+                    if (index < permissions.lastIndex) RowDivider()
                 }
             }
         }

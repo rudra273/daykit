@@ -64,7 +64,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun DeviceManagerScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     // Keeps this screen composed behind the unlock gate so the picker result lands.
     onExpectActivityResult: () -> Unit,
 ) {

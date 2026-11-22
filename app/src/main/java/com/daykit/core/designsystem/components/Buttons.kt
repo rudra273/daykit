@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,8 +23,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.designsystem.pressScale
 
-private val ButtonHeight = 36.dp
+private val ButtonHeight = 38.dp
 
 @Composable
 private fun compactButtonHeight() = ButtonHeight * LocalDensity.current.fontScale.coerceAtLeast(1f)
@@ -40,13 +42,17 @@ fun PrimaryButton(
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.height(compactButtonHeight()).glassControl(MaterialTheme.shapes.medium),
+        modifier = modifier
+            .pressScale(enabled = enabled && !loading, pressedScale = 0.96f)
+            .minimumInteractiveComponentSize()
+            .height(compactButtonHeight())
+            .glassControl(MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.extendedColors.actionFill,
             contentColor = MaterialTheme.extendedColors.onActionFill,
             disabledContainerColor = MaterialTheme.extendedColors.inputField,
-            disabledContentColor = MaterialTheme.extendedColors.textMuted,
+            disabledContentColor = MaterialTheme.extendedColors.textTertiary,
         ),
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
@@ -77,13 +83,17 @@ fun SecondaryButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(compactButtonHeight()).glassControl(MaterialTheme.shapes.medium),
+        modifier = modifier
+            .pressScale(enabled = enabled, pressedScale = 0.96f)
+            .minimumInteractiveComponentSize()
+            .height(compactButtonHeight())
+            .glassControl(MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.extendedColors.inputField,
             contentColor = MaterialTheme.colorScheme.onSurface,
             disabledContainerColor = MaterialTheme.extendedColors.inputField,
-            disabledContentColor = MaterialTheme.extendedColors.textMuted,
+            disabledContentColor = MaterialTheme.extendedColors.textTertiary,
         ),
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
@@ -113,13 +123,17 @@ fun DestructiveButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(compactButtonHeight()).glassControl(MaterialTheme.shapes.medium),
+        modifier = modifier
+            .pressScale(enabled = enabled, pressedScale = 0.96f)
+            .minimumInteractiveComponentSize()
+            .height(compactButtonHeight())
+            .glassControl(MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = content,
             disabledContainerColor = MaterialTheme.extendedColors.inputField,
-            disabledContentColor = MaterialTheme.extendedColors.textMuted,
+            disabledContentColor = MaterialTheme.extendedColors.textTertiary,
         ),
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {

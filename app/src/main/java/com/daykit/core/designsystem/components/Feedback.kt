@@ -1,13 +1,17 @@
 package com.daykit.core.designsystem.components
 
+import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import android.util.Log
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,9 +27,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.vector.ImageVector
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.extendedColors
 import kotlinx.coroutines.CancellationException
@@ -36,14 +42,6 @@ import kotlinx.coroutines.launch
 
 /**
  * Snackbar-backed error channel for a screen.
- *
- * Screens hold state in plain `remember` with no ViewModel, so every write is a bare
- * `scope.launch { repository.x() }`. Without a catch, a failed write — most often a
- * `SensitiveDataLockedException` when the vault re-locks mid-edit — cancels the coroutine
- * silently and the UI reads as if the save succeeded.
- *
- * Create one with [rememberErrorReporter], wire [ErrorReporter.host] into the `Scaffold`'s
- * `snackbarHost`, and replace `scope.launch { … }` with [ErrorReporter.launchGuarded].
  */
 @Stable
 class ErrorReporter internal constructor(
@@ -118,6 +116,10 @@ fun LoadingIndicator(
     )
 }
 
+/**
+ * Apple HIG empty state with a layered concentric emblem (outer soft halo + inner tinted disc
+ * + crisp icon), concise headline, optional muted subtitle, and single primary action.
+ */
 @Composable
 fun EmptyState(
     icon: ImageVector,
@@ -125,8 +127,10 @@ fun EmptyState(
     modifier: Modifier = Modifier,
     description: String? = null,
     actionText: String? = null,
+    accent: Color = MaterialTheme.extendedColors.accents.blue,
     onAction: (() -> Unit)? = null,
 ) {
+    val isDark = MaterialTheme.extendedColors.isDark
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -134,13 +138,30 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.extendedColors.textMuted,
-            modifier = Modifier.size(48.dp),
-        )
-        Spacer(Modifier.height(Spacing.lg))
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = if (isDark) 0.10f else 0.08f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = if (isDark) 0.22f else 0.15f))
+                    .border(0.5.dp, accent.copy(alpha = 0.28f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,

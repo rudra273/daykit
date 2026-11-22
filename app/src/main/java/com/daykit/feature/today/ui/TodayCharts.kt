@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.core.designsystem.tabularNums
 
 /** 0 → 1 once, when the chart first enters composition. */
 @Composable
@@ -293,6 +294,6 @@ internal fun LegendRow(color: Color, label: String, value: String, modifier: Mod
             maxLines = 1,
             modifier = Modifier.weight(1f),
         )
-        Text(value, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+        Text(value, style = MaterialTheme.typography.labelLarge.tabularNums, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
     }
 }

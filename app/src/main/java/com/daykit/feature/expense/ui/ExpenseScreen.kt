@@ -29,12 +29,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.Subscriptions
@@ -132,7 +132,7 @@ private val EXPENSE_CATEGORIES = listOf(
 @Composable
 fun ExpenseScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val errors = rememberErrorReporter()
     var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
@@ -156,11 +156,11 @@ fun ExpenseScreen(
     var stopBill by remember { mutableStateOf<MonthlyBill?>(null) }
     var editBill by remember { mutableStateOf<MonthlyBill?>(null) }
 
-    BackHandler {
+    BackHandler(enabled = manageBillsOpen || onBack != null) {
         if (manageBillsOpen) {
             manageBillsOpen = false
         } else {
-            onBack()
+            onBack?.invoke()
         }
     }
 
@@ -506,7 +506,7 @@ private fun ExpenseMainList(
         if (dayGroups.isEmpty()) {
             item {
                 EmptyState(
-                    icon = Icons.Rounded.ReceiptLong,
+                    icon = Icons.AutoMirrored.Rounded.ReceiptLong,
                     title = "No expenses this month",
                     description = "Add an expense to see your monthly totals and spending chart.",
                 )
@@ -564,6 +564,8 @@ private fun HeroSummaryCard(
                     .clip(RoundedCornerShape(8.dp)),
                 color = if (isOverLimit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.extendedColors.inputField,
+                gapSize = 0.dp,
+                drawStopIndicator = {},
             )
             Spacer(Modifier.height(Spacing.sm))
             Text(
@@ -591,7 +593,7 @@ private fun HeroSummaryCard(
             com.daykit.core.designsystem.components.StatTile(
                 label = "Other expenses",
                 value = Money.format(summary.dailyTotalMinor),
-                icon = Icons.Rounded.ReceiptLong,
+                icon = Icons.AutoMirrored.Rounded.ReceiptLong,
                 accent = MaterialTheme.extendedColors.accents.teal,
                 modifier = Modifier.weight(1f),
             )
@@ -1456,7 +1458,7 @@ private fun categoryStyle(category: String): Pair<Color, ImageVector> {
         "Shopping" -> accents.pink to Icons.Rounded.ShoppingBag
         "Bills" -> accents.indigo to Icons.Rounded.Subscriptions
         "Health" -> accents.green to Icons.Rounded.FavoriteBorder
-        else -> accents.teal to Icons.Rounded.ReceiptLong
+        else -> accents.teal to Icons.AutoMirrored.Rounded.ReceiptLong
     }
 }
 

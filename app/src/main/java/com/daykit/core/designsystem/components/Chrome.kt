@@ -7,15 +7,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
+import com.daykit.core.designsystem.LocalReduceTransparency
 import com.daykit.core.designsystem.background.LocalPageBackground
 import com.daykit.core.designsystem.background.frostedBackdrop
 import com.daykit.core.designsystem.background.pageBackground
 import com.daykit.core.designsystem.extendedColors
 
-/** An even translucent scrim; a gradient can show banding over the system bars. */
+/** An even translucent scrim; respects [LocalReduceTransparency] by turning opaque when enabled. */
 @Composable
 fun glassChromeBrush(): Brush {
     val base = LocalPageBackground.current.solid
+    val reduceTransparency = LocalReduceTransparency.current
+    if (reduceTransparency) return SolidColor(base)
     val dark = MaterialTheme.extendedColors.isDark
     return SolidColor(base.copy(alpha = if (dark) 0.94f else 0.92f))
 }
@@ -28,8 +31,12 @@ fun glassChromeBrush(): Brush {
 @Composable
 fun Modifier.chromeBackground(): Modifier {
     val page = LocalPageBackground.current
-    return if (page.isDecorated) {
-        frostedBackdrop(RectangleShape, tint = page.solid.copy(alpha = if (MaterialTheme.extendedColors.isDark) 0.62f else 0.58f))
+    val reduceTransparency = LocalReduceTransparency.current
+    return if (page.isDecorated && !reduceTransparency) {
+        frostedBackdrop(
+            RectangleShape,
+            tint = page.solid.copy(alpha = if (MaterialTheme.extendedColors.isDark) 0.65f else 0.60f),
+        )
     } else {
         background(glassChromeBrush())
     }

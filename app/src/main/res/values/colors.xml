@@ -4,20 +4,20 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Meta Classic palette — LIGHT (default). Night overrides in values-night/colors.xml. -->
-    <color name="brand_primary">#FF1877F2</color>
+    <!-- Apple HIG Light Mode (systemGray6 #F2F2F7 page canvas + Pure White #FFFFFF cards). -->
+    <color name="brand_primary">#FF0088FF</color>
     <color name="on_brand_primary">#FFFFFFFF</color>
-    <color name="window_bg">#FFFFFFFF</color>
-    <color name="surface">#FFF0F2F5</color>
-    <color name="text_primary">#FF050505</color>
-    <color name="text_muted">#FF65676B</color>
-    <color name="divider">#FFE4E6EB</color>
-    <color name="success">#FF31A24C</color>
-    <color name="danger">#FFE41E3F</color>
+    <color name="window_bg">#FFF2F2F7</color>
+    <color name="surface">#FFFFFFFF</color>
+    <color name="text_primary">#FF000000</color>
+    <color name="text_muted">#FF6C6C70</color>
+    <color name="divider">#293C3C43</color>
+    <color name="success">#FF1A7532</color>
+    <color name="danger">#FFC20013</color>
 
     <!-- Widget surfaces -->
     <color name="widget_container">#FAFFFFFF</color>
-    <color name="widget_stroke">#80CED0D4</color>
-    <color name="widget_button">#FF176FE5</color>
-    <color name="widget_button_muted">#C9F0F2F5</color>
+    <color name="widget_stroke">#66C7C7CC</color>
+    <color name="widget_button">#FF0070E0</color>
+    <color name="widget_button_muted">#D9E5E5EA</color>
 </resources>

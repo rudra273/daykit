@@ -1,7 +1,10 @@
 package com.daykit.feature.focus.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
@@ -9,6 +12,8 @@ import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.daykit.R
+import com.daykit.feature.focus.data.ShortVideoMode
+import com.daykit.feature.focus.data.ShortVideoStore
 
 internal enum class ShortVideoTarget(val packageName: String, val label: Int) {
     YouTube("com.google.android.youtube", R.string.short_video_youtube),
@@ -24,36 +29,66 @@ internal const val SHORT_VIDEO_CONSENT = "short_video_redirect_consent"
 class ShortVideoBlockerService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private val preferences by lazy { shortVideoPreferences() }
+    private val store by lazy { ShortVideoStore(preferences) }
     private var targets = emptyList<ShortVideoTarget>()
     private var viewerTarget: ShortVideoTarget? = null
     private var viewerWindowId = -1
     private var redirectAttempts = 0
     private var nextRedirectAt = 0L
     private var lastClickAt = -1_000L
+
+    // Active watch-session tracking for DailyLimit mode
+    private var activeWatchTarget: ShortVideoTarget? = null
+    private var lastTickElapsed = 0L
+    private var screenOffReceiverRegistered = false
+
     private val refresh = Runnable { updateBlock() }
+    private val usageTick = Runnable { onUsageTick() }
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
         updateTargets()
+    }
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                endWatchSession()
+                resetRedirect()
+            }
+        }
     }
 
     override fun onServiceConnected() {
         preferences.registerOnSharedPreferenceChangeListener(preferenceListener)
+        if (!screenOffReceiverRegistered) {
+            runCatching {
+                registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
+                screenOffReceiverRegistered = true
+            }
+        }
         updateTargets()
     }
 
     private fun updateTargets() {
-        targets = ShortVideoTarget.entries.filter {
-            preferences.getBoolean(SHORT_VIDEO_CONSENT, false) &&
-                preferences.getBoolean(it.packageName, false)
-        }
+        targets = store.activeTargets()
         serviceInfo = serviceInfo.apply {
             packageNames = targets.map { it.packageName }.ifEmpty { listOf(packageName) }.toTypedArray()
+        }
+        if (activeWatchTarget != null && activeWatchTarget !in targets) {
+            endWatchSession()
         }
         resetRedirect()
         if (targets.isNotEmpty()) scheduleCheck()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (targets.any { it.packageName == event.packageName?.toString() }) {
+        val eventPkg = event.packageName?.toString()
+        if (activeWatchTarget != null &&
+            event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            eventPkg != null &&
+            eventPkg != activeWatchTarget?.packageName
+        ) {
+            endWatchSession()
+        }
+        if (targets.any { it.packageName == eventPkg }) {
             if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
                 lastClickAt = SystemClock.uptimeMillis()
                 if (redirectAttempts >= 2) redirectAttempts = 0
@@ -69,16 +104,80 @@ class ShortVideoBlockerService : AccessibilityService() {
         if (!handler.hasCallbacks(refresh)) handler.postDelayed(refresh, delayMillis)
     }
 
+    private fun onUsageTick() {
+        val watching = activeWatchTarget ?: return
+        val root = rootInActiveWindow
+        if (root == null || root.packageName?.toString() != watching.packageName || !isShortVideoViewer(root, watching)) {
+            endWatchSession()
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        val delta = (now - lastTickElapsed).coerceIn(0L, MAX_TICK_DELTA_MS)
+        lastTickElapsed = now
+        val rule = store.addUsageMillis(watching, delta)
+        if (rule.shouldRedirectNow) {
+            endWatchSession()
+            scheduleCheck(0)
+        } else {
+            handler.postDelayed(usageTick, USAGE_TICK_INTERVAL_MS)
+        }
+    }
+
+    private fun startOrContinueWatchSession(target: ShortVideoTarget) {
+        val now = SystemClock.elapsedRealtime()
+        if (activeWatchTarget != target) {
+            endWatchSession()
+            activeWatchTarget = target
+            lastTickElapsed = now
+            handler.postDelayed(usageTick, USAGE_TICK_INTERVAL_MS)
+        } else if (!handler.hasCallbacks(usageTick)) {
+            val delta = (now - lastTickElapsed).coerceIn(0L, MAX_TICK_DELTA_MS)
+            lastTickElapsed = now
+            store.addUsageMillis(target, delta)
+            handler.postDelayed(usageTick, USAGE_TICK_INTERVAL_MS)
+        }
+    }
+
+    private fun endWatchSession() {
+        handler.removeCallbacks(usageTick)
+        val watching = activeWatchTarget ?: return
+        val now = SystemClock.elapsedRealtime()
+        val delta = (now - lastTickElapsed).coerceIn(0L, MAX_TICK_DELTA_MS)
+        if (delta > 0L) {
+            store.addUsageMillis(watching, delta)
+        }
+        activeWatchTarget = null
+        lastTickElapsed = 0L
+    }
+
     private fun updateBlock() {
         val root = rootInActiveWindow
         val target = targets.firstOrNull { it.packageName == root?.packageName?.toString() }
         if (root == null || target == null || !isShortVideoViewer(root, target)) {
+            endWatchSession()
             resetRedirect()
             if (target != null && SystemClock.uptimeMillis() - lastClickAt < 600) {
                 scheduleCheck(120)
             }
             return
         }
+
+        val rule = store.getRule(target)
+        if (rule.mode == ShortVideoMode.Off) {
+            endWatchSession()
+            resetRedirect()
+            return
+        }
+        if (rule.mode == ShortVideoMode.DailyLimit && !rule.isLimitReached) {
+            // Allowed within daily budget: track time and let the user watch until budget runs out.
+            resetRedirect()
+            startOrContinueWatchSession(target)
+            return
+        }
+
+        // Either BlockAll or DailyLimit exhausted — stop timer and redirect out of the viewer.
+        endWatchSession()
+
         if (viewerTarget != target || viewerWindowId != root.windowId) {
             viewerTarget = target
             viewerWindowId = root.windowId
@@ -90,6 +189,10 @@ class ShortVideoBlockerService : AccessibilityService() {
         if (now < nextRedirectAt) {
             scheduleCheck(nextRedirectAt - now)
             return
+        }
+
+        if (redirectAttempts == 0) {
+            store.recordBlock(target)
         }
 
         // Try the social app's own Home tab first. Full-screen viewers often hide it.
@@ -165,11 +268,24 @@ class ShortVideoBlockerService : AccessibilityService() {
         redirectAttempts = 0
     }
 
-    override fun onInterrupt() = resetRedirect()
+    override fun onInterrupt() {
+        endWatchSession()
+        resetRedirect()
+    }
 
     override fun onDestroy() {
         preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener)
+        if (screenOffReceiverRegistered) {
+            runCatching { unregisterReceiver(screenOffReceiver) }
+            screenOffReceiverRegistered = false
+        }
+        endWatchSession()
         resetRedirect()
         super.onDestroy()
+    }
+
+    private companion object {
+        const val USAGE_TICK_INTERVAL_MS = 1_000L
+        const val MAX_TICK_DELTA_MS = 5_000L
     }
 }

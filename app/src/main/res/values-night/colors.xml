@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Meta Classic palette — DARK overrides. -->
-    <color name="brand_primary">#FF2D88FF</color>
+    <!-- Apple HIG System Gray Dark Mode overrides (systemGray6 #1C1C1E base + systemGray5 #2C2C2E cards). -->
+    <color name="brand_primary">#FF0A84FF</color>
     <color name="on_brand_primary">#FFFFFFFF</color>
-    <color name="window_bg">#FF18191A</color>
-    <color name="surface">#FF242526</color>
-    <color name="text_primary">#FFE4E6EB</color>
-    <color name="text_muted">#FFB0B3B8</color>
-    <color name="divider">#FF3E4042</color>
-    <color name="success">#FF45BD62</color>
-    <color name="danger">#FFF02849</color>
+    <color name="window_bg">#FF1C1C1E</color>
+    <color name="surface">#FF2C2C2E</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_muted">#FFAEAEB2</color>
+    <color name="divider">#52545458</color>
+    <color name="success">#FF30D158</color>
+    <color name="danger">#FFFF453A</color>
 
     <!-- Widget surfaces -->
-    <color name="widget_container">#F51B1D1E</color>
-    <color name="widget_stroke">#665A5D62</color>
-    <color name="widget_button">#FF216BD6</color>
-    <color name="widget_button_muted">#B03A3D42</color>
+    <color name="widget_container">#F52C2C2E</color>
+    <color name="widget_stroke">#6648484A</color>
+    <color name="widget_button">#FF0070E0</color>
+    <color name="widget_button_muted">#CC3A3A3C</color>
 </resources>

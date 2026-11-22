@@ -28,14 +28,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.Payments
-import androidx.compose.material.icons.rounded.Timer
-import androidx.compose.material.icons.rounded.TrackChanges
+import androidx.compose.material.icons.rounded.TaskAlt
+import com.daykit.core.designsystem.tabularNums
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -75,6 +76,7 @@ import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.AppTopBarCompactHeight
 import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.permissions.AppLockPermissionChecker
@@ -214,13 +216,13 @@ fun TodayScreen(
     )
     val dayScore = if (scored.isEmpty()) 0 else (scored.average().toFloat() * 100).toInt()
 
-    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight
+    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarCompactHeight
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = rememberLazyListState(),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg, top = headerHeight + Spacing.sm,
+                start = Spacing.lg, end = Spacing.lg, top = headerHeight + Spacing.md,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xl,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -249,8 +251,8 @@ fun TodayScreen(
             item(key = "actions") {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     QuickAction("Journal", Icons.Rounded.AutoAwesome, accents.indigo, Modifier.weight(1f)) { onOpenTool(Routes.TOOL_DAYFLOW) }
-                    QuickAction("Focus", Icons.Rounded.Timer, accents.red, Modifier.weight(1f)) { onOpenTool(Routes.TOOL_FOCUS) }
-                    QuickAction("Expense", Icons.Rounded.Payments, accents.pink, Modifier.weight(1f)) { onOpenTool(Routes.TOOL_EXPENSES) }
+                    QuickAction("Focus", Icons.Rounded.HourglassTop, accents.red, Modifier.weight(1f)) { onOpenTool(Routes.TOOL_FOCUS) }
+                    QuickAction("Expense", Icons.Rounded.AccountBalanceWallet, accents.pink, Modifier.weight(1f)) { onOpenTool(Routes.TOOL_EXPENSES) }
                     QuickAction("Remind", Icons.Rounded.NotificationsActive, accents.orange, Modifier.weight(1f)) { onOpenTool(Routes.TOOL_REMINDERS) }
                 }
             }
@@ -349,6 +351,7 @@ fun TodayScreen(
         AppTopBar(
             title = "Today",
             subtitle = today.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.getDefault())),
+            height = AppTopBarCompactHeight,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }
@@ -379,14 +382,18 @@ private fun HeroCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ActivityRings(
                     rings = rings,
+                    strokeWidth = 10.dp,
+                    gap = 3.5.dp,
                     modifier = Modifier
-                        .size(132.dp)
+                        .size(134.dp)
                         .semantics { contentDescription = "Day progress $score percent" },
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("$score%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("of today", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.extendedColors.textMuted)
-                    }
+                    Text(
+                        text = "$score%",
+                        style = MaterialTheme.typography.titleLarge.tabularNums,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
                 Spacer(Modifier.width(Spacing.xl))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
@@ -463,7 +470,7 @@ private fun HabitsCard(
 ) {
     AppCard {
         CardHeader(
-            Icons.Rounded.TrackChanges, accent, "Habits",
+            Icons.Rounded.TaskAlt, accent, "Habits",
             if (habits.isEmpty()) "Build a daily routine" else "$done of ${habits.size} done today",
             onOpen,
         )
@@ -686,7 +693,7 @@ private fun FocusCard(
 ) {
     AppCard {
         CardHeader(
-            Icons.Rounded.Timer, accent, "Focus",
+            Icons.Rounded.HourglassTop, accent, "Focus",
             when {
                 blocked.isNotEmpty() -> "${blocked.size} app${if (blocked.size == 1) "" else "s"} blocked now"
                 budgetMillis > 0 && hasUsageAccess ->
@@ -860,7 +867,7 @@ private fun SpendingCard(
     val lineColor = if (over) MaterialTheme.colorScheme.error else accents.pink
     AppCard {
         CardHeader(
-            Icons.Rounded.Payments, accents.pink, "Spending",
+            Icons.Rounded.AccountBalanceWallet, accents.pink, "Spending",
             when {
                 limit <= 0L -> "No monthly limit set"
                 over -> "${Money.format(total - limit)} over limit"

@@ -44,8 +44,8 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.Label
-import androidx.compose.material.icons.rounded.Notes
+import androidx.compose.material.icons.automirrored.rounded.Label
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -113,7 +113,7 @@ private sealed interface NoteEditorState {
 @Composable
 fun SecureNotesScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val errors = rememberErrorReporter()
@@ -134,7 +134,7 @@ fun SecureNotesScreen(
         .observeTrash()
         .collectAsStateWithLifecycle(initialValue = emptyList())
 
-    BackHandler {
+    BackHandler(enabled = searchActive || query.isNotBlank() || selectedLabel != null || onBack != null) {
         when {
             searchActive -> {
                 searchActive = false
@@ -145,7 +145,7 @@ fun SecureNotesScreen(
                 query = ""
                 selectedLabel = null
             }
-            else -> onBack()
+            else -> onBack?.invoke()
         }
     }
 
@@ -251,7 +251,7 @@ fun SecureNotesScreen(
                     if (currentNotes.isEmpty()) {
                         item(span = StaggeredGridItemSpan.FullLine) {
                             EmptyState(
-                                icon = Icons.Rounded.Notes,
+                                icon = Icons.AutoMirrored.Rounded.Notes,
                                 title = "No secure notes",
                                 description = "Tap + to write your first note.",
                                 modifier = Modifier.padding(top = Spacing.xxl),
@@ -623,7 +623,7 @@ private fun NoteEditorPage(
                     }
                     androidx.compose.material3.IconButton(onClick = { labelSheetOpen = true }) {
                         Icon(
-                            Icons.Rounded.Label,
+                            Icons.AutoMirrored.Rounded.Label,
                             contentDescription = "Add label",
                             tint = MaterialTheme.colorScheme.primary,
                         )

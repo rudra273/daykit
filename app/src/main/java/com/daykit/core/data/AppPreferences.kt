@@ -55,6 +55,23 @@ enum class TimeFormatPreference(val label: String) {
 enum class StartTab(val label: String) {
     Home("Home"),
     Today("Today"),
+    Custom("Pinned tab"),
+}
+
+/** Tool shown in the customizable 4th bottom-navigation tab. */
+enum class CustomNavTab(val label: String, val navLabel: String) {
+    Focus("Focus", "Focus"),
+    Habits("Habits", "Habits"),
+    Dayflow("Dayflow", "Dayflow"),
+    Expenses("Expenses", "Expenses"),
+    Reminders("Reminders", "Reminders"),
+    Notes("Notes", "Notes"),
+    KeyStore("Key Store", "Keys"),
+    FileVault("File Vault", "Vault"),
+    AppLock("App Lock", "App Lock"),
+    DeviceManager("Device Manager", "Device"),
+    DnsManager("DNS Manager", "DNS"),
+    Canvas("Canvas", "Canvas"),
 }
 
 enum class HomeCardSize(val label: String) {
@@ -95,6 +112,7 @@ object AppPreferences {
     const val KEY_SNOOZE_MINUTES = "reminder_snooze_minutes"
     const val KEY_REMINDER_FULL_SCREEN = "reminder_full_screen"
     const val KEY_START_TAB = "start_tab"
+    const val KEY_CUSTOM_NAV_TAB = "custom_nav_tab"
     const val KEY_HOME_HIDDEN_TOOLS = "home_hidden_tools"
     const val KEY_HOME_TOOL_ORDER = "home_tool_order"
     const val KEY_HOME_CARD_SIZE = "home_card_size"
@@ -167,6 +185,10 @@ object AppPreferences {
     var startTab: StartTab
         get() = enumOrDefault(prefs?.getString(KEY_START_TAB, null), StartTab.Home)
         set(value) = edit { putString(KEY_START_TAB, value.name) }
+
+    var customNavTab: CustomNavTab
+        get() = enumOrDefault(prefs?.getString(KEY_CUSTOM_NAV_TAB, null), CustomNavTab.Focus)
+        set(value) = edit { putString(KEY_CUSTOM_NAV_TAB, value.name) }
 
     // ── Reminders ──
 

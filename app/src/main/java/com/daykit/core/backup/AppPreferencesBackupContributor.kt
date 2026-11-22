@@ -2,6 +2,7 @@ package com.daykit.core.backup
 
 import android.content.Context
 import com.daykit.core.data.AppPreferences
+import com.daykit.core.data.CustomNavTab
 import com.daykit.core.data.HomeCardSize
 import com.daykit.core.data.SecureSettingRepository
 import com.daykit.core.data.StartTab
@@ -39,6 +40,7 @@ class AppPreferencesBackupContributor(
         .put("weekStart", AppPreferences.weekStart.name)
         .put("timeFormat", AppPreferences.timeFormat.name)
         .put("startTab", AppPreferences.startTab.name)
+        .put("customNavTab", AppPreferences.customNavTab.name)
         .put("snoozeMinutes", AppPreferences.snoozeMinutes)
         .put("reminderFullScreen", AppPreferences.reminderFullScreen)
         .put("homeHiddenTools", JSONArray(AppPreferences.homeHiddenTools.toList()))
@@ -65,6 +67,7 @@ class AppPreferencesBackupContributor(
         enumOrNull<WeekStart>(payload.optString("weekStart"))?.let { AppPreferences.weekStart = it }
         enumOrNull<TimeFormatPreference>(payload.optString("timeFormat"))?.let { AppPreferences.timeFormat = it }
         enumOrNull<StartTab>(payload.optString("startTab"))?.let { AppPreferences.startTab = it }
+        enumOrNull<CustomNavTab>(payload.optString("customNavTab"))?.let { AppPreferences.customNavTab = it }
         if (payload.has("snoozeMinutes")) AppPreferences.snoozeMinutes = payload.getInt("snoozeMinutes")
         if (payload.has("reminderFullScreen")) AppPreferences.reminderFullScreen = payload.getBoolean("reminderFullScreen")
         enumOrNull<CardStyle>(payload.optString("cardStyle"))?.let { CardStyleStore.set(context, it) }

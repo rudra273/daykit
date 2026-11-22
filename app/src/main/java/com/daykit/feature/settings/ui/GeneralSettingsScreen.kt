@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import com.daykit.core.data.AppPreferences
+import com.daykit.core.data.CustomNavTab
 import com.daykit.core.data.StartTab
 import com.daykit.core.data.TimeFormatPreference
 import com.daykit.core.data.WeekStart
@@ -27,10 +28,11 @@ import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.util.Money
 import com.daykit.core.util.TimeFormat
+import com.daykit.navigation.activeIcon
 import java.time.format.TextStyle
 import java.util.Locale
 
-private enum class GeneralPicker { Currency, WeekStart, TimeFormat, StartTab }
+private enum class GeneralPicker { Currency, WeekStart, TimeFormat, StartTab, CustomNavTab }
 
 @Composable
 fun GeneralSettingsScreen(onBack: () -> Unit) {
@@ -41,6 +43,7 @@ fun GeneralSettingsScreen(onBack: () -> Unit) {
     val weekStart by AppPreferences.rememberPreference(AppPreferences.KEY_WEEK_START) { AppPreferences.weekStart }
     val timeFormat by AppPreferences.rememberPreference(AppPreferences.KEY_TIME_FORMAT) { AppPreferences.timeFormat }
     val startTab by AppPreferences.rememberPreference(AppPreferences.KEY_START_TAB) { AppPreferences.startTab }
+    val customNavTab by AppPreferences.rememberPreference(AppPreferences.KEY_CUSTOM_NAV_TAB) { AppPreferences.customNavTab }
 
     SettingsSubPage(title = "General", onBack = onBack) {
         item { SectionHeader("Region", topPadding = 0.dp) }
@@ -48,25 +51,25 @@ fun GeneralSettingsScreen(onBack: () -> Unit) {
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 AppListRow(
                     headline = "Currency",
-                    supporting = Money.displayName(currency),
+                    trailingValue = currency,
                     leadingIcon = Icons.Rounded.Payments,
                     leadingAccent = accents.pink,
                     trailing = { NavChevron() },
                     onClick = { picker = GeneralPicker.Currency },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "First Day of Week",
-                    supporting = weekStartLabel(weekStart),
+                    trailingValue = weekStartLabel(weekStart),
                     leadingIcon = Icons.Rounded.CalendarViewWeek,
                     leadingAccent = accents.green,
                     trailing = { NavChevron() },
                     onClick = { picker = GeneralPicker.WeekStart },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "Time Format",
-                    supporting = timeFormatLabel(timeFormat),
+                    trailingValue = timeFormatLabel(timeFormat),
                     leadingIcon = Icons.Rounded.Schedule,
                     leadingAccent = accents.blue,
                     trailing = { NavChevron() },
@@ -74,17 +77,21 @@ fun GeneralSettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
-        item {
-            SettingsFootnote(
-                "Changing the currency only changes the symbol shown; amounts you already entered are not converted.",
-            )
-        }
-        item { SectionHeader("Startup") }
+        item { SectionHeader("Navigation") }
         item {
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 AppListRow(
+                    headline = "Navigation Bar Tab",
+                    trailingValue = customNavTab.label,
+                    leadingIcon = customNavTab.activeIcon(),
+                    leadingAccent = accents.red,
+                    trailing = { NavChevron() },
+                    onClick = { picker = GeneralPicker.CustomNavTab },
+                )
+                RowDivider()
+                AppListRow(
                     headline = "Open On",
-                    supporting = startTab.label,
+                    trailingValue = startTabLabel(startTab, customNavTab),
                     leadingIcon = Icons.Rounded.SpaceDashboard,
                     leadingAccent = accents.orange,
                     trailing = { NavChevron() },
@@ -136,10 +143,22 @@ fun GeneralSettingsScreen(onBack: () -> Unit) {
             description = "The tab DayKit shows when you open it.",
             options = StartTab.entries,
             selected = startTab,
-            label = { it.label },
+            label = { startTabLabel(it, customNavTab) },
             onDismiss = { picker = null },
             onSelect = {
                 AppPreferences.startTab = it
+                picker = null
+            },
+        )
+        GeneralPicker.CustomNavTab -> OptionSheet(
+            title = "Navigation Bar Tab",
+            description = "Choose which tool appears in the bottom navigation bar.",
+            options = CustomNavTab.entries,
+            selected = customNavTab,
+            label = { it.label },
+            onDismiss = { picker = null },
+            onSelect = {
+                AppPreferences.customNavTab = it
                 picker = null
             },
         )
@@ -147,15 +166,21 @@ fun GeneralSettingsScreen(onBack: () -> Unit) {
     }
 }
 
+private fun startTabLabel(startTab: StartTab, customNavTab: CustomNavTab): String = when (startTab) {
+    StartTab.Custom -> customNavTab.label
+    else -> startTab.label
+}
+
 private fun weekStartLabel(weekStart: WeekStart): String = when (weekStart) {
     WeekStart.System -> {
-        val day = AppPreferences.systemFirstDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault())
-        "${weekStart.label} ($day)"
+        val day = AppPreferences.systemFirstDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        "System ($day)"
     }
     else -> weekStart.label
 }
 
 private fun timeFormatLabel(format: TimeFormatPreference): String = when (format) {
-    TimeFormatPreference.System -> "${format.label} (${TimeFormat.format(13, 30, AppPreferences.systemIs24Hour())})"
-    else -> format.label
+    TimeFormatPreference.System -> if (AppPreferences.systemIs24Hour()) "System (24h)" else "System (12h)"
+    TimeFormatPreference.Hour12 -> "12-hour"
+    TimeFormatPreference.Hour24 -> "24-hour"
 }

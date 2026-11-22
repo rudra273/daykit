@@ -14,7 +14,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import com.daykit.core.designsystem.background.CardStyle
@@ -87,12 +86,20 @@ val MaterialTheme.extendedColors: ExtendedColors
 @Composable
 fun DayKitTheme(content: @Composable () -> Unit) {
     val mode by ThemeModeStore.rememberThemeMode()
-    val cardStyle by CardStyleStore.rememberState()
+    val rawCardStyle by CardStyleStore.rememberState()
     val backgroundKind by PageBackgroundStore.rememberState()
+    val reduceMotion by rememberSystemReduceMotion()
+    val reduceTransparency by rememberSystemReduceTransparency()
     val darkTheme = when (mode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
+    }
+
+    val cardStyle = if (reduceTransparency && rawCardStyle == CardStyle.Glass) {
+        CardStyle.Flat
+    } else {
+        rawCardStyle
     }
 
     val colorScheme = if (darkTheme) DayKitDarkColorScheme else DayKitLightColorScheme
@@ -118,6 +125,8 @@ fun DayKitTheme(content: @Composable () -> Unit) {
         LocalSolidColors provides SolidColors(colorScheme, extended),
         LocalCardStyle provides cardStyle,
         LocalPageBackground provides pageBackground,
+        LocalReduceMotion provides reduceMotion,
+        LocalReduceTransparency provides reduceTransparency,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

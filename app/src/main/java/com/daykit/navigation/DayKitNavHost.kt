@@ -2,6 +2,8 @@ package com.daykit.navigation
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
@@ -10,17 +12,27 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.daykit.AppContainer
+import com.daykit.core.data.AppPreferences
+import com.daykit.core.data.CustomNavTab
+import com.daykit.core.designsystem.DayKitMotion
+import com.daykit.core.designsystem.LocalReduceMotion
 import com.daykit.core.designsystem.SolidPage
 import com.daykit.core.designsystem.background.LocalPageBackground
 import com.daykit.core.designsystem.background.pageBackground
@@ -64,26 +76,59 @@ fun DayKitNavHost(
 ) {
     val back: () -> Unit = { navController.popBackStack() }
     val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
+    val reduceMotion = LocalReduceMotion.current
 
     NavHost(
         navController = navController,
         startDestination = Routes.HOME,
         enterTransition = {
-            val from = TopLevelDestination.entries.indexOfFirst { it.route == initialState.destination.route }
-            val to = TopLevelDestination.entries.indexOfFirst { it.route == targetState.destination.route }
-            if (from >= 0 && to >= 0 && from != to) {
-                slideInHorizontally(tween(220)) { width -> (if (to > from) width else -width) * direction }
-            } else EnterTransition.None
+            if (reduceMotion) {
+                fadeIn(tween(120))
+            } else {
+                val from = TopLevelDestination.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = TopLevelDestination.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from >= 0 && to >= 0 && from != to) {
+                    slideInHorizontally(DayKitMotion.TabOffsetSpring) { width ->
+                        (if (to > from) width else -width) * direction
+                    }
+                } else {
+                    // iOS-style push transition into tools & settings sub-pages
+                    slideInHorizontally(DayKitMotion.NavOffsetSpring) { width -> width * direction } +
+                        fadeIn(DayKitMotion.FadeFast)
+                }
+            }
         },
         exitTransition = {
-            val from = TopLevelDestination.entries.indexOfFirst { it.route == initialState.destination.route }
-            val to = TopLevelDestination.entries.indexOfFirst { it.route == targetState.destination.route }
-            if (from >= 0 && to >= 0 && from != to) {
-                slideOutHorizontally(tween(220)) { width -> (if (to > from) -width else width) * direction }
-            } else ExitTransition.None
+            if (reduceMotion) {
+                fadeOut(tween(120))
+            } else {
+                val from = TopLevelDestination.entries.indexOfFirst { it.route == initialState.destination.route }
+                val to = TopLevelDestination.entries.indexOfFirst { it.route == targetState.destination.route }
+                if (from >= 0 && to >= 0 && from != to) {
+                    slideOutHorizontally(DayKitMotion.TabOffsetSpring) { width ->
+                        (if (to > from) -width else width) * direction
+                    }
+                } else {
+                    // Subtle -24% underlying parallax when pushing a child screen
+                    slideOutHorizontally(DayKitMotion.NavOffsetSpring) { width -> (-width * 0.24f).toInt() * direction }
+                }
+            }
         },
-        popEnterTransition = { EnterTransition.None },
-        popExitTransition = { ExitTransition.None },
+        popEnterTransition = {
+            if (reduceMotion) {
+                fadeIn(tween(120))
+            } else {
+                slideInHorizontally(DayKitMotion.NavOffsetSpring) { width -> (-width * 0.24f).toInt() * direction }
+            }
+        },
+        popExitTransition = {
+            if (reduceMotion) {
+                fadeOut(tween(120))
+            } else {
+                slideOutHorizontally(DayKitMotion.NavOffsetSpring) { width -> width * direction } +
+                    fadeOut(DayKitMotion.FadeFast)
+            }
+        },
     ) {
         // ── Tabs ──
         opaqueComposable(Routes.HOME) {
@@ -100,6 +145,40 @@ fun DayKitNavHost(
                 bottomBarPadding = bottomBarPadding,
                 onOpenTool = { navController.navigate(it) },
             )
+        }
+        opaqueComposable(Routes.CUSTOM_TAB) {
+            val customNavTab by AppPreferences.rememberPreference(AppPreferences.KEY_CUSTOM_NAV_TAB) {
+                AppPreferences.customNavTab
+            }
+            val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val dockClearance = (bottomBarPadding.calculateBottomPadding() - navBarInset).coerceAtLeast(0.dp)
+            Box(Modifier.fillMaxSize().padding(bottom = dockClearance)) {
+                when (customNavTab) {
+                    CustomNavTab.Focus -> FocusScreen(
+                        container = container,
+                        onBack = null,
+                        onMonitorNeeded = onAppLockSelectionChanged,
+                    )
+                    CustomNavTab.Habits -> HabitScreen(container = container, onBack = null)
+                    CustomNavTab.Dayflow -> DayflowScreen(container = container, onBack = null)
+                    CustomNavTab.Expenses -> ExpenseScreen(container = container, onBack = null)
+                    CustomNavTab.Reminders -> ReminderScreen(container = container, onBack = null)
+                    CustomNavTab.Notes -> SecureNotesScreen(container = container, onBack = null)
+                    CustomNavTab.KeyStore -> KeyStoreScreen(container = container, onBack = null)
+                    CustomNavTab.FileVault -> FileLockerScreen(container = container, onBack = null)
+                    CustomNavTab.AppLock -> AppLockScreen(
+                        container = container,
+                        onBack = null,
+                        onSelectionChanged = onAppLockSelectionChanged,
+                    )
+                    CustomNavTab.DeviceManager -> DeviceManagerScreen(
+                        onBack = null,
+                        onExpectActivityResult = { container.sensitiveKeyManager.expectingActivityResult = true },
+                    )
+                    CustomNavTab.DnsManager -> DnsManagerScreen(onBack = null)
+                    CustomNavTab.Canvas -> CanvasScreen(onBack = null)
+                }
+            }
         }
         opaqueComposable(Routes.SETTINGS) {
             SettingsScreen(

@@ -74,6 +74,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import com.daykit.core.designsystem.components.AppSlider
 import com.daykit.core.designsystem.components.AppSwitch
+import com.daykit.core.designsystem.tabularNums
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
@@ -157,7 +158,7 @@ private val quotes = listOf(
 @Composable
 fun HabitScreen(
     container: AppContainer,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val errors = rememberErrorReporter()
     val context = LocalContext.current
@@ -179,7 +180,7 @@ fun HabitScreen(
     val nestedUiOpen = addOpen || editHabit != null || deleteHabit != null || logHabit != null ||
         relapseHabit != null || progressOpen || quitDetailId != null
 
-    BackHandler(enabled = !nestedUiOpen, onBack = onBack)
+    BackHandler(enabled = !nestedUiOpen && onBack != null) { onBack?.invoke() }
 
     when {
         addOpen -> HabitEditorPage(
@@ -413,7 +414,7 @@ fun HabitScreen(
 private fun HabitHome(
     snackbarHostState: SnackbarHostState,
     dashboard: HabitDashboard?,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     selectedDate: LocalDate,
     onSelectDate: (LocalDate) -> Unit,
     onOpenProgress: () -> Unit,
@@ -555,7 +556,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.todayItems(
                         modifier = Modifier.weight(1f),
                     )
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                if (row.size == 1 && dashboard.quitHabits.size > 1) Spacer(Modifier.weight(1f))
             }
         }
     }
@@ -609,6 +610,8 @@ private fun DaySummaryHeader(
                 .clip(RoundedCornerShape(99.dp)),
             color = MaterialTheme.colorScheme.primary,
             trackColor = MaterialTheme.extendedColors.inputField,
+            gapSize = 0.dp,
+            drawStopIndicator = {},
         )
     }
 }
@@ -695,17 +698,25 @@ private fun PausedHabitRow(habit: Habit, onEdit: () -> Unit, onDelete: () -> Uni
 private fun QuoteCard(dashboard: HabitDashboard) {
     val quote = remember(dashboard.today) { quotes[dashboard.today.dayOfYear % quotes.size] }
     val accent = MaterialTheme.extendedColors.accents.teal
-    AppCard(modifier = Modifier.fillMaxWidth()) {
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.sm),
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            AccentIconTile(icon = Icons.Rounded.SelfImprovement, accent = accent)
+            AccentIconTile(
+                icon = Icons.Rounded.SelfImprovement,
+                accent = accent,
+                size = 34.dp,
+                iconSize = 18.dp,
+            )
             Text(
                 text = quote,
                 color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -830,17 +841,19 @@ private fun DailyHabitRow(
                     Text(
                         "${(progress * 100).roundToInt()}%",
                         color = MaterialTheme.extendedColors.textMuted,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelMedium.tabularNums,
                     )
                 }
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(4.dp)
+                        .height(5.dp)
                         .clip(RoundedCornerShape(99.dp)),
                     color = color,
                     trackColor = MaterialTheme.extendedColors.inputField,
+                    gapSize = 0.dp,
+                    drawStopIndicator = {},
                 )
                 FlowRow(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -860,7 +873,7 @@ private fun DailyHabitRow(
                             Text(
                                 "$streak",
                                 color = MaterialTheme.extendedColors.textMuted,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodySmall.tabularNums,
                             )
                         }
                     }
@@ -1652,7 +1665,7 @@ private fun QuitHabitTile(
             Text(
                 cleanDays.toString(),
                 color = color,
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineMedium.tabularNums,
                 fontWeight = FontWeight.Bold,
             )
             Text(
@@ -1665,7 +1678,7 @@ private fun QuitHabitTile(
         Text(
             "Best $best",
             color = MaterialTheme.extendedColors.textMuted,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.tabularNums,
         )
     }
 }

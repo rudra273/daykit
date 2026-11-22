@@ -21,11 +21,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +38,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,8 +48,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -58,6 +65,7 @@ import com.daykit.core.designsystem.components.AppTextField
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.extendedColors
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val PRIVATE_DNS_SETTINGS_ACTION = "android.settings.PRIVATE_DNS_SETTINGS"
@@ -69,16 +77,9 @@ private data class DnsProvider(
     val accent: @Composable () -> Color,
 )
 
-private val HowToSteps = listOf(
-    "Copy a provider hostname below.",
-    "Tap \"Open Private DNS settings\".",
-    "Choose \"Private DNS provider hostname\".",
-    "Paste the hostname and save.",
-)
-
 @Composable
 fun DnsManagerScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -163,13 +164,47 @@ fun DnsManagerScreen(
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
-                                    text = "No VPN, no proxy, no traffic capture. Android applies DNS only after you confirm it in Settings.",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    text = "Encrypted DNS applied natively in Android Settings.",
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.extendedColors.textMuted,
                                 )
                             }
                         }
-                        Spacer(Modifier.height(Spacing.lg))
+                        Spacer(Modifier.height(Spacing.md))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            DnsBadgePill(
+                                icon = Icons.Rounded.VerifiedUser,
+                                label = "No VPN",
+                                accent = MaterialTheme.extendedColors.accents.green,
+                            )
+                            DnsBadgePill(
+                                icon = Icons.Rounded.Security,
+                                label = "System Native",
+                                accent = MaterialTheme.colorScheme.primary,
+                            )
+                            DnsBadgePill(
+                                icon = Icons.Rounded.Lock,
+                                label = "DoT Encrypted",
+                                accent = MaterialTheme.extendedColors.accents.teal,
+                            )
+                        }
+                        Spacer(Modifier.height(Spacing.md))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.extendedColors.inputField, MaterialTheme.shapes.small)
+                                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            StepPill(number = 1, text = "Copy host", modifier = Modifier.weight(1f))
+                            StepPill(number = 2, text = "Open DNS", modifier = Modifier.weight(1f))
+                            StepPill(number = 3, text = "Paste & save", modifier = Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(Spacing.md))
                         PrimaryButton(
                             text = "Open Private DNS settings",
                             modifier = Modifier.fillMaxWidth(),
@@ -260,24 +295,71 @@ fun DnsManagerScreen(
                         }
                     }
                 }
-
-                // How to enable
-                item {
-                    AppCard(modifier = Modifier.padding(top = Spacing.sm)) {
-                        Text(
-                            text = "How to enable",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(Modifier.height(Spacing.md))
-                        HowToSteps.forEachIndexed { index, step ->
-                            if (index > 0) Spacer(Modifier.height(Spacing.md))
-                            StepRow(number = index + 1, text = step)
-                        }
-                    }
-                }
             }
         }
+    }
+}
+
+@Composable
+private fun DnsBadgePill(
+    icon: ImageVector,
+    label: String,
+    accent: Color,
+) {
+    Row(
+        modifier = Modifier
+            .background(accent.asAccentContainer(), RoundedCornerShape(999.dp))
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(12.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = accent,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun StepPill(
+    number: Int,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .background(MaterialTheme.colorScheme.primary.asAccentContainer(), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "$number",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -287,6 +369,13 @@ private fun ProviderCard(
     onCopy: () -> Unit,
 ) {
     val accent = provider.accent()
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1800)
+            copied = false
+        }
+    }
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AccentIconTile(icon = Icons.Rounded.Dns, accent = accent, size = 40.dp, iconSize = 22.dp)
@@ -321,40 +410,21 @@ private fun ProviderCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = onCopy, modifier = Modifier.size(MinTouchTarget)) {
+            IconButton(
+                onClick = {
+                    copied = true
+                    onCopy()
+                },
+                modifier = Modifier.size(MinTouchTarget),
+            ) {
                 Icon(
-                    Icons.Rounded.ContentCopy,
+                    imageVector = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
                     contentDescription = "Copy ${provider.hostname}",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (copied) MaterialTheme.extendedColors.success else MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(19.dp),
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun StepRow(number: Int, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(26.dp)
-                .background(MaterialTheme.colorScheme.primary.asAccentContainer(), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "$number",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Spacer(Modifier.width(Spacing.md))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
     }
 }
 

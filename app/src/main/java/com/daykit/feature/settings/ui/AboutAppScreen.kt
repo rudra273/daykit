@@ -1,8 +1,16 @@
 package com.daykit.feature.settings.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -11,18 +19,60 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.DocumentScanner
+import androidx.compose.material.icons.rounded.FolderSpecial
+import androidx.compose.material.icons.rounded.HourglassTop
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.daykit.R
 import com.daykit.core.designsystem.Spacing
+import com.daykit.core.designsystem.components.AppCard
+import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.RowDivider
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
+
+private data class AboutFeatureItem(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val accent: Color,
+)
 
 @Composable
 fun AboutAppScreen(
@@ -30,7 +80,33 @@ fun AboutAppScreen(
 ) {
     BackHandler { onBack() }
 
-    val scrollState = rememberScrollState()
+    val context = LocalContext.current
+    val versionName = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "1.2.0"
+    }
+    val accents = MaterialTheme.extendedColors.accents
+
+    val vaultFeatures = listOf(
+        AboutFeatureItem("App Lock", "PIN & biometric protection for installed apps", Icons.Rounded.Lock, accents.blue),
+        AboutFeatureItem("Key Store", "Hardware-bound Argon2id + AES-GCM secret vault", Icons.Rounded.Key, accents.indigo),
+        AboutFeatureItem("Secure Notes", "Encrypted local notes with PIN-gated access", Icons.Rounded.Description, accents.mint),
+        AboutFeatureItem("File Vault", "Streamed AES-256 photo & video encryption", Icons.Rounded.FolderSpecial, accents.purple),
+    )
+
+    val dailyFeatures = listOf(
+        AboutFeatureItem("Focus & Shorts Shield", "Strict locks, daily limits, routines & short-video blocker", Icons.Rounded.HourglassTop, accents.red),
+        AboutFeatureItem("Habits & Reminders", "Daily streaks, check-ins & exact alarm reminders", Icons.Rounded.TaskAlt, accents.green),
+        AboutFeatureItem("Dayflow & Expenses", "Pomodoro timer, mood journal & monthly spend tracker", Icons.Rounded.AutoAwesome, accents.pink),
+    )
+
+    val utilityFeatures = listOf(
+        AboutFeatureItem("Canvas", "Home screen widgets, daily widgets & live glass wallpapers", Icons.Rounded.Widgets, accents.purple),
+        AboutFeatureItem("Encrypted Backups", "Password-encrypted local & Google Drive backups", Icons.Rounded.CloudUpload, accents.blue),
+        AboutFeatureItem("Scanner & Image Tool", "On-device PDF scanning, compression & EXIF stripping", Icons.Rounded.DocumentScanner, accents.mint),
+        AboutFeatureItem("DNS & Device Manager", "Private DNS shortcuts & local storage diagnostics", Icons.Rounded.PhoneAndroid, accents.cyan),
+    )
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -47,127 +123,119 @@ fun AboutAppScreen(
                 .padding(padding)
                 .padding(horizontal = Spacing.lg)
                 .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            AboutHero()
-            AboutSection(
-                title = "What DayKit Does",
-                body = listOf(
-                    "DayKit is a private utility app for securing app access, storing sensitive notes and keys, tracking expenses and habits, managing reminders, choosing DNS shortcuts, editing text files, scanning documents into PDFs, and hiding selected media files from normal gallery views.",
-                    "The app is designed around local-first storage. Most data stays on the device unless the user creates an encrypted backup or connects Google Drive backup.",
-                ),
-            )
-            AboutSection(
-                title = "Key Store Locking",
-                body = listOf(
-                    "Key Store entries are stored in the encrypted local database. Entry names, labels, and values are encrypted before they are saved.",
-                    "The Key Store tool is locked by default. A user must unlock it with the master PIN or enabled biometric unlock before saved key values are shown.",
-                    "The local database passphrase is randomly generated and protected with Android Keystore AES-GCM. Android Keystore protects the app's encryption key from normal file access by other apps.",
-                ),
-            )
-            AboutSection(
-                title = "Backup And Restore",
-                body = listOf(
-                    "Backups are encrypted before they leave the device. The backup password is used to derive an encryption key, and the backup payload is encrypted with AES-GCM.",
-                    "Key Store and Secure Notes are always included in app backups. Expenses, Habits, and File Vault files are optional and can be switched on or off in Backup & Restore settings. File Vault backup is off by default.",
-                    "App Lock selections, theme preferences, dashboard widget settings, DNS choices, reminder schedules, and editor cache are not included in app backups.",
-                    "Google Drive backup uses the user's Google account permission to create and manage DayKit backup files. Google Drive stores the encrypted backup file, not plain app data.",
-                ),
-            )
-            AboutSection(
-                title = "App Lock",
-                body = listOf(
-                    "App Lock stores the selected locked package list locally on the device so the app can keep working after restart or reboot.",
-                    "Usage access is used to detect when a locked app opens, and overlay permission is used to show the lock challenge over it.",
-                    "App Lock package selections are not backed up to cloud or local backup files.",
-                ),
-            )
-            AboutSection(
-                title = "Secure Notes",
-                body = listOf(
-                    "Secure Notes stores private note titles, content, and labels encrypted in the local database.",
-                    "The Notes tool can require master PIN or biometric unlock before opening, depending on the user's tool-lock settings.",
-                    "Secure Notes are included in encrypted backup files so they can be restored on a new install with the backup password.",
-                ),
-            )
-            AboutSection(
-                title = "File Vault",
-                body = listOf(
-                    "File Vault encrypts selected images and videos with AES-256 and stores the ciphertext in the app's private storage, where other apps and file managers cannot read it.",
-                    "Each file is encrypted with its own key, and that key is protected by the Android Keystore. Files are streamed through encryption, so even large videos can be added and played back without leaving a decrypted copy on disk.",
-                    "File Vault files can optionally be included in encrypted backups. This is off by default and only takes effect when the user turns it on in Backup & Restore settings.",
-                ),
-            )
-            AboutSection(
-                title = "Daily Tools And Document Scanner",
-                body = listOf(
-                    "Expenses and Habits are stored locally and can optionally be included in encrypted backups.",
-                    "Reminders are stored locally for app scheduling and notification behavior, but they are not currently included in backup files.",
-                    "DNS Manager opens Android private DNS settings and does not operate a DNS server or collect DNS traffic.",
-                    "Editor creates user-directed text files and temporary share files only when the user chooses to save or share.",
-                    "Document Scanner lets the user capture or import multiple pages, crop, rotate, and enhance them, then save the finished scan as a PDF.",
-                    "Image Tool resizes, crops, compresses, and converts a photo you pick, entirely on the device. It re-encodes the image, so location and camera metadata are removed, and it saves or shares the result only when the user chooses.",
-                ),
-            )
-            AboutSection(
-                title = "Dayflow",
-                body = listOf(
-                    "Dayflow combines focused work sessions, journaling, and mood tracking in one local-first daily view.",
-                    "Focus sessions can be tracked with the Dayflow timer, while journal entries and mood history help you review how each day went.",
-                    "Dayflow data is stored locally and included in encrypted backups.",
-                ),
-            )
-            AboutSection(
-                title = "Device Manager",
-                body = listOf(
-                    "Device Manager gives you a quick view of device storage, memory, battery, and system details from one place.",
-                    "It can also help identify large files so you can review storage usage without sending device information outside the app.",
-                    "Device Manager reads device information locally and does not upload it.",
-                ),
-            )
+            AboutBrandHero(versionName = versionName)
+
+            SectionHeader("Security & Vault")
+            AboutFeatureGroupCard(items = vaultFeatures)
+
+            SectionHeader("Focus & Daily Kit")
+            AboutFeatureGroupCard(items = dailyFeatures)
+
+            SectionHeader("Utilities & Backup")
+            AboutFeatureGroupCard(items = utilityFeatures)
+
             Spacer(Modifier.height(Spacing.xl))
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AboutHero() {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "DayKit",
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.titleLarge,
+private fun AboutBrandHero(versionName: String) {
+    val ext = MaterialTheme.extendedColors
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(vertical = Spacing.xl, horizontal = Spacing.lg),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(76.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Color(0xFFF8F3EB))
+                    .border(0.5.dp, ext.divider, RoundedCornerShape(22.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_daykit_mark),
+                    contentDescription = "DayKit",
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = "DayKit",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Version $versionName",
+                style = MaterialTheme.typography.labelMedium,
+                color = ext.textMuted,
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                text = "Local-first privacy & productivity kit. Your data stays encrypted on your device.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = ext.textMuted,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(Spacing.md))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                TrustBadge(icon = Icons.Rounded.WifiOff, label = "Local-First", accent = ext.accents.mint)
+                TrustBadge(icon = Icons.Rounded.Shield, label = "AES-256-GCM", accent = ext.accents.blue)
+                TrustBadge(icon = Icons.Rounded.VerifiedUser, label = "SQLCipher DB", accent = ext.accents.indigo)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrustBadge(icon: ImageVector, label: String, accent: Color) {
+    val isDark = MaterialTheme.extendedColors.isDark
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(accent.copy(alpha = if (isDark) 0.18f else 0.12f))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(14.dp),
         )
-        Spacer(Modifier.height(Spacing.sm))
+        Spacer(Modifier.width(5.dp))
         Text(
-            "A local-first privacy utility with locked tools, encrypted notes and keys, optional encrypted backups, and practical daily trackers.",
-            color = MaterialTheme.extendedColors.textMuted,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        Text(
-            "Version 1.0.8",
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.bodySmall,
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = accent,
         )
     }
 }
 
 @Composable
-private fun AboutSection(
-    title: String,
-    body: List<String>,
-) {
-    SectionHeader(text = title)
-    Column(modifier = Modifier.fillMaxWidth()) {
-        body.forEachIndexed { index, paragraph ->
-            if (index > 0) Spacer(Modifier.height(Spacing.sm))
-            Text(
-                paragraph,
-                color = MaterialTheme.extendedColors.textMuted,
-                style = MaterialTheme.typography.bodyMedium,
+private fun AboutFeatureGroupCard(items: List<AboutFeatureItem>) {
+    AppCard(contentPadding = PaddingValues(0.dp)) {
+        items.forEachIndexed { index, item ->
+            AppListRow(
+                headline = item.title,
+                supporting = item.subtitle,
+                leadingIcon = item.icon,
+                leadingAccent = item.accent,
             )
+            if (index < items.lastIndex) RowDivider()
         }
     }
 }

@@ -10,8 +10,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Storage
@@ -132,27 +132,27 @@ fun DataStorageScreen(container: AppContainer, onBack: () -> Unit) {
             val s = stats
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 StorageRow("Key Store", Icons.Rounded.VpnKey, accents.indigo, s?.keyStoreEntries?.let { count(it, "entry", "entries") })
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 StorageRow(
-                    "Notes", Icons.Rounded.Notes, accents.teal,
+                    "Notes", Icons.AutoMirrored.Rounded.Notes, accents.teal,
                     s?.notes?.let { notes ->
                         count(notes, "note", "notes") + (s.noteImages?.takeIf { it > 0 }?.let { " · ${count(it, "image", "images")}" } ?: "")
                     },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 StorageRow(
                     "File Vault", Icons.Rounded.Folder, accents.purple,
                     s?.vaultFiles?.let { files ->
                         count(files, "file", "files") + (s.vaultBytes?.let { " · ${Formatter.formatShortFileSize(context, it)}" } ?: "")
                     },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 StorageRow("Expenses", Icons.Rounded.Payments, accents.pink, s?.expenses?.let { count(it, "entry", "entries") })
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 StorageRow("Habits", Icons.Rounded.TrackChanges, accents.green, s?.habits?.let { count(it, "habit", "habits") })
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 StorageRow("Reminders", Icons.Rounded.NotificationsActive, accents.orange, s?.reminders?.let { count(it, "reminder", "reminders") })
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 StorageRow(
                     "Encrypted Database", Icons.Rounded.Storage, accents.blue,
                     s?.let { Formatter.formatShortFileSize(context, it.databaseBytes) },
@@ -176,11 +176,11 @@ fun DataStorageScreen(container: AppContainer, onBack: () -> Unit) {
                         expensesLauncher.launch("daykit-expenses-${LocalDate.now()}.csv")
                     },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "Export Notes",
                     supporting = "Markdown text, without images",
-                    leadingIcon = Icons.Rounded.Notes,
+                    leadingIcon = Icons.AutoMirrored.Rounded.Notes,
                     leadingAccent = accents.teal,
                     enabled = !busy,
                     trailing = { NavChevron() },

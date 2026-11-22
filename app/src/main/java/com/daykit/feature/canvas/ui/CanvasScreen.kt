@@ -70,10 +70,12 @@ import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.BetaBadge
 import com.daykit.core.designsystem.components.EmptyState
 import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SectionHeader
+import com.daykit.core.designsystem.components.SegmentedControl
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.feature.eventlight.data.EventLightGradientStops
 import com.daykit.feature.eventlight.service.EventLightRingCanvas
@@ -86,8 +88,8 @@ import com.daykit.feature.widget.WeatherGlassWidgetProvider
 import kotlinx.coroutines.launch
 
 private enum class CanvasSection(val label: String) {
-    DayKitWidgets("DayKit Widgets"),
-    DailyWidgets("Daily Widgets"),
+    DayKitWidgets("DayKit"),
+    DailyWidgets("Daily"),
     Wallpapers("Wallpapers"),
 }
 
@@ -104,7 +106,7 @@ private data class CanvasWidgetItem(
 
 @Composable
 fun CanvasScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -213,7 +215,28 @@ fun CanvasScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { AppTopBar(title = "Canvas", onBack = onBack) },
+        topBar = {
+            AppTopBar(
+                title = "Canvas",
+                onBack = onBack,
+                titleContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Canvas",
+                            style = if (onBack == null) {
+                                MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                            } else {
+                                MaterialTheme.typography.titleLarge
+                            },
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        BetaBadge()
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -221,22 +244,12 @@ fun CanvasScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            // Section filter chips
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                CanvasSection.entries.forEach { section ->
-                    FilterChipButton(
-                        text = section.label,
-                        selected = selectedSection == section,
-                        onClick = { selectedSection = section },
-                    )
-                }
-            }
+            SegmentedControl(
+                items = CanvasSection.entries.map { it.label },
+                selectedIndex = CanvasSection.entries.indexOf(selectedSection).coerceAtLeast(0),
+                onSelect = { index -> selectedSection = CanvasSection.entries[index] },
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            )
 
             when (selectedSection) {
                 CanvasSection.DayKitWidgets -> {

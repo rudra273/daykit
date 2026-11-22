@@ -18,13 +18,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.extendedColors
 
-/** A tappable row with optional accent icon tile, headline + supporting text, trailing slot. */
+/** Standard text-aligned inset for dividers in rows that carry a 32dp leading icon tile (`16 + 32 + 12 = 60dp`). */
+val RowDividerIconIndent = 60.dp
+
+/** A tappable row with optional vibrant accent icon tile, headline + supporting text, optional trailing value, and trailing slot. */
 @Composable
 fun AppListRow(
     headline: String,
@@ -33,6 +38,7 @@ fun AppListRow(
     leadingIcon: ImageVector? = null,
     leadingAccent: Color = MaterialTheme.colorScheme.primary,
     leading: (@Composable () -> Unit)? = null,
+    trailingValue: String? = null,
     trailing: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
@@ -40,10 +46,10 @@ fun AppListRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            // Global 58dp floor; longer text may increase the measured height.
-            .defaultMinSize(minHeight = 58.dp)
+            // Global 56dp floor; longer text may increase the measured height.
+            .defaultMinSize(minHeight = 56.dp)
             .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier)
-            .padding(horizontal = Spacing.lg, vertical = 3.dp),
+            .padding(horizontal = Spacing.lg, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
@@ -60,7 +66,7 @@ fun AppListRow(
             Text(
                 text = headline,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.extendedColors.textMuted,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.extendedColors.textTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -74,8 +80,18 @@ fun AppListRow(
                 )
             }
         }
+        if (trailingValue != null) {
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                text = trailingValue,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.extendedColors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (trailing != null) {
-            Spacer(Modifier.width(Spacing.md))
+            Spacer(Modifier.width(if (trailingValue != null) Spacing.xs else Spacing.md))
             trailing()
         }
     }
@@ -93,21 +109,23 @@ fun SectionHeader(
         color = MaterialTheme.extendedColors.textMuted,
         // No start inset: callers already pad their content region, so the label
         // aligns flush with the cards' left edge instead of double-indenting.
-        // More space above than below so it hugs its group.
-        modifier = modifier.padding(end = Spacing.lg, top = topPadding, bottom = Spacing.xs),
+        // Marked as an accessibility heading so screen readers can jump by section.
+        modifier = modifier
+            .semantics { heading() }
+            .padding(end = Spacing.lg, top = topPadding, bottom = Spacing.xs),
     )
 }
 
 @Composable
 fun RowDivider(
     modifier: Modifier = Modifier,
-    startIndent: Dp = Spacing.lg,
+    startIndent: Dp = RowDividerIconIndent,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(start = startIndent)
-            .height(1.dp)
+            .height(0.5.dp)
             .background(MaterialTheme.extendedColors.divider),
     )
 }

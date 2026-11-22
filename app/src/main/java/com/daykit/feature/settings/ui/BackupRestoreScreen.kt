@@ -970,7 +970,7 @@ private fun BackupContentOptions(
                     ),
                 )
             }
-            if (index < options.lastIndex) RowDivider(startIndent = Spacing.lg)
+            if (index < options.lastIndex) RowDivider()
         }
     }
 }
