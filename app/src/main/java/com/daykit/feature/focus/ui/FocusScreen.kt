@@ -75,6 +75,8 @@ import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppSwitch
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.AppTopBarCompactHeight
+import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SecondaryButton
 import com.daykit.core.designsystem.components.rememberErrorReporter
@@ -351,7 +353,13 @@ private fun FocusHome(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(errors.host) },
-        topBar = { AppTopBar(title = "Focus", onBack = onBack) },
+        topBar = {
+            AppTopBar(
+                title = "Focus",
+                onBack = onBack,
+                height = if (onBack == null) AppTopBarCompactHeight else AppTopBarHeight,
+            )
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier

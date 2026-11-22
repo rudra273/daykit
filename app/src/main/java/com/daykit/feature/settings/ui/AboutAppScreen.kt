@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -83,7 +84,7 @@ fun AboutAppScreen(
     val versionName = remember(context) {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "1.1.1"
+        }.getOrNull() ?: "1.2.0"
     }
     val accents = MaterialTheme.extendedColors.accents
 
@@ -95,12 +96,13 @@ fun AboutAppScreen(
     )
 
     val dailyFeatures = listOf(
-        AboutFeatureItem("Focus & Limits", "Strict locks, daily app budgets & scheduled routines", Icons.Rounded.HourglassTop, accents.red),
+        AboutFeatureItem("Focus & Shorts Shield", "Strict locks, daily limits, routines & short-video blocker", Icons.Rounded.HourglassTop, accents.red),
         AboutFeatureItem("Habits & Reminders", "Daily streaks, check-ins & exact alarm reminders", Icons.Rounded.TaskAlt, accents.green),
         AboutFeatureItem("Dayflow & Expenses", "Pomodoro timer, mood journal & monthly spend tracker", Icons.Rounded.AutoAwesome, accents.pink),
     )
 
     val utilityFeatures = listOf(
+        AboutFeatureItem("Canvas", "Home screen widgets, daily widgets & live glass wallpapers", Icons.Rounded.Widgets, accents.purple),
         AboutFeatureItem("Encrypted Backups", "Password-encrypted local & Google Drive backups", Icons.Rounded.CloudUpload, accents.blue),
         AboutFeatureItem("Scanner & Image Tool", "On-device PDF scanning, compression & EXIF stripping", Icons.Rounded.DocumentScanner, accents.mint),
         AboutFeatureItem("DNS & Device Manager", "Private DNS shortcuts & local storage diagnostics", Icons.Rounded.PhoneAndroid, accents.cyan),

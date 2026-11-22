@@ -76,6 +76,7 @@ import com.daykit.core.designsystem.components.AccentIconTile
 import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTopBar
+import com.daykit.core.designsystem.components.AppTopBarCompactHeight
 import com.daykit.core.designsystem.components.AppTopBarHeight
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.permissions.AppLockPermissionChecker
@@ -215,13 +216,13 @@ fun TodayScreen(
     )
     val dayScore = if (scored.isEmpty()) 0 else (scored.average().toFloat() * 100).toInt()
 
-    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarHeight
+    val headerHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AppTopBarCompactHeight
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = rememberLazyListState(),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = Spacing.lg, end = Spacing.lg, top = headerHeight + Spacing.sm,
+                start = Spacing.lg, end = Spacing.lg, top = headerHeight + Spacing.md,
                 bottom = bottomBarPadding.calculateBottomPadding() + Spacing.xl,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
@@ -350,6 +351,7 @@ fun TodayScreen(
         AppTopBar(
             title = "Today",
             subtitle = today.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.getDefault())),
+            height = AppTopBarCompactHeight,
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }

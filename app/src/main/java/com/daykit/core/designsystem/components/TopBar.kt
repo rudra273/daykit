@@ -97,15 +97,34 @@ fun AppTopBar(
             }
             if (titleContent != null) {
                 Box(modifier = Modifier.weight(1f)) { titleContent() }
+            } else if (subtitle != null && isTopLevel) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.extendedColors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             } else if (subtitle != null) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = if (isTopLevel) {
-                            MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-                        } else {
-                            MaterialTheme.typography.titleLarge
-                        },
+                        style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
