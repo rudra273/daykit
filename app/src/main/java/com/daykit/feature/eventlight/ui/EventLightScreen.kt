@@ -169,7 +169,6 @@ fun EventLightScreen(onBack: () -> Unit) {
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 AppListRow(
                     headline = "Edge Light",
-                    supporting = "Soft glowing ring around your screen during video calls.",
                     enabled = overlayGranted,
                     trailing = {
                         AppSwitch(

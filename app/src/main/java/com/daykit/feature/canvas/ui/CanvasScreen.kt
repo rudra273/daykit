@@ -535,41 +535,74 @@ private fun DayKitToolMiniPreview(
             "eventlight" -> {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Glowing ON rectangle widget preview
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF121418)),
-                    ) {
-                        EventLightRingCanvas(
-                            thicknessDp = 3.5f,
-                            colorTemp = 0.18f,
-                            cornerRadiusDp = 8.dp,
-                            edgeInsetDp = 5.dp,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Event Light", color = fg, style = MaterialTheme.typography.titleSmall)
-                        Spacer(Modifier.height(2.dp))
-                        Text("Edge light active", color = muted, style = MaterialTheme.typography.labelSmall)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(accent)
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                            .weight(1f)
+                            .height(74.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xFF0C0E12))
+                            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(18.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = "ON",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
+                        EventLightRingCanvas(
+                            thicknessDp = 5.5f,
+                            colorTemp = 0.20f,
+                            cornerRadiusDp = 12.dp,
+                            edgeInsetDp = 7.dp,
+                            modifier = Modifier.fillMaxSize(),
                         )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Rounded.WbSunny,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.94f),
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                text = "ON",
+                                color = Color(0xFFFFE4BA),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                            )
+                        }
+                    }
+
+                    // Matte OFF rectangle widget preview
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(74.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xFF17191F))
+                            .border(1.dp, Color.White.copy(alpha = 0.09f), RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(10.dp)
+                                .border(3.dp, Color(0xFF3A3F4B), RoundedCornerShape(10.dp)),
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Rounded.WbSunny,
+                                contentDescription = null,
+                                tint = Color(0xFF7A808E),
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                text = "OFF",
+                                color = Color(0xFF6B717E),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                            )
+                        }
                     }
                 }
             }

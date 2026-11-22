@@ -36,6 +36,7 @@ class EventLightService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         overlayController = EventLightOverlayController(this)
         overlayController.show(EventLightStore.get(this))
+        FrontCameraMonitor.dismissNotification(this)
         EventLightWidgetProvider.refreshAll(this)
 
         val p = getSharedPreferences(PREF_EVENT_LIGHT, Context.MODE_PRIVATE)
@@ -80,10 +81,25 @@ class EventLightService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val turnOffIntent = PendingIntent.getBroadcast(
+            this,
+            NOTIFICATION_ID,
+            Intent(this, EventLightWidgetProvider::class.java).apply {
+                action = EventLightWidgetProvider.ACTION_TURN_OFF
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         return Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Event Light is on")
+            .setContentTitle("Edge Light is on")
             .setContentIntent(contentIntent)
+            .addAction(
+                Notification.Action.Builder(
+                    null,
+                    "Turn off",
+                    turnOffIntent,
+                ).build(),
+            )
             .setOngoing(true)
             .build()
     }
