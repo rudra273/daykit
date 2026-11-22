@@ -10,8 +10,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Storage
@@ -134,7 +134,7 @@ fun DataStorageScreen(container: AppContainer, onBack: () -> Unit) {
                 StorageRow("Key Store", Icons.Rounded.VpnKey, accents.indigo, s?.keyStoreEntries?.let { count(it, "entry", "entries") })
                 RowDivider()
                 StorageRow(
-                    "Notes", Icons.Rounded.Notes, accents.teal,
+                    "Notes", Icons.AutoMirrored.Rounded.Notes, accents.teal,
                     s?.notes?.let { notes ->
                         count(notes, "note", "notes") + (s.noteImages?.takeIf { it > 0 }?.let { " · ${count(it, "image", "images")}" } ?: "")
                     },
@@ -180,7 +180,7 @@ fun DataStorageScreen(container: AppContainer, onBack: () -> Unit) {
                 AppListRow(
                     headline = "Export Notes",
                     supporting = "Markdown text, without images",
-                    leadingIcon = Icons.Rounded.Notes,
+                    leadingIcon = Icons.AutoMirrored.Rounded.Notes,
                     leadingAccent = accents.teal,
                     enabled = !busy,
                     trailing = { NavChevron() },

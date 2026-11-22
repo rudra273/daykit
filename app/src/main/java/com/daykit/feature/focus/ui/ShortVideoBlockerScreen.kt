@@ -17,7 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.PlayCircleOutline
+import androidx.compose.material.icons.rounded.SlowMotionVideo
+import com.daykit.core.designsystem.extendedColors
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -78,17 +79,22 @@ internal fun ShortVideoBlockerEntry(onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            AccentIconTile(Icons.Rounded.PlayCircleOutline, MaterialTheme.colorScheme.primary, size = 40.dp)
+            AccentIconTile(
+                icon = Icons.Rounded.SlowMotionVideo,
+                accent = MaterialTheme.extendedColors.accents.pink,
+                size = 38.dp,
+                iconSize = 21.dp,
+            )
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.short_video_blocker_title), style = MaterialTheme.typography.titleMedium)
                 Text(
                     if (count == 0) stringResource(R.string.short_video_entry_description)
                     else pluralStringResource(R.plurals.short_video_active_apps, count, count),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.extendedColors.textMuted,
                 )
             }
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.extendedColors.textMuted)
         }
     }
 }
@@ -126,12 +132,12 @@ internal fun ShortVideoBlockerScreen(onBack: () -> Unit, onOpeningSettings: (Boo
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    AccentIconTile(Icons.Rounded.PlayCircleOutline, MaterialTheme.colorScheme.primary, size = 48.dp)
+                    AccentIconTile(Icons.Rounded.SlowMotionVideo, MaterialTheme.extendedColors.accents.pink, size = 48.dp, iconSize = 26.dp)
                     Text(stringResource(R.string.short_video_intro_title), style = MaterialTheme.typography.headlineSmall)
                     Text(
                         stringResource(R.string.short_video_blocker_summary),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.extendedColors.textMuted,
                     )
                 }
             }
@@ -169,7 +175,13 @@ internal fun ShortVideoBlockerScreen(onBack: () -> Unit, onOpeningSettings: (Boo
                             val icon = remember(context, target) {
                                 runCatching { context.packageManager.getApplicationIcon(target.packageName) }.getOrNull()
                             }
-                            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 52.dp),
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.extendedColors.divider,
+                                )
+                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm),
                                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),

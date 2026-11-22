@@ -815,7 +815,24 @@ private fun AppLimitRow(
                 )
             }
             Spacer(Modifier.width(Spacing.sm))
-            AppSwitch(checked = limit.enabled, enabled = !isExceeded, onCheckedChange = onToggle)
+            if (isExceeded) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(danger.asAccentContainer()),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = "Locked until midnight",
+                        tint = danger,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
+            } else {
+                AppSwitch(checked = limit.enabled, onCheckedChange = onToggle)
+            }
         }
     }
 }
@@ -1007,8 +1024,8 @@ private fun SuggestButton(onClick: () -> Unit) {
             AccentIconTile(
                 icon = Icons.Rounded.AutoAwesome,
                 accent = MaterialTheme.colorScheme.primary,
-                size = 36.dp,
-                iconSize = 20.dp,
+                size = 38.dp,
+                iconSize = 21.dp,
             )
             Spacer(Modifier.width(Spacing.md))
             Text(

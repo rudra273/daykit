@@ -19,8 +19,8 @@ import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Snooze
-import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -112,7 +112,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 AppListRow(
                     headline = "Sound & Vibration",
                     supporting = "Android's settings for reminder alerts",
-                    leadingIcon = Icons.Rounded.VolumeUp,
+                    leadingIcon = Icons.AutoMirrored.Rounded.VolumeUp,
                     leadingAccent = accents.purple,
                     trailing = { NavChevron() },
                     onClick = { context.startActivity(reminderChannelSettings(context)) },
