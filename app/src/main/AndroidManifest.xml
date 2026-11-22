@@ -193,6 +193,8 @@
                 <action android:name="com.daykit.feature.widget.ACTION_TOGGLE_EVENT_LIGHT" />
                 <action android:name="com.daykit.feature.widget.ACTION_TURN_ON_EVENT_LIGHT" />
                 <action android:name="com.daykit.feature.widget.ACTION_TURN_OFF_EVENT_LIGHT" />
+                <action android:name="com.daykit.feature.widget.ACTION_SET_EVENT_LIGHT_THICKNESS" />
+                <action android:name="com.daykit.feature.widget.ACTION_SET_EVENT_LIGHT_TEMP" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

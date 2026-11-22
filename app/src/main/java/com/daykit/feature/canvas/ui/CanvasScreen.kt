@@ -75,6 +75,7 @@ import com.daykit.core.designsystem.components.FilterChipButton
 import com.daykit.core.designsystem.components.PrimaryButton
 import com.daykit.core.designsystem.components.SectionHeader
 import com.daykit.core.designsystem.extendedColors
+import com.daykit.feature.eventlight.data.EventLightGradientStops
 import com.daykit.feature.eventlight.service.EventLightRingCanvas
 import com.daykit.feature.widget.DayflowWidgetProvider
 import com.daykit.feature.widget.EventLightWidgetProvider
@@ -170,7 +171,7 @@ fun CanvasScreen(
                 id = "eventlight",
                 title = "Edge Light",
                 toolName = "Event Light",
-                description = "Turn the glowing screen edge light on or off right from your home screen without opening DayKit.",
+                description = "Compact glowing icon to toggle Edge Light on/off. Stretch it horizontally to reveal thickness and color controls.",
                 sizeLabel = "2 × 1",
                 icon = Icons.Rounded.WbSunny,
                 accent = { MaterialTheme.extendedColors.accents.teal },
@@ -533,26 +534,29 @@ private fun DayKitToolMiniPreview(
             }
 
             "eventlight" -> {
+                // Wide expanded preview: glowing rectangle icon on left + both macOS sliders on right
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(74.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF0C0E12))
+                        .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(18.dp))
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Glowing ON rectangle widget preview
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(74.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF0C0E12))
-                            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(18.dp)),
+                            .width(64.dp)
+                            .fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         EventLightRingCanvas(
-                            thicknessDp = 5.5f,
+                            thicknessDp = 4.5f,
                             colorTemp = 0.20f,
-                            cornerRadiusDp = 12.dp,
-                            edgeInsetDp = 7.dp,
+                            cornerRadiusDp = 10.dp,
+                            edgeInsetDp = 4.dp,
                             modifier = Modifier.fillMaxSize(),
                         )
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -560,47 +564,73 @@ private fun DayKitToolMiniPreview(
                                 Icons.Rounded.WbSunny,
                                 contentDescription = null,
                                 tint = Color.White.copy(alpha = 0.94f),
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(14.dp),
                             )
                             Text(
                                 text = "ON",
                                 color = Color(0xFFFFE4BA),
-                                fontSize = 9.sp,
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
                             )
                         }
                     }
 
-                    // Matte OFF rectangle widget preview
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(74.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF17191F))
-                            .border(1.dp, Color.White.copy(alpha = 0.09f), RoundedCornerShape(18.dp)),
-                        contentAlignment = Alignment.Center,
+                            .width(1.dp)
+                            .height(42.dp)
+                            .background(Color.White.copy(alpha = 0.12f)),
+                    )
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
+                        // Mini thickness slider
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(5.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF3E424B)),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.42f)
+                                    .height(5.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFA4A9B4)),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 52.dp)
+                                    .size(width = 18.dp, height = 13.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White),
+                            )
+                        }
+
+                        // Mini yellow -> blue color temp slider
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(10.dp)
-                                .border(3.dp, Color(0xFF3A3F4B), RoundedCornerShape(10.dp)),
-                        )
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Rounded.WbSunny,
-                                contentDescription = null,
-                                tint = Color(0xFF7A808E),
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Text(
-                                text = "OFF",
-                                color = Color(0xFF6B717E),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
+                                .fillMaxWidth()
+                                .height(16.dp)
+                                .clip(CircleShape)
+                                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(EventLightGradientStops)),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 20.dp)
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFFC168))
+                                    .border(2.dp, Color.White, CircleShape),
                             )
                         }
                     }

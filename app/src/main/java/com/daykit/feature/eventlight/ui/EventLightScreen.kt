@@ -205,6 +205,7 @@ fun EventLightScreen(onBack: () -> Unit) {
                             val dp = EVENT_LIGHT_MIN_THICKNESS_DP +
                                 f * (EVENT_LIGHT_MAX_THICKNESS_DP - EVENT_LIGHT_MIN_THICKNESS_DP)
                             EventLightStore.setThickness(context, dp)
+                            EventLightWidgetProvider.refreshAll(context)
                         },
                     )
 

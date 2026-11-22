@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent">
+
+    <ImageView
+        android:id="@+id/widget_event_light_canvas"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/widget_event_light_title"
+        android:scaleType="fitXY" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <!-- Left 30%: glowing rectangle toggle hit zone -->
+        <FrameLayout
+            android:id="@+id/widget_event_light_toggle_zone"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="30"
+            android:contentDescription="@string/widget_event_light_title" />
+
+        <!-- Right 70%: thickness slider (top) + yellow->blue color temp slider (bottom) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="70"
+            android:orientation="vertical"
+            android:paddingStart="28dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
+
+            <!-- Thickness slider tap segments -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <FrameLayout android:id="@+id/hit_thick_0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_thick_1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_thick_2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_thick_3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_thick_4" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_thick_5" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_thick_6" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            </LinearLayout>
+
+            <!-- Color temperature slider tap segments -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <FrameLayout android:id="@+id/hit_temp_0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_temp_1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_temp_2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_temp_3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_temp_4" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_temp_5" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+                <FrameLayout android:id="@+id/hit_temp_6" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
