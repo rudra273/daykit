@@ -51,25 +51,25 @@ fun GeneralSettingsScreen(onBack: () -> Unit) {
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 AppListRow(
                     headline = "Currency",
-                    supporting = Money.displayName(currency),
+                    trailingValue = currency,
                     leadingIcon = Icons.Rounded.Payments,
                     leadingAccent = accents.pink,
                     trailing = { NavChevron() },
                     onClick = { picker = GeneralPicker.Currency },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "First Day of Week",
-                    supporting = weekStartLabel(weekStart),
+                    trailingValue = weekStartLabel(weekStart),
                     leadingIcon = Icons.Rounded.CalendarViewWeek,
                     leadingAccent = accents.green,
                     trailing = { NavChevron() },
                     onClick = { picker = GeneralPicker.WeekStart },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "Time Format",
-                    supporting = timeFormatLabel(timeFormat),
+                    trailingValue = timeFormatLabel(timeFormat),
                     leadingIcon = Icons.Rounded.Schedule,
                     leadingAccent = accents.blue,
                     trailing = { NavChevron() },
@@ -77,26 +77,21 @@ fun GeneralSettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
-        item {
-            SettingsFootnote(
-                "Changing the currency only changes the symbol shown; amounts you already entered are not converted.",
-            )
-        }
         item { SectionHeader("Navigation") }
         item {
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 AppListRow(
                     headline = "Navigation Bar Tab",
-                    supporting = customNavTab.label,
+                    trailingValue = customNavTab.label,
                     leadingIcon = customNavTab.activeIcon(),
                     leadingAccent = accents.red,
                     trailing = { NavChevron() },
                     onClick = { picker = GeneralPicker.CustomNavTab },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "Open On",
-                    supporting = startTabLabel(startTab, customNavTab),
+                    trailingValue = startTabLabel(startTab, customNavTab),
                     leadingIcon = Icons.Rounded.SpaceDashboard,
                     leadingAccent = accents.orange,
                     trailing = { NavChevron() },
@@ -178,13 +173,14 @@ private fun startTabLabel(startTab: StartTab, customNavTab: CustomNavTab): Strin
 
 private fun weekStartLabel(weekStart: WeekStart): String = when (weekStart) {
     WeekStart.System -> {
-        val day = AppPreferences.systemFirstDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault())
-        "${weekStart.label} ($day)"
+        val day = AppPreferences.systemFirstDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        "System ($day)"
     }
     else -> weekStart.label
 }
 
 private fun timeFormatLabel(format: TimeFormatPreference): String = when (format) {
-    TimeFormatPreference.System -> "${format.label} (${TimeFormat.format(13, 30, AppPreferences.systemIs24Hour())})"
-    else -> format.label
+    TimeFormatPreference.System -> if (AppPreferences.systemIs24Hour()) "System (24h)" else "System (12h)"
+    TimeFormatPreference.Hour12 -> "12-hour"
+    TimeFormatPreference.Hour24 -> "24-hour"
 }

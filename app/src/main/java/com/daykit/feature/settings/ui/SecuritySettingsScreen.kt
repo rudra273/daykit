@@ -238,7 +238,7 @@ fun SecuritySettingsScreen(
                             showChangePin = true
                         },
                     )
-                    RowDivider(startIndent = Spacing.lg)
+                    RowDivider()
                     // Fingerprint
                     AppListRow(
                         headline = "Fingerprint Unlock",
@@ -291,7 +291,7 @@ fun SecuritySettingsScreen(
                             )
                         },
                     )
-                    RowDivider(startIndent = Spacing.lg)
+                    RowDivider()
                     // Lock grace window after leaving the app
                     AppListRow(
                         headline = "Auto-Lock",
@@ -330,7 +330,7 @@ fun SecuritySettingsScreen(
                             )
                         },
                     )
-                    RowDivider(startIndent = Spacing.lg)
+                    RowDivider()
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         AppListRow(
                             headline = "Hide in Recents",
@@ -345,7 +345,7 @@ fun SecuritySettingsScreen(
                                 )
                             },
                         )
-                        RowDivider(startIndent = Spacing.lg)
+                        RowDivider()
                     }
                     AppListRow(
                         headline = "Clear Copied Secrets",

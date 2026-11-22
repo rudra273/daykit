@@ -78,12 +78,12 @@ import com.daykit.core.designsystem.background.PageBackgroundStore
 import com.daykit.core.designsystem.background.meshPalette
 import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppListRow
-import com.daykit.core.designsystem.components.AppRadioButton
 import com.daykit.core.designsystem.components.AppSwitch
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.RowDivider
 import com.daykit.core.designsystem.components.SectionHeader
+import com.daykit.core.designsystem.components.SegmentedControl
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.designsystem.isAppInDarkTheme
 import kotlinx.coroutines.Dispatchers
@@ -128,16 +128,12 @@ fun AppearanceScreen(
         pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
-    val themeOptions = listOf(
-        Triple(ThemeMode.SYSTEM, "System default", Icons.Rounded.BrightnessAuto to accents.blue),
-        Triple(ThemeMode.LIGHT, "Light", Icons.Rounded.LightMode to accents.orange),
-        Triple(ThemeMode.DARK, "Dark", Icons.Rounded.DarkMode to accents.indigo),
+    val themeModes = listOf(
+        ThemeMode.SYSTEM to "System",
+        ThemeMode.LIGHT to "Light",
+        ThemeMode.DARK to "Dark",
     )
-    val styleOptions = listOf(
-        CardStyle.Flat to (Icons.Rounded.CropSquare to accents.blue),
-        CardStyle.Clay to (Icons.Rounded.Layers to accents.orange),
-        CardStyle.Glass to (Icons.Rounded.AutoAwesome to accents.indigo),
-    )
+    val styleOptions = CardStyle.entries
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -148,21 +144,12 @@ fun AppearanceScreen(
                     .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.xs, bottom = Spacing.xl),
             ) {
                 SectionHeader("Theme")
-                AppCard(contentPadding = PaddingValues(0.dp)) {
-                    themeOptions.forEachIndexed { index, (value, label, iconAccent) ->
-                        AppListRow(
-                            headline = label,
-                            leadingIcon = iconAccent.first,
-                            leadingAccent = iconAccent.second,
-                            modifier = Modifier.selectable(
-                                selected = mode == value,
-                                onClick = { ThemeModeStore.set(context, value) },
-                                role = Role.RadioButton,
-                            ),
-                            trailing = { AppRadioButton(selected = mode == value, onClick = null) },
-                        )
-                        if (index < themeOptions.lastIndex) RowDivider(startIndent = Spacing.lg)
-                    }
+                AppCard(contentPadding = PaddingValues(Spacing.md)) {
+                    SegmentedControl(
+                        items = themeModes.map { it.second },
+                        selectedIndex = themeModes.indexOfFirst { it.first == mode }.coerceAtLeast(0),
+                        onSelect = { index -> ThemeModeStore.set(context, themeModes[index].first) },
+                    )
                 }
 
                 SectionHeader("Background")
@@ -198,7 +185,7 @@ fun AppearanceScreen(
                             leadingAccent = accents.blue,
                             onClick = ::choosePhoto,
                         )
-                        RowDivider(startIndent = Spacing.lg)
+                        RowDivider()
                         AppListRow(
                             headline = "Remove photo",
                             leadingIcon = Icons.Rounded.Delete,
@@ -218,21 +205,12 @@ fun AppearanceScreen(
                     GlassSuggestion(onUseGlass = { CardStyleStore.set(context, CardStyle.Glass) })
                     Spacer(Modifier.height(Spacing.sm))
                 }
-                AppCard(contentPadding = PaddingValues(0.dp)) {
-                    styleOptions.forEachIndexed { index, (style, iconAccent) ->
-                        AppListRow(
-                            headline = style.label,
-                            leadingIcon = iconAccent.first,
-                            leadingAccent = iconAccent.second,
-                            modifier = Modifier.selectable(
-                                selected = cardStyle == style,
-                                onClick = { CardStyleStore.set(context, style) },
-                                role = Role.RadioButton,
-                            ),
-                            trailing = { AppRadioButton(selected = cardStyle == style, onClick = null) },
-                        )
-                        if (index < styleOptions.lastIndex) RowDivider(startIndent = Spacing.lg)
-                    }
+                AppCard(contentPadding = PaddingValues(Spacing.md)) {
+                    SegmentedControl(
+                        items = styleOptions.map { it.label },
+                        selectedIndex = styleOptions.indexOf(cardStyle).coerceAtLeast(0),
+                        onSelect = { index -> CardStyleStore.set(context, styleOptions[index]) },
+                    )
                 }
 
                 SectionHeader("Feedback")

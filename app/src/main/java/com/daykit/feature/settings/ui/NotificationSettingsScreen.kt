@@ -94,7 +94,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     trailing = { NavChevron() },
                     onClick = { showSnoozePicker = true },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "Full-Screen Alarm",
                     supporting = if (fullScreen) "Ring over the lock screen" else "Notification only",
@@ -108,7 +108,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                         )
                     },
                 )
-                RowDivider(startIndent = Spacing.lg)
+                RowDivider()
                 AppListRow(
                     headline = "Sound & Vibration",
                     supporting = "Android's settings for reminder alerts",
@@ -132,7 +132,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                         trailing = { StatusPill(if (row.granted) "Allowed" else "Off", ok = row.granted) },
                         onClick = { runCatching { context.startActivity(row.intent(context)) } },
                     )
-                    if (index < permissions.lastIndex) RowDivider(startIndent = Spacing.lg)
+                    if (index < permissions.lastIndex) RowDivider()
                 }
             }
         }

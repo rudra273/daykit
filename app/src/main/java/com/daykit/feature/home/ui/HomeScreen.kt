@@ -76,7 +76,11 @@ import com.daykit.core.designsystem.components.AppCard
 import com.daykit.core.designsystem.components.AppTextButton
 import com.daykit.core.designsystem.components.AppTopBar
 import com.daykit.core.designsystem.components.EmptyState
-import com.daykit.core.designsystem.components.FilterChipButton
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import com.daykit.R
+import com.daykit.core.designsystem.components.SegmentedControl
 import com.daykit.core.designsystem.components.SearchAppTopBar
 import com.daykit.core.designsystem.components.AppTopBarCompactHeight
 import com.daykit.core.designsystem.components.SectionHeader
@@ -158,15 +162,6 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(gridSpacing),
             horizontalArrangement = Arrangement.spacedBy(gridSpacing),
         ) {
-            if (editLayoutActive) {
-                item(span = { GridItemSpan(maxLineSpan) }, key = "edit-banner") {
-                    Text(
-                        text = "Touch and drag any card to reorder it within its group.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.extendedColors.textMuted,
-                    )
-                }
-            }
             if (nothing) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
@@ -257,6 +252,22 @@ fun HomeScreen(
                 searchPlaceholder = "Search tools",
                 height = AppTopBarCompactHeight,
                 modifier = Modifier.align(Alignment.TopCenter),
+                titleContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_daykit_mark),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "DayKit",
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                        )
+                    }
+                },
                 actions = {
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
@@ -378,19 +389,12 @@ private fun HomeViewModeSheet(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.extendedColors.textMuted,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    HomeColumns.OPTIONS.forEach { count ->
-                        FilterChipButton(
-                            text = "$count",
-                            selected = columns == count,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onColumnsChange(count) },
-                        )
-                    }
-                }
+                val columnOptions = HomeColumns.OPTIONS
+                SegmentedControl(
+                    items = columnOptions.map { "$it" },
+                    selectedIndex = columnOptions.indexOf(columns).coerceAtLeast(0),
+                    onSelect = { index -> onColumnsChange(columnOptions[index]) },
+                )
             }
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Text(
@@ -398,19 +402,12 @@ private fun HomeViewModeSheet(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.extendedColors.textMuted,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    HomeCardSize.entries.forEach { size ->
-                        FilterChipButton(
-                            text = size.label,
-                            selected = cardSize == size,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onCardSizeChange(size) },
-                        )
-                    }
-                }
+                val sizeOptions = HomeCardSize.entries
+                SegmentedControl(
+                    items = sizeOptions.map { it.label },
+                    selectedIndex = sizeOptions.indexOf(cardSize).coerceAtLeast(0),
+                    onSelect = { index -> onCardSizeChange(sizeOptions[index]) },
+                )
             }
         }
     }
@@ -486,16 +483,15 @@ private fun ToolCard(
     val latestOnDrag by rememberUpdatedState(onDrag)
     val latestOnDragEnd by rememberUpdatedState(onDragEnd)
 
-    val reservedDescriptionHeight = with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() }
     val (basePadding, baseTileSize, baseIconSize) = when (cardSize) {
-        HomeCardSize.Compact -> Triple(10.dp, 28.dp, 16.dp)
-        HomeCardSize.Default -> Triple(Spacing.md, 32.dp, 18.dp)
-        HomeCardSize.Large -> Triple(Spacing.md, 36.dp, 20.dp)
+        HomeCardSize.Compact -> Triple(11.dp, 32.dp, 18.dp)
+        HomeCardSize.Default -> Triple(14.dp, 38.dp, 21.dp)
+        HomeCardSize.Large -> Triple(16.dp, 44.dp, 24.dp)
     }
     val (iconTitleGap, verticalSpace) = when (cardSize) {
-        HomeCardSize.Compact -> 6.dp to 0.dp
-        HomeCardSize.Default -> Spacing.sm to (reservedDescriptionHeight / 4)
-        HomeCardSize.Large -> Spacing.sm to (reservedDescriptionHeight / 2)
+        HomeCardSize.Compact -> 8.dp to 0.dp
+        HomeCardSize.Default -> 10.dp to 0.dp
+        HomeCardSize.Large -> 12.dp to 4.dp
     }
 
     val cardPadding = when (columns) {

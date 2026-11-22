@@ -201,7 +201,7 @@ private fun DraggableToolSectionCard(
                         }
                     },
                 )
-                if (index < section.tools.lastIndex) RowDivider(startIndent = Spacing.lg)
+                if (index < section.tools.lastIndex) RowDivider()
             }
         }
     }
