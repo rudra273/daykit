@@ -1,35 +1,35 @@
 package com.daykit.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderSpecial
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.Today
-import androidx.compose.material.icons.outlined.TrackChanges
-import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Dns
-import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FolderSpecial
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.HourglassTop
+import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.Today
-import androidx.compose.material.icons.rounded.TrackChanges
-import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.daykit.core.data.CustomNavTab
@@ -78,19 +78,19 @@ enum class TopLevelDestination(
 ) {
     HOME(Routes.HOME, "Home", Icons.Rounded.GridView, Icons.Outlined.GridView),
     TODAY(Routes.TODAY, "Today", Icons.Rounded.Today, Icons.Outlined.Today),
-    CUSTOM(Routes.CUSTOM_TAB, CustomNavTab.Focus.navLabel, Icons.Rounded.Timer, Icons.Outlined.Timer),
+    CUSTOM(Routes.CUSTOM_TAB, CustomNavTab.Focus.navLabel, Icons.Rounded.HourglassTop, Icons.Outlined.HourglassEmpty),
     SETTINGS(Routes.SETTINGS, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
 }
 
 fun CustomNavTab.activeIcon(): ImageVector = when (this) {
-    CustomNavTab.Focus -> Icons.Rounded.Timer
-    CustomNavTab.Habits -> Icons.Rounded.TrackChanges
+    CustomNavTab.Focus -> Icons.Rounded.HourglassTop
+    CustomNavTab.Habits -> Icons.Rounded.TaskAlt
     CustomNavTab.Dayflow -> Icons.Rounded.AutoAwesome
-    CustomNavTab.Expenses -> Icons.Rounded.Payments
+    CustomNavTab.Expenses -> Icons.Rounded.AccountBalanceWallet
     CustomNavTab.Reminders -> Icons.Rounded.NotificationsActive
-    CustomNavTab.Notes -> Icons.Rounded.Notes
-    CustomNavTab.KeyStore -> Icons.Rounded.VpnKey
-    CustomNavTab.FileVault -> Icons.Rounded.Folder
+    CustomNavTab.Notes -> Icons.Rounded.Description
+    CustomNavTab.KeyStore -> Icons.Rounded.Key
+    CustomNavTab.FileVault -> Icons.Rounded.FolderSpecial
     CustomNavTab.AppLock -> Icons.Rounded.Lock
     CustomNavTab.DeviceManager -> Icons.Rounded.PhoneAndroid
     CustomNavTab.DnsManager -> Icons.Rounded.Dns
@@ -98,14 +98,14 @@ fun CustomNavTab.activeIcon(): ImageVector = when (this) {
 }
 
 fun CustomNavTab.inactiveIcon(): ImageVector = when (this) {
-    CustomNavTab.Focus -> Icons.Outlined.Timer
-    CustomNavTab.Habits -> Icons.Outlined.TrackChanges
+    CustomNavTab.Focus -> Icons.Outlined.HourglassEmpty
+    CustomNavTab.Habits -> Icons.Outlined.TaskAlt
     CustomNavTab.Dayflow -> Icons.Outlined.AutoAwesome
-    CustomNavTab.Expenses -> Icons.Outlined.Payments
+    CustomNavTab.Expenses -> Icons.Outlined.AccountBalanceWallet
     CustomNavTab.Reminders -> Icons.Outlined.NotificationsActive
-    CustomNavTab.Notes -> Icons.Outlined.Notes
-    CustomNavTab.KeyStore -> Icons.Outlined.VpnKey
-    CustomNavTab.FileVault -> Icons.Outlined.Folder
+    CustomNavTab.Notes -> Icons.Outlined.Description
+    CustomNavTab.KeyStore -> Icons.Outlined.Key
+    CustomNavTab.FileVault -> Icons.Outlined.FolderSpecial
     CustomNavTab.AppLock -> Icons.Outlined.Lock
     CustomNavTab.DeviceManager -> Icons.Outlined.PhoneAndroid
     CustomNavTab.DnsManager -> Icons.Outlined.Dns

@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.Spacing
 import com.daykit.core.designsystem.extendedColors
 
-/** A tappable row with optional accent icon tile, headline + supporting text, trailing slot. */
+/** Standard text-aligned inset for dividers in rows that carry a 32dp leading icon tile (`16 + 32 + 12 = 60dp`). */
+val RowDividerIconIndent = 60.dp
+
+/** A tappable row with optional vibrant accent icon tile, headline + supporting text, optional trailing value, and trailing slot. */
 @Composable
 fun AppListRow(
     headline: String,
@@ -35,6 +38,7 @@ fun AppListRow(
     leadingIcon: ImageVector? = null,
     leadingAccent: Color = MaterialTheme.colorScheme.primary,
     leading: (@Composable () -> Unit)? = null,
+    trailingValue: String? = null,
     trailing: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
@@ -76,8 +80,18 @@ fun AppListRow(
                 )
             }
         }
+        if (trailingValue != null) {
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                text = trailingValue,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.extendedColors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (trailing != null) {
-            Spacer(Modifier.width(Spacing.md))
+            Spacer(Modifier.width(if (trailingValue != null) Spacing.xs else Spacing.md))
             trailing()
         }
     }
@@ -105,7 +119,7 @@ fun SectionHeader(
 @Composable
 fun RowDivider(
     modifier: Modifier = Modifier,
-    startIndent: Dp = Spacing.lg,
+    startIndent: Dp = RowDividerIconIndent,
 ) {
     Box(
         modifier = modifier

@@ -154,7 +154,7 @@ fun SettingsScreen(
                                     trailing = { NavChevron() },
                                     onClick = hit.link.onClick,
                                 )
-                                if (index < hits.lastIndex) RowDivider(startIndent = Spacing.lg)
+                                if (index < hits.lastIndex) RowDivider()
                             }
                         }
                     }
@@ -174,7 +174,7 @@ fun SettingsScreen(
                                     trailing = { NavChevron() },
                                     onClick = link.onClick,
                                 )
-                                if (index < links.lastIndex) RowDivider(startIndent = Spacing.lg)
+                                if (index < links.lastIndex) RowDivider()
                             }
                         }
                     }

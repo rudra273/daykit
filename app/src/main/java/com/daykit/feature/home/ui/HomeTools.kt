@@ -1,21 +1,21 @@
 package com.daykit.feature.home.ui
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.CropRotate
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.FlashOn
-import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FolderSpecial
+import androidx.compose.material.icons.rounded.HourglassTop
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.PhoneAndroid
-import androidx.compose.material.icons.rounded.PhotoSizeSelectLarge
-import androidx.compose.material.icons.rounded.Timer
-import androidx.compose.material.icons.rounded.TrackChanges
-import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -41,24 +41,24 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
         listOf(
             ToolTile(Routes.TOOL_APPLOCK, "App Lock", "Protect selected apps", Icons.Rounded.Lock, { accents.blue },
                 listOf("app lock", "lock")),
-            ToolTile(Routes.TOOL_KEYSTORE, "Key Store", "Store private values", Icons.Rounded.VpnKey, { accents.indigo },
+            ToolTile(Routes.TOOL_KEYSTORE, "Key Store", "Store private values", Icons.Rounded.Key, { accents.indigo },
                 listOf("key store", "password", "vault")),
-            ToolTile(Routes.TOOL_NOTES, "Notes", "Keep private notes", Icons.Rounded.Notes, { accents.teal },
+            ToolTile(Routes.TOOL_NOTES, "Notes", "Keep private notes", Icons.Rounded.Description, { accents.mint },
                 listOf("notes", "secure notes")),
-            ToolTile(Routes.TOOL_FILEVAULT, "File Vault", "Protect photos & videos", Icons.Rounded.Folder, { accents.purple },
+            ToolTile(Routes.TOOL_FILEVAULT, "File Vault", "Protect photos & videos", Icons.Rounded.FolderSpecial, { accents.purple },
                 listOf("file vault", "file locker", "hide files", "images", "videos")),
         ),
     ),
     ToolSection(
         "Productivity",
         listOf(
-            ToolTile(Routes.TOOL_FOCUS, "Focus", "Block distractions", Icons.Rounded.Timer, { accents.red },
+            ToolTile(Routes.TOOL_FOCUS, "Focus", "Block distractions", Icons.Rounded.HourglassTop, { accents.red },
                 listOf("focus", "focus block", "block app", "distraction", "screen time")),
-            ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TrackChanges, { accents.green },
+            ToolTile(Routes.TOOL_HABITS, "Habits", "Build daily routines", Icons.Rounded.TaskAlt, { accents.green },
                 listOf("habit", "habits")),
             ToolTile(Routes.TOOL_DAYFLOW, "Dayflow", "Pomodoro, journal & mood", Icons.Rounded.AutoAwesome, { accents.indigo },
                 listOf("dayflow", "pomodoro", "journal", "mood", "timer")),
-            ToolTile(Routes.TOOL_EXPENSES, "Expenses", "Track monthly spending", Icons.Rounded.Payments, { accents.pink },
+            ToolTile(Routes.TOOL_EXPENSES, "Expenses", "Track monthly spending", Icons.Rounded.AccountBalanceWallet, { accents.pink },
                 listOf("expenses", "budget", "money")),
         ),
     ),
@@ -67,19 +67,19 @@ fun homeToolCatalog(accents: AccentColors): List<ToolSection> = listOf(
         listOf(
             ToolTile(Routes.TOOL_CANVAS, "Canvas", "Home widgets & wallpapers", Icons.Rounded.Widgets, { accents.purple },
                 listOf("canvas", "widget", "widgets", "wallpaper", "wallpapers", "home screen")),
-            ToolTile(Routes.TOOL_DEVICE_MANAGER, "Device Manager", "Usage, storage & battery", Icons.Rounded.PhoneAndroid, { accents.teal },
+            ToolTile(Routes.TOOL_DEVICE_MANAGER, "Device Manager", "Usage, storage & battery", Icons.Rounded.PhoneAndroid, { accents.cyan },
                 listOf("device manager", "usage", "storage", "battery", "largest files", "apps")),
             ToolTile(Routes.TOOL_REMINDERS, "Reminders", "Stay on top of tasks", Icons.Rounded.NotificationsActive, { accents.orange },
                 listOf("reminder", "notification", "alarm")),
             ToolTile(Routes.TOOL_SCANNER, "Document Scanner", "Scan documents", Icons.Rounded.DocumentScanner, { accents.blue },
                 listOf("scanner", "scan document", "document", "camera", "pdf")),
-            ToolTile(Routes.TOOL_IMAGE, "Image Tool", "Resize, compress & strip location", Icons.Rounded.PhotoSizeSelectLarge, { accents.green },
+            ToolTile(Routes.TOOL_IMAGE, "Image Tool", "Resize, compress & strip location", Icons.Rounded.CropRotate, { accents.mint },
                 listOf("image", "photo", "resize", "compress", "convert", "exif", "location", "metadata", "jpeg", "png", "webp")),
-            ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.yellow },
+            ToolTile(Routes.TOOL_EDITOR, "Editor", "Write text files", Icons.Rounded.EditNote, { accents.orange },
                 listOf("editor", "document", "text", "pdf")),
-            ToolTile(Routes.TOOL_DNS, "DNS Manager", "Set up Private DNS", Icons.Rounded.Dns, { accents.red },
+            ToolTile(Routes.TOOL_DNS, "DNS Manager", "Set up Private DNS", Icons.Rounded.Dns, { accents.teal },
                 listOf("dns", "ad block", "private dns")),
-            ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", "Light for video calls", Icons.Rounded.FlashOn, { accents.yellow },
+            ToolTile(Routes.TOOL_EVENTLIGHT, "Event Light", "Light for video calls", Icons.Rounded.LightMode, { accents.yellow },
                 listOf("event light", "ring light", "video call light", "night light", "border light")),
         ),
     ),

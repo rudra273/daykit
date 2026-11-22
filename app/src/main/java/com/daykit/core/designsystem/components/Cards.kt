@@ -1,6 +1,7 @@
 package com.daykit.core.designsystem.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -22,19 +24,22 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.daykit.core.designsystem.asAccentContainer
 import com.daykit.core.designsystem.background.CardStyle
 import com.daykit.core.designsystem.background.LocalCardStyle
 import com.daykit.core.designsystem.extendedColors
 import com.daykit.core.designsystem.isAppInDarkTheme
+import com.daykit.core.designsystem.tabularNums
 
 /**
  * The core surface primitive. Cards separate from the page by color (white on the
- * light gray page, lighter charcoal on the dark one), plus the user's card style
- * (Settings › Appearance): [CardStyle.Clay] adds a soft lift, [CardStyle.Glass]
- * makes the card see-through to the page background. Default is flat.
+ * `systemGray6` light page, `systemGray5` #2C2C2E on the `systemGray6` #1C1C1E dark page),
+ * plus the user's card style (Settings › Appearance): [CardStyle.Clay] adds a soft lift,
+ * [CardStyle.Glass] makes the card see-through to the page background. Default is flat.
  */
 @Composable
 fun AppCard(
@@ -52,7 +57,12 @@ fun AppCard(
     )
     val elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     val surface = when (style) {
-        CardStyle.Flat -> modifier
+        CardStyle.Flat -> if (dark) {
+            // Subtle 0.5dp top/edge rim in Dark Mode (like Apple System Settings cards)
+            modifier.border(0.5.dp, Color.White.copy(alpha = 0.07f), shape)
+        } else {
+            modifier
+        }
         CardStyle.Clay -> modifier.clay(shape, dark)
         CardStyle.Glass -> modifier.liquidGlassCard(shape)
     }
@@ -69,13 +79,6 @@ fun AppCard(
 
 /**
  * Soft "clay" volume built only from short transitions, so it never bands.
- *
- * A wide, faint shadow or fill gradient covers just a few 8-bit color steps over
- * many pixels; each step becomes a visible band, and the display's dithering turns
- * the bands into grain. Instead:
- *  - the lift is a *tight* shadow (4dp), whose falloff is only a few pixels long;
- *  - the volume is a 1dp inner bevel: a highlight along the top edge, a shade
- *    along the bottom. It is a hairline, not a fill, so there is no area to band.
  */
 private fun Modifier.clay(shape: Shape, dark: Boolean): Modifier {
     val style = if (dark) DarkClay else LightClay
@@ -105,7 +108,6 @@ private val LightClay = ClayStyle(
     shadow = Color(0xFF3A4A6B),
     ambientAlpha = 0.16f,
     spotAlpha = 0.30f,
-    // The card is already white, so only the bottom lip carries the volume.
     highlight = Color.Transparent,
     shade = Color(0xFF3A4A6B).copy(alpha = 0.10f),
 )
@@ -115,32 +117,72 @@ private val DarkClay = ClayStyle(
     shadow = Color.Black,
     ambientAlpha = 0.30f,
     spotAlpha = 0.45f,
-    highlight = Color.White.copy(alpha = 0.07f),
+    highlight = Color.White.copy(alpha = 0.09f),
     shade = Color.Black.copy(alpha = 0.22f),
 )
 
-/** A small rounded icon tile filled with the accent's tinted container color. */
+/**
+ * Apple HIG icon tile with concentric corner radius (`size * 0.28f`).
+ *
+ * When [vibrant] is true (default), renders an Apple Settings / Control Center
+ * style vibrant squircle (rich top-to-bottom subtle gradient fill + 0.5dp top
+ * specular rim + crisp pure white glyph), eliminating muddy low-alpha dark tiles.
+ */
 @Composable
 fun AccentIconTile(
     icon: ImageVector,
     accent: Color,
     modifier: Modifier = Modifier,
-    size: androidx.compose.ui.unit.Dp = 30.dp,
-    iconSize: androidx.compose.ui.unit.Dp = 17.dp,
+    size: Dp = 32.dp,
+    iconSize: Dp = 18.dp,
     contentDescription: String? = null,
+    vibrant: Boolean = true,
 ) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(MaterialTheme.shapes.medium)
-            .background(accent.asAccentContainer()),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = contentDescription, tint = accent, modifier = Modifier.size(iconSize))
+    val cornerRadius = (size.value * 0.28f).coerceIn(8f, 14f).dp
+    val tileShape = RoundedCornerShape(cornerRadius)
+    if (vibrant) {
+        val topColor = lerp(accent, Color.White, 0.16f)
+        val bottomColor = lerp(accent, Color.Black, 0.06f)
+        Box(
+            modifier = modifier
+                .size(size)
+                .clip(tileShape)
+                .background(Brush.verticalGradient(listOf(topColor, bottomColor)))
+                .border(
+                    width = 0.5.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.28f), Color.White.copy(alpha = 0.06f)),
+                    ),
+                    shape = tileShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = Color.White,
+                modifier = Modifier.size(iconSize),
+            )
+        }
+    } else {
+        Box(
+            modifier = modifier
+                .size(size)
+                .clip(tileShape)
+                .background(accent.asAccentContainer()),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = accent,
+                modifier = Modifier.size(iconSize),
+            )
+        }
     }
 }
 
-/** A compact metric surface: big value, small muted label, optional accent icon chip. */
+/** A compact metric surface: big tabular value, small muted label, optional accent icon chip. */
 @Composable
 fun StatTile(
     label: String,
@@ -156,7 +198,7 @@ fun StatTile(
         }
         Text(
             text = value,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleLarge.tabularNums,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(2.dp))

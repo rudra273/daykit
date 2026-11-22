@@ -43,7 +43,7 @@ import com.daykit.core.designsystem.components.AppIconOrMonogram
 import com.daykit.core.designsystem.components.AppListRow
 import com.daykit.core.designsystem.components.AppSwitch
 import com.daykit.core.designsystem.components.EmptyState
-import com.daykit.core.designsystem.components.FilterChipButton
+import com.daykit.core.designsystem.components.SegmentedControl
 import com.daykit.core.designsystem.components.GroupPosition
 import com.daykit.core.designsystem.components.LoadingIndicator
 import com.daykit.core.designsystem.components.SearchAppTopBar
@@ -218,28 +218,12 @@ fun AppLockScreen(
                     verticalArrangement = Arrangement.spacedBy(if (glass) 0.dp else Spacing.xs),
                 ) {
                     item(key = "tabs") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = if (glass) Spacing.sm else 0.dp),
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        ) {
-                            FilterChipButton(
-                                text = "All",
-                                selected = selectedTab == AppLockTab.All,
-                                onClick = { selectedTab = AppLockTab.All },
-                            )
-                            FilterChipButton(
-                                text = "Locked",
-                                selected = selectedTab == AppLockTab.Locked,
-                                onClick = { selectedTab = AppLockTab.Locked },
-                            )
-                            FilterChipButton(
-                                text = "Unlocked",
-                                selected = selectedTab == AppLockTab.Unlocked,
-                                onClick = { selectedTab = AppLockTab.Unlocked },
-                            )
-                        }
+                        SegmentedControl(
+                            items = listOf("All", "Locked", "Unlocked"),
+                            selectedIndex = selectedTab.ordinal,
+                            onSelect = { index -> selectedTab = AppLockTab.entries[index] },
+                            modifier = Modifier.padding(bottom = Spacing.xs),
+                        )
                     }
                     when (selectedTab) {
                         AppLockTab.Locked -> {
